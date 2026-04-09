@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+openai
+httpx
+python-dotenv
+pydantic
+ruff
+pytest
+pytest-asyncio
