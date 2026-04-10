@@ -85,6 +85,7 @@ function App() {
   const [agentState, setAgentState] = useState("idle"); // idle|working|done|error
   const [currentTool, setCurrentTool] = useState(null);
   const [requestStartedAt, setRequestStartedAt] = useState(null);
+  const [pendingInputRequest, setPendingInputRequest] = useState(null);
   const tripDates = loadTripDates(); // edited via PanelProfile in the future
   const { location: userLocation, requestPermission } = useGeolocation();
   const menu = useMenuState();
@@ -241,6 +242,16 @@ function App() {
         setCurrentTool(null);
         setAgentState("done");
         setTimeout(() => setAgentState("idle"), 1500);
+
+        // Auto-reopen the chat popover on a follow-up question. If the
+        // LLM's reply ends with "?", schedule the popover to pop after
+        // a short delay so the TTS finishes first. Skipped when a
+        // request_input is already pending — that takes precedence and
+        // drives the user to the TRIP form instead.
+        const trimmedReply = (data.reply || "").trim();
+        if (trimmedReply.endsWith("?") && !pendingInputRequest) {
+          setTimeout(() => setChatPopoverOpen(true), 2000);
+        }
       } catch (err) {
         setError(err);
         setAgentState("error");
@@ -250,7 +261,16 @@ function App() {
         setIsLoading(false);
       }
     },
-    [messages, preferences, userLocation, tripDates, subtitles, menu, cues],
+    [
+      messages,
+      preferences,
+      userLocation,
+      tripDates,
+      subtitles,
+      menu,
+      cues,
+      pendingInputRequest,
+    ],
   );
 
   // Trigger the GPS prompt on the first user gesture
