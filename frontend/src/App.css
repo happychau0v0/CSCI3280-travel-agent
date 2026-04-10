@@ -542,6 +542,156 @@
   color: #c4b5fd;
 }
 
+/* AgentStatusBar — prominent working banner pinned below the tab strip */
+
+.agent-status-bar {
+  position: fixed;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 480px;
+  max-width: 80vw;
+  padding: 14px 20px;
+  background: rgba(10, 14, 26, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  font-family: var(--mono);
+  pointer-events: auto;
+  animation: status-slide-in 0.3s ease;
+}
+
+@keyframes status-slide-in {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.agent-status-bar.status-working {
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 32px rgba(0, 217, 255, 0.4);
+}
+
+.agent-status-bar.status-done {
+  border: 1px solid #5eead4;
+  box-shadow: 0 0 32px rgba(94, 234, 212, 0.5);
+}
+
+.agent-status-bar.status-error {
+  border: 1px solid var(--danger);
+  box-shadow: 0 0 32px rgba(255, 85, 119, 0.5);
+}
+
+.status-icon {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.status-working .status-icon {
+  color: var(--accent);
+  animation: status-icon-pulse 1.6s ease-in-out infinite;
+}
+
+.status-done .status-icon {
+  color: #5eead4;
+}
+
+.status-error .status-icon {
+  color: var(--danger);
+}
+
+@keyframes status-icon-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.status-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.status-heading {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-h);
+}
+
+.status-tool {
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.status-detail {
+  font-size: 11px;
+  color: var(--text);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-progress {
+  position: relative;
+  height: 3px;
+  background: rgba(0, 217, 255, 0.15);
+  overflow: hidden;
+}
+
+.status-progress-sweep {
+  position: absolute;
+  top: 0;
+  left: -30%;
+  width: 30%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent),
+    transparent
+  );
+  animation: status-sweep 1.4s linear infinite;
+}
+
+@keyframes status-sweep {
+  to { left: 100%; }
+}
+
+.status-elapsed {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+  min-width: 48px;
+  text-align: right;
+}
+
+.status-dismiss {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.status-dismiss:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-h);
+}
+
 @keyframes field-pulse {
   0%, 100% {
     background: rgba(94, 234, 212, 0.08);

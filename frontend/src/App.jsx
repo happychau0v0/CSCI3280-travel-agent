@@ -3,6 +3,7 @@ import ErrorBanner from "./components/ErrorBanner";
 import MenuShell from "./components/MenuShell";
 import Subtitle from "./components/Subtitle";
 import ChatPopover from "./components/ChatPopover";
+import AgentStatusBar from "./components/AgentStatusBar";
 import PanelHome from "./components/panels/PanelHome";
 import PanelTrip from "./components/panels/PanelTrip";
 import PanelSettings from "./components/panels/PanelSettings";
@@ -23,6 +24,21 @@ const GlobeView = lazy(() => import("./components/GlobeView"));
 
 const STATE_KEY = "travel-chat-state";
 const TRIP_DATES_KEY = "travel-trip-dates";
+
+// Subtitle-line narration for each tool the LLM can call. Pushed onto
+// the subtitle queue when a tool_start event arrives so the user sees
+// concrete progress instead of a frozen "working" indicator.
+const TOOL_NARRATIONS = {
+  search_flights: "Searching flights…",
+  search_places: "Looking up places…",
+  get_place_details: "Fetching place details…",
+  get_directions: "Routing the next leg…",
+  get_weather: "Checking the weather…",
+  geocode_city: "Locating the city…",
+  navigate_menu: "Switching panels…",
+  request_input: "Awaiting your input…",
+  web_search: "Searching the web…",
+};
 
 function loadState() {
   try {
@@ -64,6 +80,11 @@ function App() {
   const [error, setError] = useState(null);
   const [muted, setMuted] = useState(false);
   const [chatPopoverOpen, setChatPopoverOpen] = useState(false);
+  // Agent status state used by the AgentStatusBar — addresses the
+  // round-7 "feels unresponsive" complaint with overlapping indicators.
+  const [agentState, setAgentState] = useState("idle"); // idle|working|done|error
+  const [currentTool, setCurrentTool] = useState(null);
+  const [requestStartedAt, setRequestStartedAt] = useState(null);
   const tripDates = loadTripDates(); // edited via PanelProfile in the future
   const { location: userLocation, requestPermission } = useGeolocation();
   const menu = useMenuState();
@@ -170,6 +191,20 @@ function App() {
       setIsLoading(true);
       setError(null);
 
+      // ── Immediate "received" feedback. The user sees something
+      // happening within ~16ms of pressing send, which is the most
+      // important responsiveness fix in round 8. The status bar
+      // appears, the subtitle confirms what was sent, and a tick
+      // cue plays.
+      const startedAt = Date.now();
+      setRequestStartedAt(startedAt);
+      setAgentState("working");
+      setCurrentTool(null);
+      subtitles.clear();
+      const preview = text.length > 60 ? text.slice(0, 57) + "…" : text;
+      subtitles.push(`▸ ${preview}`);
+      cues.tick();
+
       try {
         const data = await streamChat({
           message: text,
@@ -180,6 +215,14 @@ function App() {
           onEvent: ({ type, data: payload }) => {
             if (type === "tool_start") {
               cues.bloop();
+              const tool = payload?.name || payload?.tool;
+              if (tool) {
+                setCurrentTool(tool);
+                // Push a friendly narration so the user sees progress
+                // in the subtitle bar in addition to the status banner.
+                const label = TOOL_NARRATIONS[tool];
+                if (label) subtitles.push(label);
+              }
             } else if (type === "navigate") {
               menu.navigate(payload);
               cues.select();
@@ -194,8 +237,14 @@ function App() {
           cues.chime();
         }
         subtitles.pushParagraph(data.reply);
+        // ── Done state: brief ✓ READY flash, then collapse to idle
+        setCurrentTool(null);
+        setAgentState("done");
+        setTimeout(() => setAgentState("idle"), 1500);
       } catch (err) {
         setError(err);
+        setAgentState("error");
+        setCurrentTool(null);
         cues.error();
       } finally {
         setIsLoading(false);
@@ -294,12 +343,28 @@ function App() {
         />
       </Suspense>
 
+      {/* Prominent agent-working banner — pinned below the tab strip
+       *  via fixed positioning. The user's #1 round-7 complaint was
+       *  "feels unresponsive", so this is impossible to miss. */}
+      <AgentStatusBar
+        state={agentState}
+        currentTool={currentTool}
+        startedAt={requestStartedAt}
+        errorMessage={error?.message}
+        onDismissError={() => {
+          setError(null);
+          setAgentState("idle");
+        }}
+      />
+
       {/* NieR-style menu shell */}
       <MenuShell state={menu.state} onTabClick={setPanelWithCue} muted={muted}>
         {menu.state.panel === "HOME" && (
           <PanelHome
             itinerary={currentItinerary}
             userLocation={userLocation}
+            agentState={agentState}
+            currentTool={currentTool}
             onJumpTo={setPanelWithCue}
           />
         )}
