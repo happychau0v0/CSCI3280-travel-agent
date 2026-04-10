@@ -87,6 +87,9 @@ function App() {
   const [currentTool, setCurrentTool] = useState(null);
   const [requestStartedAt, setRequestStartedAt] = useState(null);
   const [pendingInputRequest, setPendingInputRequest] = useState(null);
+  // Tracks the in-flight done→idle setTimeout so a new request can
+  // cancel it before it overwrites the new "working" state (B6).
+  const idleTimerRef = useRef(null);
   // Ref mirror so handleSend's running invocation can read the
   // post-stream value of pendingInputRequest without being trapped
   // by its useCallback closure (B4). Keep in sync via a tiny effect.
@@ -238,6 +241,12 @@ function App() {
       // important responsiveness fix in round 8. The status bar
       // appears, the subtitle confirms what was sent, and a tick
       // cue plays.
+      // Cancel any stale done→idle timer from a previous request so it
+      // doesn't fire mid-stream and flicker the banner back to idle (B6).
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = null;
+      }
       const startedAt = Date.now();
       setRequestStartedAt(startedAt);
       setAgentState("working");
@@ -290,7 +299,10 @@ function App() {
         // ── Done state: brief ✓ READY flash, then collapse to idle
         setCurrentTool(null);
         setAgentState("done");
-        setTimeout(() => setAgentState("idle"), 1500);
+        idleTimerRef.current = setTimeout(() => {
+          setAgentState("idle");
+          idleTimerRef.current = null;
+        }, 1500);
 
         // Auto-reopen the chat popover on a follow-up question. If the
         // LLM's reply ends with "?", schedule the popover to pop after
