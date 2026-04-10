@@ -4,6 +4,8 @@ import InputDock from "./components/InputDock";
 import ItineraryDrawer from "./components/ItineraryDrawer";
 import ProfilePanel from "./components/ProfilePanel";
 import ErrorBanner from "./components/ErrorBanner";
+import LiveTicker from "./components/LiveTicker";
+import FullscreenButton from "./components/FullscreenButton";
 import { postChat } from "./api/client";
 import { useGeolocation } from "./hooks/useGeolocation";
 import "./App.css";
@@ -43,6 +45,7 @@ function App() {
   const [preferences, setPreferences] = useState(null);
   const [error, setError] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [lastAction, setLastAction] = useState("");
   const { location: userLocation, requestPermission } = useGeolocation();
 
   // Persist on every change
@@ -68,14 +71,24 @@ function App() {
       setError(null);
 
       try {
+        setLastAction("Thinking…");
         const data = await postChat(text, history, preferences, userLocation);
         const assistantMsg = { role: "assistant", content: data.reply };
         setMessages((prev) => [...prev, assistantMsg]);
         if (data.itinerary) {
           setCurrentItinerary(data.itinerary);
         }
+        // Surface the most informative last tool call so the LIVE chip
+        // tells the user what just happened.
+        const lastTool = (data.tool_calls_made || []).slice(-1)[0];
+        if (lastTool) {
+          setLastAction(`Called ${lastTool}`);
+        } else {
+          setLastAction("Ready");
+        }
       } catch (err) {
         setError(err);
+        setLastAction("Error");
       } finally {
         setIsLoading(false);
       }
@@ -204,14 +217,12 @@ function App() {
         />
       </Suspense>
 
-      {/* Top-left LIVE chip */}
-      <div className="live-chip">
-        <span className="live-dot" />
-        <span className="live-label">LIVE</span>
-        {userLocation?.city && (
-          <span className="live-city">— {userLocation.city}</span>
-        )}
-      </div>
+      {/* Top-left LIVE ticker */}
+      <LiveTicker
+        userLocation={userLocation}
+        isLoading={isLoading}
+        lastAction={lastAction}
+      />
 
       {/* Top-right controls */}
       <div className="top-right-controls">
@@ -231,12 +242,13 @@ function App() {
       {/* Chat overlay */}
       <ChatWindow messages={messages} isLoading={isLoading} />
 
-      {/* Bottom-left input dock */}
+      {/* Bottom-left input dock + fullscreen toggle */}
       <InputDock
         onSend={handleSend}
         isLoading={isLoading}
         userLocation={userLocation}
       />
+      <FullscreenButton />
 
       {/* Slide-in itinerary drawer */}
       <ItineraryDrawer

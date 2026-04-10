@@ -30,27 +30,30 @@
   z-index: 0;
 }
 
-/* ─── Top-left LIVE chip ─────────────────────────────────── */
+/* ─── Top-left LIVE ticker ───────────────────────────────── */
 
-.live-chip {
+.live-ticker {
   position: fixed;
   top: 24px;
   left: 24px;
   z-index: 10;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
+  padding: 10px 14px;
   background: var(--bg-glass);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 14px;
+  min-width: 180px;
+}
+
+.live-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-h);
 }
 
 .live-dot {
@@ -76,6 +79,42 @@
   text-transform: none;
   font-weight: 500;
   letter-spacing: 0;
+}
+
+.live-status {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+
+.live-status.working {
+  color: var(--accent);
+}
+
+/* ─── Fullscreen button ──────────────────────────────────── */
+
+.fullscreen-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 15;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: var(--text-h);
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.fullscreen-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* ─── Top-right controls ─────────────────────────────────── */
