@@ -802,6 +802,37 @@
   text-transform: capitalize;
 }
 
+/* ─── Day mini-map ───────────────────────────────────────── */
+
+.day-mini-map {
+  height: 140px;
+  width: 100%;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.day-mini-marker {
+  background: transparent;
+  border: none;
+}
+
+.day-mini-pin {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #00d9ff;
+  color: #002;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 11px;
+  border: 2px solid #002;
+  box-shadow: 0 0 8px rgba(0, 217, 255, 0.6);
+}
+
 /* ─── Itinerary card (rendered inside drawer) ────────────── */
 
 .itinerary-card {

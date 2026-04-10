@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { optimizeRoute, photoSrc } from "../api/client";
+import DayMiniMap from "./DayMiniMap";
 
 const WEATHER_ICONS = {
   sunny: "☀️",
@@ -128,6 +129,9 @@ export default function ItineraryCard({ itinerary, onItineraryUpdate }) {
                 )}
               </div>
             )}
+
+            <DayMiniMap activities={day.activities} />
+
             <ol className="activities">
               {(day.activities || []).map((act, i) => {
                 const photo = photoSrc(act.photo_url);
