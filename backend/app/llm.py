@@ -33,18 +33,37 @@ def _get_client() -> AsyncOpenAI:
     return _client
 
 
-async def chat(messages: list[dict]) -> dict:
+def _format_preferences(preferences: dict | None) -> str:
+    """Render a USER PROFILE block to append to the system prompt."""
+    if not preferences:
+        return ""
+    parts: list[str] = []
+    for key in ("interests", "dislikes", "dietary", "budget", "travel_style"):
+        value = preferences.get(key)
+        if value in (None, "", []):
+            continue
+        if isinstance(value, list):
+            value = ", ".join(str(v) for v in value)
+        parts.append(f"- {key.replace('_', ' ')}: {value}")
+    if not parts:
+        return ""
+    return "\n\nUSER PROFILE (honor these on every recommendation):\n" + "\n".join(parts)
+
+
+async def chat(messages: list[dict], preferences: dict | None = None) -> dict:
     """Run the LLM with a tool-call loop.
 
     Args:
         messages: prior conversation history [{role, content}, ...]
+        preferences: optional user profile dict to inject into system prompt
 
     Returns:
         {reply: str, itinerary: dict | None, tool_calls_made: list[str]}
     """
     client = _get_client()
 
-    full_messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}] + list(messages)
+    system_content = SYSTEM_PROMPT + _format_preferences(preferences)
+    full_messages: list[dict] = [{"role": "system", "content": system_content}] + list(messages)
     tool_calls_made: list[str] = []
     last_text = ""
 

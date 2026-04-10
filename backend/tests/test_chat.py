@@ -86,6 +86,48 @@ def test_chat_accepts_history():
     assert call_args[-1] == {"role": "user", "content": "and dinner?"}
 
 
+def test_chat_forwards_preferences():
+    fake_result = {"reply": "ok", "itinerary": None, "tool_calls_made": []}
+    with patch("app.routers.chat.llm.chat", new=AsyncMock(return_value=fake_result)) as m:
+        response = client.post(
+            "/chat",
+            json={
+                "message": "plan a trip",
+                "preferences": {
+                    "interests": ["history", "food"],
+                    "dislikes": ["crowds"],
+                    "budget": "$$",
+                },
+            },
+        )
+
+    assert response.status_code == 200
+    # llm.chat called as (messages, preferences=...)
+    assert m.call_args.kwargs["preferences"]["interests"] == ["history", "food"]
+    assert m.call_args.kwargs["preferences"]["budget"] == "$$"
+
+
+def test_format_preferences_renders_user_profile_block():
+    from app.llm import _format_preferences
+
+    rendered = _format_preferences(
+        {"interests": ["history", "ramen"], "budget": "$$", "dislikes": []}
+    )
+    assert "USER PROFILE" in rendered
+    assert "interests: history, ramen" in rendered
+    assert "budget: $$" in rendered
+    # Empty values are skipped
+    assert "dislikes" not in rendered
+
+
+def test_format_preferences_empty_returns_empty_string():
+    from app.llm import _format_preferences
+
+    assert _format_preferences(None) == ""
+    assert _format_preferences({}) == ""
+    assert _format_preferences({"interests": [], "budget": ""}) == ""
+
+
 # ─── /itinerary ───────────────────────────────────────────────────────────
 
 
