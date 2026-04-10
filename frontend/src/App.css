@@ -468,6 +468,19 @@
   border-left-color: #5eead4 !important;
 }
 
+/* Picked flight / hotel — selection that has been confirmed */
+.panel-list-item.picked {
+  background: rgba(94, 234, 212, 0.18);
+  border-left: 3px solid #5eead4;
+  padding-left: 13px;
+}
+
+.panel-list-picked-tag {
+  color: #5eead4;
+  font-weight: 700;
+  margin-left: 6px;
+}
+
 /* Settings panel extras */
 
 .panel-list-item.panel-list-action .panel-list-value {

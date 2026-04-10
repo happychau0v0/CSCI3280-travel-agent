@@ -24,7 +24,7 @@ function stopsLabel(stops) {
   return `${stops} stops`;
 }
 
-export default function PanelFlights({ itinerary, listIndex, onSelect }) {
+export default function PanelFlights({ itinerary, listIndex, onSelect, onPick }) {
   const flight = itinerary?.flight;
   const options = flight?.options || [];
 
@@ -33,7 +33,7 @@ export default function PanelFlights({ itinerary, listIndex, onSelect }) {
       <section className="panel panel-list" aria-label="Flights">
         <div className="panel-empty">
           <h2>NO FLIGHTS YET</h2>
-          <p>Press Enter and ask the agent to plan a trip with flights.</p>
+          <p>Press T and ask the agent to plan a trip with flights.</p>
         </div>
       </section>
     );
@@ -42,6 +42,11 @@ export default function PanelFlights({ itinerary, listIndex, onSelect }) {
   const selectedIdx = Math.min(listIndex, options.length - 1);
   const selected = options[selectedIdx];
   const isLive = flight.source === "fast-flights";
+  // The "picked" flight is the one currently saved on the itinerary
+  // (set by clicking PICK below). It survives across reloads via the
+  // existing localStorage persistence in App.jsx.
+  const picked = itinerary?.selected_flight;
+  const pickedIdx = picked ? options.findIndex((o) => o === picked || o.label === picked.label) : -1;
 
   return (
     <section className="panel panel-list" aria-label="Flights">
@@ -49,11 +54,15 @@ export default function PanelFlights({ itinerary, listIndex, onSelect }) {
         {options.map((opt, i) => (
           <li
             key={i}
-            className={`panel-list-item${i === selectedIdx ? " active" : ""}`}
+            className={
+              `panel-list-item${i === selectedIdx ? " active" : ""}` +
+              (i === pickedIdx ? " picked" : "")
+            }
             onClick={() => onSelect?.(i)}
           >
             <span className="panel-list-label">
               {opt.label || stopsLabel(opt.stops)}
+              {i === pickedIdx && <span className="panel-list-picked-tag"> ✓ PICKED</span>}
             </span>
             <span className="panel-list-value">
               {formatHKD(opt.price_low)}
@@ -107,13 +116,24 @@ export default function PanelFlights({ itinerary, listIndex, onSelect }) {
               </div>
             </div>
 
+            <button
+              type="button"
+              className="trip-plan-btn"
+              onClick={() => onPick?.(selectedIdx)}
+              disabled={selectedIdx === pickedIdx}
+              data-testid="flight-pick-btn"
+              style={{ marginTop: 16 }}
+            >
+              {selectedIdx === pickedIdx ? "✓ PICKED" : "PICK THIS FLIGHT →"}
+            </button>
+
             {flight.google_flights_url && (
               <a
                 href={flight.google_flights_url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flight-cta"
-                style={{ marginTop: 16 }}
+                style={{ marginTop: 12 }}
               >
                 View live prices on Google Flights ↗
               </a>

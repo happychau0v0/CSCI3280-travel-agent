@@ -477,6 +477,12 @@ function App() {
             itinerary={currentItinerary}
             listIndex={menu.state.listIndex}
             onSelect={selectListItem}
+            onPick={(i) => {
+              const opt = currentItinerary?.flight?.options?.[i];
+              if (!opt) return;
+              setCurrentItinerary({ ...currentItinerary, selected_flight: opt });
+              cues.chime();
+            }}
           />
         )}
         {menu.state.panel === "HOTELS" && (
