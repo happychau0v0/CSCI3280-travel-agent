@@ -83,11 +83,27 @@ function App() {
       case "DAYS":
         return currentItinerary?.days?.length || 0;
       case "SETTINGS":
-        return 8; // 5 prefs + mute + clear + globe-stars
+        return 8; // 5 prefs + mute + clear + about
       default:
         return 0;
     }
   }, [menu.state.panel, currentItinerary]);
+
+  // SETTINGS → "clear all data" handler. Wipes conversation, itinerary
+  // and trip form, leaves preferences alone.
+  const handleClearAll = useCallback(() => {
+    try {
+      localStorage.removeItem(STATE_KEY);
+      localStorage.removeItem(TRIP_DATES_KEY);
+      localStorage.removeItem("travel-trip-form");
+    } catch {
+      /* ignore */
+    }
+    setMessages([]);
+    setCurrentItinerary(null);
+    setError(null);
+    menu.reset();
+  }, [menu]);
 
   // Cue audio on cursor moves and tab switches
   const setPanelWithCue = useCallback(
@@ -301,6 +317,9 @@ function App() {
             listIndex={menu.state.listIndex}
             onChange={setPreferences}
             onSelect={selectListItem}
+            muted={muted}
+            onToggleMute={() => setMuted((m) => !m)}
+            onClearAll={handleClearAll}
           />
         )}
         {menu.state.panel === "FLIGHTS" && (

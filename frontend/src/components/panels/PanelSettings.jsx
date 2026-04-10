@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react";
 
 /**
- * PROFILE panel — list of editable preference fields on the left,
- * inline editor for the selected field on the right. Persists to
- * localStorage under "travel-prefs" via the parent.
+ * SETTINGS panel — list of editable preference fields plus app-level
+ * controls (mute, clear data). Persists prefs to localStorage under
+ * "travel-prefs" via the parent.
+ *
+ * Two kinds of rows:
+ *   - "field" rows are editable preferences (text/select). Activated
+ *     row swaps in an inline editor on the right.
+ *   - "action" rows are buttons (mute toggle, clear all data). Pressing
+ *     Space or clicking calls the action handler.
  */
 
-const FIELDS = [
+const PREF_FIELDS = [
   { key: "interests", label: "INTERESTS", type: "text", placeholder: "history, ramen, hiking" },
   { key: "dislikes", label: "DISLIKES", type: "text", placeholder: "crowds, seafood" },
   { key: "dietary", label: "DIETARY", type: "text", placeholder: "vegetarian, halal" },
@@ -58,8 +64,17 @@ export function preferencesForApi(prefs) {
   return Object.keys(out).length > 0 ? out : null;
 }
 
-export default function PanelSettings({ listIndex, onChange, onSelect }) {
+export default function PanelSettings({
+  listIndex,
+  onChange,
+  onSelect,
+  muted = false,
+  onToggleMute,
+  onClearAll,
+}) {
   const [prefs, setPrefs] = useState(() => loadPrefs());
+  const [savedFlash, setSavedFlash] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   useEffect(() => {
     onChange?.(preferencesForApi(prefs));
@@ -69,61 +84,159 @@ export default function PanelSettings({ listIndex, onChange, onSelect }) {
     const next = { ...prefs, [field]: e.target.value };
     setPrefs(next);
     savePrefs(next);
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 600);
   };
 
-  const selected = FIELDS[Math.min(listIndex, FIELDS.length - 1)];
+  // Combine pref fields with action rows so the same listIndex cursor
+  // moves through everything in a single column.
+  const rows = [
+    ...PREF_FIELDS.map((f) => ({ kind: "field", ...f })),
+    {
+      kind: "action",
+      key: "mute",
+      label: "MUTE TTS",
+      value: muted ? "ON" : "OFF",
+      onActivate: onToggleMute,
+    },
+    {
+      kind: "action",
+      key: "clear",
+      label: "CLEAR ALL DATA",
+      value: confirmClear ? "TAP AGAIN" : "RESET",
+      onActivate: () => {
+        if (confirmClear) {
+          onClearAll?.();
+          setConfirmClear(false);
+        } else {
+          setConfirmClear(true);
+          setTimeout(() => setConfirmClear(false), 4000);
+        }
+      },
+    },
+    {
+      kind: "action",
+      key: "about",
+      label: "ABOUT",
+      value: "v0.8",
+      onActivate: () => {},
+    },
+  ];
+
+  const selectedIdx = Math.min(listIndex, rows.length - 1);
+  const selected = rows[selectedIdx];
+
+  const handleRowClick = (i, row) => {
+    onSelect?.(i);
+    if (row.kind === "action") row.onActivate?.();
+  };
 
   return (
-    <section className="panel panel-list" aria-label="Profile">
+    <section className="panel panel-list" aria-label="Settings">
       <ul className="panel-list-items">
-        {FIELDS.map((field, i) => {
-          const value = prefs[field.key];
-          const display =
-            field.type === "select"
-              ? field.options.find(([v]) => v === value)?.[1] || "—"
-              : value || "—";
+        {rows.map((row, i) => {
+          let display = "—";
+          if (row.kind === "field") {
+            const value = prefs[row.key];
+            display =
+              row.type === "select"
+                ? row.options.find(([v]) => v === value)?.[1] || "—"
+                : value || "—";
+          } else {
+            display = row.value;
+          }
           return (
             <li
-              key={field.key}
-              className={`panel-list-item${i === listIndex ? " active" : ""}`}
-              onClick={() => onSelect?.(i)}
+              key={row.key}
+              className={
+                `panel-list-item${i === selectedIdx ? " active" : ""}` +
+                (row.kind === "action" ? " panel-list-action" : "")
+              }
+              onClick={() => handleRowClick(i, row)}
             >
-              <span className="panel-list-label">{field.label}</span>
+              <span className="panel-list-label">{row.label}</span>
               <span className="panel-list-value">{display}</span>
             </li>
           );
         })}
       </ul>
       <div className="panel-detail">
-        {selected && (
+        <div className="panel-detail-label">
+          {selected.label}
+          {savedFlash && selected.kind === "field" && (
+            <span className="settings-saved">✓ SAVED</span>
+          )}
+        </div>
+
+        {selected.kind === "field" && selected.type === "text" && (
+          <input
+            type="text"
+            value={prefs[selected.key] || ""}
+            onChange={update(selected.key)}
+            placeholder={selected.placeholder}
+            className="panel-input"
+          />
+        )}
+        {selected.kind === "field" && selected.type === "select" && (
+          <select
+            value={prefs[selected.key] || ""}
+            onChange={update(selected.key)}
+            className="panel-input"
+          >
+            {selected.options.map(([v, label]) => (
+              <option key={v} value={v}>
+                {label}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {selected.kind === "action" && selected.key === "mute" && (
           <>
-            <div className="panel-detail-label">{selected.label}</div>
-            {selected.type === "text" && (
-              <input
-                type="text"
-                value={prefs[selected.key] || ""}
-                onChange={update(selected.key)}
-                placeholder={selected.placeholder}
-                className="panel-input"
-              />
-            )}
-            {selected.type === "select" && (
-              <select
-                value={prefs[selected.key] || ""}
-                onChange={update(selected.key)}
-                className="panel-input"
-              >
-                {selected.options.map(([v, label]) => (
-                  <option key={v} value={v}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            )}
+            <button
+              type="button"
+              className="settings-btn"
+              onClick={selected.onActivate}
+            >
+              {muted ? "🔇 UNMUTE TTS" : "🔊 MUTE TTS"}
+            </button>
             <p className="panel-detail-hint">
-              The agent uses your profile when planning trips. Edit here, or speak to update.
+              When muted, the agent's reply still shows as a subtitle but
+              isn't spoken aloud and audio cues are silenced.
             </p>
           </>
+        )}
+
+        {selected.kind === "action" && selected.key === "clear" && (
+          <>
+            <button
+              type="button"
+              className={`settings-btn settings-btn-danger${confirmClear ? " confirming" : ""}`}
+              onClick={selected.onActivate}
+            >
+              {confirmClear ? "TAP AGAIN TO CONFIRM" : "CLEAR ALL DATA"}
+            </button>
+            <p className="panel-detail-hint">
+              Wipes the conversation, current itinerary, and saved trip
+              form. Preferences are preserved.
+            </p>
+          </>
+        )}
+
+        {selected.kind === "action" && selected.key === "about" && (
+          <>
+            <p className="panel-detail-hint" style={{ marginTop: 0 }}>
+              CSCI3280 AI Travel Agent — round 8 build.<br />
+              NieR-style menu shell, voice-first, LLM-driven.
+            </p>
+          </>
+        )}
+
+        {selected.kind === "field" && (
+          <p className="panel-detail-hint">
+            The agent uses your profile when planning trips. Edit here,
+            or speak to update.
+          </p>
         )}
       </div>
     </section>

@@ -336,6 +336,71 @@
   border-left-color: #5eead4 !important;
 }
 
+/* Settings panel extras */
+
+.panel-list-item.panel-list-action .panel-list-value {
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.settings-saved {
+  margin-left: 12px;
+  font-size: 10px;
+  color: #5eead4;
+  letter-spacing: 0.1em;
+  animation: fade-out 0.6s ease forwards;
+}
+
+@keyframes fade-out {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.settings-btn {
+  display: block;
+  padding: 12px 18px;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-h);
+  background: rgba(0, 217, 255, 0.08);
+  border: 1px solid var(--accent);
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.15s ease;
+  width: 100%;
+  text-align: left;
+}
+
+.settings-btn:hover {
+  background: rgba(0, 217, 255, 0.18);
+  box-shadow: 0 0 16px rgba(0, 217, 255, 0.3);
+}
+
+.settings-btn-danger {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: rgba(255, 85, 119, 0.06);
+}
+
+.settings-btn-danger:hover {
+  background: rgba(255, 85, 119, 0.18);
+  box-shadow: 0 0 16px rgba(255, 85, 119, 0.4);
+}
+
+.settings-btn-danger.confirming {
+  background: rgba(255, 85, 119, 0.3);
+  animation: settings-confirm-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes settings-confirm-pulse {
+  0%, 100% { box-shadow: 0 0 16px rgba(255, 85, 119, 0.4); }
+  50% { box-shadow: 0 0 32px rgba(255, 85, 119, 0.7); }
+}
+
 @keyframes field-pulse {
   0%, 100% {
     background: rgba(94, 234, 212, 0.08);
