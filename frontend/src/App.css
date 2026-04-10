@@ -257,6 +257,96 @@
   font-weight: 600;
 }
 
+/* Editable PanelTrip — list of fields on the left, inline editor on
+ * the right, big PLAN button below the list. */
+
+.panel-trip-form .trip-form-list {
+  flex: 0 0 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.panel-trip-form .trip-form-list .panel-list-items {
+  flex: 1 0 auto;
+}
+
+.trip-form-origin {
+  padding: 14px 18px;
+  background: rgba(0, 217, 255, 0.06);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trip-plan-btn {
+  margin-top: 12px;
+  padding: 16px 18px;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--bg);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-transform: uppercase;
+}
+
+.trip-plan-btn:hover:not(:disabled) {
+  background: #5eead4;
+  border-color: #5eead4;
+  box-shadow: 0 0 24px rgba(94, 234, 212, 0.5);
+}
+
+.trip-plan-btn:disabled {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-dim);
+  border-color: var(--border);
+  cursor: not-allowed;
+}
+
+.trip-form-prompt {
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  background: rgba(94, 234, 212, 0.1);
+  border-left: 3px solid #5eead4;
+  font-size: 13px;
+  color: var(--text-h);
+}
+
+.trip-prompt-preview {
+  margin-top: 18px;
+  padding: 12px 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px dashed var(--border);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.panel-list-item.field-pending {
+  animation: field-pulse 1.4s ease-in-out infinite;
+  border-left-color: #5eead4 !important;
+}
+
+@keyframes field-pulse {
+  0%, 100% {
+    background: rgba(94, 234, 212, 0.08);
+    box-shadow: inset 0 0 12px rgba(94, 234, 212, 0.15);
+  }
+  50% {
+    background: rgba(94, 234, 212, 0.2);
+    box-shadow: inset 0 0 24px rgba(94, 234, 212, 0.4);
+  }
+}
+
 /* Generic panel-list (left list + right detail) — shared by Profile/Flights/Hotels/Days */
 
 .panel-list {

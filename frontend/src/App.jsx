@@ -291,7 +291,9 @@ function App() {
           <PanelTrip
             itinerary={currentItinerary}
             userLocation={userLocation}
-            tripDates={tripDates}
+            listIndex={menu.state.listIndex}
+            isLoading={isLoading}
+            onPlan={handleSend}
           />
         )}
         {menu.state.panel === "SETTINGS" && (
