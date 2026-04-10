@@ -21,12 +21,21 @@ The loop repeats up to MAX_TOOL_ROUNDS times, after which we return
 whatever text we have. The system prompt (see prompts.py) instructs the
 model to embed structured itineraries as ```json blocks; we extract them
 with a brace-balancing parser at the end.
+
+Two entry points:
+- ``chat(...)`` returns the final response in one shot.
+- ``chat_stream(...)`` is an async generator that yields tool_start /
+  tool_end events as the loop runs, then a final ``done`` event with
+  the same response shape. The frontend uses this for the live status
+  ticker via SSE.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
+from typing import AsyncIterator, Awaitable, Callable
 
 from openai import AsyncOpenAI
 
@@ -98,21 +107,21 @@ def _format_user_location(user_location: dict | None) -> str:
     )
 
 
-async def chat(
+EventCallback = Callable[[str, dict], Awaitable[None]]
+
+
+async def _run_loop(
     messages: list[dict],
+    *,
     preferences: dict | None = None,
     user_location: dict | None = None,
+    on_event: EventCallback | None = None,
 ) -> dict:
-    """Run the LLM with a tool-call loop.
+    """Internal: shared tool-call loop used by both chat() and chat_stream().
 
-    Args:
-        messages: prior conversation history [{role, content}, ...]
-        preferences: optional user profile dict to inject into system prompt
-        user_location: optional {city, country, lat, lng} from the browser GPS,
-            also injected into the system prompt so the agent knows the trip origin
-
-    Returns:
-        {reply: str, itinerary: dict | None, tool_calls_made: list[str]}
+    `on_event(event_type, payload)` is called before each tool starts
+    (``"tool_start"``) and after it finishes (``"tool_end"``). Pass None to
+    disable streaming.
     """
     client = _get_client()
 
@@ -185,6 +194,9 @@ async def chat(
             tool_calls_made.append(fn_name)
             logger.info("Tool call: %s(%s)", fn_name, fn_args)
 
+            if on_event is not None:
+                await on_event("tool_start", {"name": fn_name, "args": fn_args})
+
             fn = TOOL_DISPATCH.get(fn_name)
             if fn is None:
                 tool_result = {"error": f"Unknown tool: {fn_name}"}
@@ -196,6 +208,9 @@ async def chat(
                 except Exception as e:
                     logger.exception("Tool %s failed", fn_name)
                     tool_result = {"error": f"Tool execution failed: {e}"}
+
+            if on_event is not None:
+                await on_event("tool_end", {"name": fn_name})
 
             full_messages.append(
                 {
@@ -214,6 +229,85 @@ async def chat(
         "itinerary": itinerary,
         "tool_calls_made": tool_calls_made,
     }
+
+
+async def chat(
+    messages: list[dict],
+    preferences: dict | None = None,
+    user_location: dict | None = None,
+) -> dict:
+    """Run the LLM with a tool-call loop and return the final response.
+
+    Args:
+        messages: prior conversation history [{role, content}, ...]
+        preferences: optional user profile dict
+        user_location: optional {city, country, lat, lng} from browser GPS
+
+    Returns:
+        {reply: str, itinerary: dict | None, tool_calls_made: list[str]}
+    """
+    return await _run_loop(
+        messages,
+        preferences=preferences,
+        user_location=user_location,
+        on_event=None,
+    )
+
+
+async def chat_stream(
+    messages: list[dict],
+    preferences: dict | None = None,
+    user_location: dict | None = None,
+) -> AsyncIterator[dict]:
+    """Run the LLM and yield events as tool calls fire.
+
+    Bridges the callback-driven _run_loop into an async generator via an
+    asyncio.Queue. Yields:
+      - {"type": "tool_start", "data": {"name": ..., "args": ...}}
+      - {"type": "tool_end",   "data": {"name": ...}}
+      - {"type": "done",       "data": {"reply": ..., "itinerary": ..., "tool_calls_made": [...]}}
+      - {"type": "error",      "data": {"message": ...}}  on failure
+    """
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def emit(event_type: str, payload: dict) -> None:
+        await queue.put({"type": event_type, "data": payload})
+
+    async def run() -> None:
+        try:
+            result = await _run_loop(
+                messages,
+                preferences=preferences,
+                user_location=user_location,
+                on_event=emit,
+            )
+            await queue.put({"type": "done", "data": result})
+        except RuntimeError as e:
+            # Missing API key — surface as error event so the SSE stream
+            # can close gracefully instead of dropping the connection.
+            await queue.put({"type": "error", "data": {"status": 503, "message": str(e)}})
+        except Exception as e:
+            logger.exception("chat_stream failed")
+            await queue.put({"type": "error", "data": {"status": 500, "message": str(e)}})
+        finally:
+            await queue.put(None)  # sentinel
+
+    task = asyncio.create_task(run())
+    try:
+        while True:
+            item = await queue.get()
+            if item is None:
+                break
+            yield item
+    finally:
+        # Ensure the background task is awaited (or cancelled) when the
+        # consumer disconnects mid-stream.
+        if not task.done():
+            task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
 
 
 _JSON_FENCE_RE = re.compile(r"```json\s*(.*?)```", re.DOTALL)

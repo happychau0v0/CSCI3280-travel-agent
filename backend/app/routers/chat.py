@@ -1,9 +1,11 @@
 """POST /chat — main entry point for the travel agent."""
 from __future__ import annotations
 
+import json
 import logging
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app import llm
@@ -52,3 +54,49 @@ async def post_chat(req: ChatRequest) -> ChatResponse:
         raise HTTPException(status_code=500, detail=f"LLM error: {e}") from e
 
     return ChatResponse(**result)
+
+
+def _format_sse(event: dict) -> str:
+    """Format a single event as SSE wire format.
+
+    Each event becomes::
+
+        event: tool_start
+        data: {"name": "search_flights", ...}
+
+        (blank line terminator)
+    """
+    event_type = event.get("type", "message")
+    payload = json.dumps(event.get("data", {}), default=str)
+    return f"event: {event_type}\ndata: {payload}\n\n"
+
+
+@router.post("/stream")
+async def post_chat_stream(req: ChatRequest):
+    """Stream the LLM response as Server-Sent Events.
+
+    Emits ``tool_start`` and ``tool_end`` events as tools fire, then a
+    final ``done`` event with the same shape as POST /chat. Use ``error``
+    to detect missing keys (status 503) or LLM failures (status 500)
+    instead of HTTP error codes — the SSE stream is always 200.
+    """
+    messages = [m.model_dump() for m in req.history] + [
+        {"role": "user", "content": req.message}
+    ]
+
+    async def event_generator():
+        async for event in llm.chat_stream(
+            messages,
+            preferences=req.preferences,
+            user_location=req.user_location,
+        ):
+            yield _format_sse(event)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # disable buffering for nginx if proxied
+        },
+    )

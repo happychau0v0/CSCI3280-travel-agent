@@ -185,6 +185,56 @@ def test_geo_reverse_missing_key_returns_503():
     assert response.status_code == 503
 
 
+# ─── /chat/stream (SSE) ───────────────────────────────────────────────────
+
+
+def test_chat_stream_emits_tool_events_then_done():
+    """The SSE stream should yield tool_start, tool_end, then done."""
+    import re
+
+    async def fake_stream(messages, **kwargs):
+        # Mimic the loop firing two tools then producing the final reply.
+        yield {"type": "tool_start", "data": {"name": "search_flights", "args": {}}}
+        yield {"type": "tool_end", "data": {"name": "search_flights"}}
+        yield {"type": "tool_start", "data": {"name": "search_places", "args": {}}}
+        yield {"type": "tool_end", "data": {"name": "search_places"}}
+        yield {"type": "done", "data": {"reply": "Done!", "itinerary": None, "tool_calls_made": ["search_flights", "search_places"]}}
+
+    with patch("app.routers.chat.llm.chat_stream", new=fake_stream):
+        response = client.post("/chat/stream", json={"message": "plan a trip to tokyo"})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    body = response.text
+
+    # Verify the wire format and order
+    events = re.findall(r"event: (\w+)\ndata: ([^\n]+)", body)
+    assert len(events) == 5
+    assert events[0][0] == "tool_start"
+    assert events[1][0] == "tool_end"
+    assert events[2][0] == "tool_start"
+    assert events[3][0] == "tool_end"
+    assert events[4][0] == "done"
+
+    # Verify the tool names
+    import json as _json
+    assert _json.loads(events[0][1])["name"] == "search_flights"
+    assert _json.loads(events[2][1])["name"] == "search_places"
+    assert _json.loads(events[4][1])["reply"] == "Done!"
+
+
+def test_chat_stream_emits_error_on_missing_key():
+    async def fake_stream(messages, **kwargs):
+        yield {"type": "error", "data": {"status": 503, "message": "OPENROUTER_API_KEY not configured"}}
+
+    with patch("app.routers.chat.llm.chat_stream", new=fake_stream):
+        response = client.post("/chat/stream", json={"message": "hi"})
+
+    assert response.status_code == 200  # SSE is always 200
+    assert "event: error" in response.text
+    assert "503" in response.text
+
+
 # ─── /itinerary/optimize ──────────────────────────────────────────────────
 
 
