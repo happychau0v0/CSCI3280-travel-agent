@@ -5,11 +5,14 @@ import { useCallback, useState } from "react";
  *
  * State shape:
  *   {
- *     panel:     "HOME" | "TRIP" | "FLIGHTS" | "HOTELS" | "DAYS" | "SETTINGS" | "HISTORY",
+ *     panel:     "HOME" | "FLIGHTS" | "HOTELS" | "DAYS",
  *     scope:     "tabs" | "list",             // which area the keyboard cursor is in
  *     listIndex: number,                      // which item in the left list is highlighted
  *     filter:    object | null,               // optional sort/filter set by the LLM
  *   }
+ *
+ * SETTINGS and HISTORY are NOT tabs — they're hotkey-triggered overlays
+ * (S and H respectively) owned at the App level outside this hook.
  *
  * Scope semantics:
  *   - "tabs" is the default scope on entry. ←/→ cycles tabs.
@@ -24,26 +27,13 @@ import { useCallback, useState } from "react";
  *  - The LLM via the navigate_menu tool, which emits a `navigate` SSE event
  *    that App.jsx routes through `navigate({panel, item, filter})`
  */
-export const PANELS = [
-  "HOME",
-  "TRIP",
-  "FLIGHTS",
-  "HOTELS",
-  "DAYS",
-  "SETTINGS",
-  "HISTORY",
-];
+export const PANELS = ["HOME", "FLIGHTS", "HOTELS", "DAYS"];
 
-// HOME has 4 corner cards (not a vertical list — handled separately).
-// TRIP has a list of editable form fields. The rest of the list-bearing
-// panels are detail/list views over the itinerary or conversation.
-export const PANELS_WITH_LIST = new Set([
-  "TRIP",
-  "FLIGHTS",
-  "HOTELS",
-  "DAYS",
-  "SETTINGS",
-]);
+// HOME absorbed the editable trip form, so it's a list-bearing panel
+// (the form's field cursor uses listIndex). FLIGHTS / HOTELS / DAYS
+// remain detail/list views. SETTINGS and HISTORY are no longer tabs
+// — they're hotkey-triggered overlays.
+export const PANELS_WITH_LIST = new Set(["HOME", "FLIGHTS", "HOTELS", "DAYS"]);
 
 const INITIAL_STATE = {
   panel: "HOME",

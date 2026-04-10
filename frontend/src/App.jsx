@@ -5,12 +5,9 @@ import Subtitle from "./components/Subtitle";
 import ChatPopover from "./components/ChatPopover";
 import AgentStatusBar from "./components/AgentStatusBar";
 import PanelHome from "./components/panels/PanelHome";
-import PanelTrip from "./components/panels/PanelTrip";
-import PanelSettings from "./components/panels/PanelSettings";
 import PanelFlights from "./components/panels/PanelFlights";
 import PanelHotels from "./components/panels/PanelHotels";
 import PanelDays from "./components/panels/PanelDays";
-import PanelHistory from "./components/panels/PanelHistory";
 import { streamChat } from "./api/client";
 import { useGeolocation } from "./hooks/useGeolocation";
 import { useMenuState } from "./hooks/useMenuState";
@@ -111,7 +108,7 @@ function App() {
   // hook can clamp ↑/↓ navigation.
   const listSize = useMemo(() => {
     switch (menu.state.panel) {
-      case "TRIP":
+      case "HOME":
         return 7; // origin, destination, start, end, transport, party, interests
       case "FLIGHTS":
         return currentItinerary?.flight?.options?.length || 0;
@@ -119,8 +116,6 @@ function App() {
         return currentItinerary?.hotels?.length || 0;
       case "DAYS":
         return currentItinerary?.days?.length || 0;
-      case "SETTINGS":
-        return 8; // 5 prefs + mute + clear + about
       default:
         return 0;
     }
@@ -455,37 +450,25 @@ function App() {
             userLocation={userLocation}
             agentState={agentState}
             currentTool={currentTool}
-            onJumpTo={setPanelWithCue}
-          />
-        )}
-        {menu.state.panel === "TRIP" && (
-          <PanelTrip
-            itinerary={currentItinerary}
-            userLocation={userLocation}
             listIndex={menu.state.listIndex}
             isLoading={isLoading}
-            onPlan={handleSend}
             pendingInputRequest={pendingInputRequest}
+            onJumpTo={(panel, fieldIdx) => {
+              if (panel === "HOME" && typeof fieldIdx === "number") {
+                // Click on a HOME form field row → enter list scope
+                selectListItem(fieldIdx);
+              } else {
+                setPanelWithCue(panel);
+              }
+            }}
+            onPlan={handleSend}
             onResolveInput={(field, value, fieldIdx) => {
-              // Move the cursor to the resolved field BEFORE clearing
-              // pendingInputRequest, so the user doesn't see the
-              // cursor visibly snap back to row 0 (B7).
               if (typeof fieldIdx === "number" && fieldIdx >= 0) {
                 menu.setListIndex(fieldIdx);
               }
               setPendingInputRequest(null);
               handleSend(`${field}: ${value}`);
             }}
-          />
-        )}
-        {menu.state.panel === "SETTINGS" && (
-          <PanelSettings
-            listIndex={menu.state.listIndex}
-            onChange={setPreferences}
-            onSelect={selectListItem}
-            muted={muted}
-            onToggleMute={() => setMuted((m) => !m)}
-            onClearAll={handleClearAll}
             rowDispatchRef={activeRowDispatchRef}
           />
         )}
@@ -509,9 +492,6 @@ function App() {
             listIndex={menu.state.listIndex}
             onSelect={selectListItem}
           />
-        )}
-        {menu.state.panel === "HISTORY" && (
-          <PanelHistory messages={messages} listIndex={menu.state.listIndex} />
         )}
       </MenuShell>
 

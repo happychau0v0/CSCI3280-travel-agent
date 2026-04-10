@@ -8,13 +8,14 @@
  * can see whether ←/→ will cycle tabs or be absorbed by the panel.
  */
 const HINTS = [
-  { key: "1-7", label: "Tab" },
+  { key: "1-4", label: "Tab" },
   { key: "← →", label: "Switch" },
   { key: "↑ ↓", label: "Item" },
   { key: "Tab", label: "Focus" },
-  { key: "Enter", label: "Speak" },
+  { key: "T", label: "Speak" },
   { key: "Space", label: "Select" },
-  { key: "E", label: "Edit" },
+  { key: "H", label: "History" },
+  { key: "S", label: "Settings" },
   { key: "Esc", label: "Back" },
   { key: "M", label: "Mute" },
 ];

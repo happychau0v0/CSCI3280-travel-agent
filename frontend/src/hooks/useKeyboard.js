@@ -53,10 +53,11 @@ export function useKeyboard({
       // Allow Esc to escape inputs but block everything else
       if (isTypingField && e.key !== "Escape") return;
 
-      // Number keys 1-7 → jump to tab
-      if (/^[1-7]$/.test(e.key)) {
+      // Number keys → jump to tab N (clamped to PANELS length)
+      const num = parseInt(e.key, 10);
+      if (!Number.isNaN(num) && num >= 1 && num <= PANELS.length) {
         e.preventDefault();
-        setPanel(PANELS[parseInt(e.key, 10) - 1]);
+        setPanel(PANELS[num - 1]);
         return;
       }
 
