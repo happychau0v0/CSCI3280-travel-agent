@@ -49,3 +49,33 @@ export async function getItinerary(id) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+
+/**
+ * Reorder a list of activities for shortest total travel distance.
+ * Each activity must have lat and lng. Other fields ride along in `extra`.
+ */
+export async function optimizeRoute(activities) {
+  // Strip lat/lng/name out of each activity; everything else passes through.
+  const payload = {
+    activities: activities.map((a) => {
+      const { lat, lng, name, ...extra } = a;
+      return { name: name || "", lat, lng, extra };
+    }),
+  };
+  const res = await fetch(`${API_BASE}/itinerary/optimize`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const err = await res.json();
+      detail = err.detail || detail;
+    } catch {
+      // ignore
+    }
+    throw new Error(detail);
+  }
+  return res.json();
+}

@@ -453,11 +453,65 @@
   border-radius: 12px;
 }
 
+.day-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
 .day-card h3 {
   font-size: 16px;
-  margin: 0 0 12px;
+  margin: 0;
   color: var(--text-h);
   font-weight: 600;
+  flex: 1;
+}
+
+.optimize-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.optimize-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.optimize-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.savings-badge {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 4px 10px;
+  background: rgba(8, 145, 178, 0.15);
+  color: var(--accent);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.optimize-error {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: rgba(231, 76, 60, 0.1);
+  color: #c0392b;
+  border-radius: 8px;
+  font-size: 12px;
 }
 
 .day-date,

@@ -131,7 +131,10 @@ function App() {
         {currentItinerary && (
           <aside className="sidebar">
             <MapView itinerary={currentItinerary} />
-            <ItineraryCard itinerary={currentItinerary} />
+            <ItineraryCard
+              itinerary={currentItinerary}
+              onItineraryUpdate={setCurrentItinerary}
+            />
           </aside>
         )}
       </div>
