@@ -20,8 +20,8 @@ export default function MenuShell({ state, onTabClick, muted, children }) {
         scope={state.scope}
         onTabClick={onTabClick}
       />
-      <main className="panel-slot">{children}</main>
-      <FooterHints muted={muted} />
+      <main className={`panel-slot scope-${state.scope}`}>{children}</main>
+      <FooterHints muted={muted} scope={state.scope} />
     </div>
   );
 }
