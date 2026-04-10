@@ -546,7 +546,115 @@
   50% { box-shadow: 0 0 32px rgba(255, 85, 119, 0.7); }
 }
 
-/* PanelHistory — Zelda-style scrolling conversation pane */
+/* HistoryOverlay — full-screen dimmed conversation review */
+
+.history-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  outline: none;
+}
+
+.history-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 6, 18, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.history-overlay-frame {
+  position: relative;
+  width: min(960px, 92vw);
+  margin: 88px 0 64px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-glass);
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 64px rgba(0, 217, 255, 0.3);
+  pointer-events: auto;
+  font-family: var(--mono);
+}
+
+.history-overlay-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 217, 255, 0.06);
+}
+
+.history-overlay-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--accent);
+}
+
+.history-overlay-meta {
+  font-size: 10px;
+  color: var(--text);
+  letter-spacing: 0.06em;
+}
+
+.history-overlay-meta kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text-h);
+  font-size: 9px;
+  margin: 0 2px;
+}
+
+.history-overlay-empty {
+  padding: 60px 40px;
+  text-align: center;
+  color: var(--text);
+}
+
+.history-overlay-empty h2 {
+  font-size: 14px;
+  letter-spacing: 0.14em;
+  color: var(--text-h);
+  margin-bottom: 8px;
+}
+
+.history-overlay-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 32px;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent) rgba(0, 0, 0, 0.4);
+}
+
+.history-overlay-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.history-overlay-scroll::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.history-overlay-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 217, 255, 0.5);
+  border-radius: 4px;
+}
+
+.history-turn-active {
+  background: rgba(0, 217, 255, 0.08);
+  border-left: 3px solid var(--accent);
+  padding-left: 12px;
+  box-shadow: 0 0 24px rgba(0, 217, 255, 0.18);
+}
+
+/* PanelHistory — legacy scrolling pane (kept for fallback selectors) */
 
 .panel-history {
   flex-direction: column;

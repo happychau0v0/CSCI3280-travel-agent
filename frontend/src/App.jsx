@@ -4,6 +4,7 @@ import MenuShell from "./components/MenuShell";
 import Subtitle from "./components/Subtitle";
 import ChatPopover from "./components/ChatPopover";
 import AgentStatusBar from "./components/AgentStatusBar";
+import HistoryOverlay from "./components/HistoryOverlay";
 import PanelHome from "./components/panels/PanelHome";
 import PanelFlights from "./components/panels/PanelFlights";
 import PanelHotels from "./components/panels/PanelHotels";
@@ -133,13 +134,22 @@ function App() {
     return null;
   }, [messages]);
 
-  // E hotkey: open the chat popover prefilled with the last user
-  // message so the user can refine and re-run.
-  const handleEditLast = useCallback(() => {
-    if (!lastUserMessage) return;
-    setChatPopoverInitial(lastUserMessage);
-    setChatPopoverOpen(true);
-  }, [lastUserMessage]);
+  // HISTORY overlay's E shortcut: edit a specific turn. Truncates the
+  // message history to before the turn at idx and opens the chat
+  // popover prefilled with the turn's text. Closes the overlay.
+  const handleEditTurn = useCallback(
+    (idx, text) => {
+      if (idx < 0 || idx >= messages.length) return;
+      // Truncate to before this turn — we'll re-add as a new user
+      // message via handleSend's editLast path. The popover only
+      // truncates if isEditSession is true (B5 fix).
+      setMessages(messages.slice(0, idx));
+      setChatPopoverInitial(text);
+      setHistoryOpen(false);
+      setChatPopoverOpen(true);
+    },
+    [messages],
+  );
 
   // SETTINGS → "clear all data" handler. Wipes conversation, itinerary
   // and trip form, leaves preferences alone.
@@ -531,6 +541,14 @@ function App() {
           />
         )}
       </MenuShell>
+
+      {/* HISTORY overlay (H key) */}
+      <HistoryOverlay
+        open={historyOpen}
+        messages={messages}
+        onClose={() => setHistoryOpen(false)}
+        onEditTurn={handleEditTurn}
+      />
 
       {/* Bottom-center subtitle bar with auto-TTS */}
       <Subtitle text={subtitles.current} />
