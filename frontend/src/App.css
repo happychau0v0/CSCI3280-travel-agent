@@ -725,32 +725,90 @@
   color: var(--text-dim);
 }
 
-.flight-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+/* Multi-option flight scroller — non-stop + 1-stop alternatives */
+.flight-options-scroller {
+  display: flex;
   gap: 10px;
-  margin-bottom: 14px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin: 0 -4px 14px;
+  padding-left: 4px;
+  padding-right: 4px;
+  scroll-snap-type: x mandatory;
 }
 
-.flight-stat {
+.flight-options-scroller::-webkit-scrollbar { height: 4px; }
+.flight-options-scroller::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.flight-option {
+  flex: 0 0 140px;
+  scroll-snap-align: start;
   background: var(--bg);
-  border-radius: 8px;
-  padding: 10px;
-  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.flight-stat-value {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-h);
+.flight-option.recommended {
+  border-color: var(--accent-border);
+  background: linear-gradient(180deg, rgba(0, 217, 255, 0.06), var(--bg));
 }
 
-.flight-stat-label {
-  font-size: 10px;
-  color: var(--text-dim);
+.flight-option-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.flight-option-label {
+  font-size: 11px;
+  color: var(--text);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-top: 2px;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.flight-option-badge {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-bg);
+  padding: 2px 6px;
+  border-radius: 999px;
+  letter-spacing: 0.1em;
+}
+
+.flight-option-price {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-h);
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
+.flight-option-price-sep {
+  color: var(--text-dim);
+  margin: 0 2px;
+  font-weight: 400;
+}
+
+.flight-option-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.flight-option-dot {
+  color: var(--text-dim);
 }
 
 .flight-cta {
