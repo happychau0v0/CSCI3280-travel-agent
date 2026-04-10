@@ -89,7 +89,7 @@ function App() {
   const [agentState, setAgentState] = useState("idle"); // idle|working|done|error
   const [currentTool, setCurrentTool] = useState(null);
   const [requestStartedAt, setRequestStartedAt] = useState(null);
-  const [pendingInputRequest, setPendingInputRequest] = useState(null);
+  const [pendingInputRequest, _setPendingInputRequest] = useState(null);
   // Tracks the in-flight done→idle setTimeout so a new request can
   // cancel it before it overwrites the new "working" state (B6).
   const idleTimerRef = useRef(null);
@@ -99,11 +99,17 @@ function App() {
   const activeRowDispatchRef = useRef(null);
   // Ref mirror so handleSend's running invocation can read the
   // post-stream value of pendingInputRequest without being trapped
-  // by its useCallback closure (B4). Keep in sync via a tiny effect.
+  // by its useCallback closure (B4). Updated SYNCHRONOUSLY inside
+  // the setter wrapper, NOT via a useEffect — the effect would only
+  // run after React commits, which is too late for code that reads
+  // the ref later in the same synchronous tick (e.g. the auto-reopen
+  // check that fires immediately after a request_input event sets
+  // the value mid-stream).
   const pendingInputRequestRef = useRef(null);
-  useEffect(() => {
-    pendingInputRequestRef.current = pendingInputRequest;
-  }, [pendingInputRequest]);
+  const setPendingInputRequest = useCallback((value) => {
+    pendingInputRequestRef.current = value;
+    _setPendingInputRequest(value);
+  }, []);
   const tripDates = loadTripDates(); // edited via PanelProfile in the future
   const { location: userLocation, requestPermission } = useGeolocation();
   const menu = useMenuState();
@@ -135,22 +141,19 @@ function App() {
     return null;
   }, [messages]);
 
-  // HISTORY overlay's E shortcut: edit a specific turn. Truncates the
-  // message history to before the turn at idx and opens the chat
-  // popover prefilled with the turn's text. Closes the overlay.
-  const handleEditTurn = useCallback(
-    (idx, text) => {
-      if (idx < 0 || idx >= messages.length) return;
-      // Truncate to before this turn — we'll re-add as a new user
-      // message via handleSend's editLast path. The popover only
-      // truncates if isEditSession is true (B5 fix).
-      setMessages(messages.slice(0, idx));
-      setChatPopoverInitial(text);
-      setHistoryOpen(false);
-      setChatPopoverOpen(true);
-    },
-    [messages],
-  );
+  // HISTORY overlay's E shortcut: edit a specific turn. Stash the
+  // target index so handleSend's truncateBefore option can do the
+  // truncation atomically with the new send (avoids the double-
+  // truncation bug where pre-truncating + editLast=true would drop
+  // additional turns).
+  const editTurnIdxRef = useRef(null);
+  const handleEditTurn = useCallback((idx, text) => {
+    if (idx < 0) return;
+    editTurnIdxRef.current = idx;
+    setChatPopoverInitial(text);
+    setHistoryOpen(false);
+    setChatPopoverOpen(true);
+  }, []);
 
   // SETTINGS → "clear all data" handler. Wipes conversation, itinerary
   // and trip form, leaves preferences alone.
@@ -240,15 +243,42 @@ function App() {
     saveState(messages, currentItinerary);
   }, [messages, currentItinerary]);
 
+  // Expose internal state to a window-level debug object so the
+  // Playwright test can probe state without relying on CSS class
+  // heuristics. Updated on every render via a tiny effect. No-op
+  // in production builds (the test uses dev server).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.__debug = {
+      menuState: menu.state,
+      agentState,
+      currentTool,
+      pendingInputRequest,
+      historyOpen,
+      settingsOpen,
+      chatPopoverOpen,
+      muted,
+      messages,
+      itinerary: currentItinerary,
+      selectedFlight: currentItinerary?.selected_flight || null,
+      selectedHotel: currentItinerary?.selected_hotel || null,
+      subtitleCurrent: subtitles.current,
+    };
+  });
+
   const handleSend = useCallback(
-    async (text, { editLast = false } = {}) => {
+    async (text, { editLast = false, truncateBefore = null } = {}) => {
       const userMsg = { role: "user", content: text };
 
-      // Edit-and-rerun: truncate the conversation back to before the
-      // most recent user message so the agent responds to the edited
-      // prompt as if the original never happened.
+      // Edit-and-rerun: truncate the conversation back to before a
+      // specific turn (truncateBefore) or before the most recent user
+      // turn (editLast) so the agent responds to the edited prompt as
+      // if the original never happened. truncateBefore wins when both
+      // are set — it's used by the HISTORY overlay's per-turn edit.
       let baseMessages = messages;
-      if (editLast) {
+      if (truncateBefore != null && truncateBefore >= 0) {
+        baseMessages = messages.slice(0, truncateBefore);
+      } else if (editLast) {
         let idx = -1;
         for (let i = messages.length - 1; i >= 0; i--) {
           if (messages[i].role === "user") {
@@ -572,10 +602,23 @@ function App() {
       {/* Chat popover (opens on Enter / Cmd+K) */}
       <ChatPopover
         open={chatPopoverOpen}
-        onSend={(text, opts) => handleSend(text, opts)}
+        onSend={(text, opts) => {
+          // If a HISTORY overlay turn-edit is in flight, route through
+          // handleSend with truncateBefore so the conversation is cut
+          // exactly at the edited turn (not at the most recent user
+          // message). This avoids the double-truncation bug.
+          const idx = editTurnIdxRef.current;
+          editTurnIdxRef.current = null;
+          if (idx != null) {
+            handleSend(text, { truncateBefore: idx });
+          } else {
+            handleSend(text, opts);
+          }
+        }}
         onClose={() => {
           setChatPopoverOpen(false);
           setChatPopoverInitial("");
+          editTurnIdxRef.current = null;
         }}
         isLoading={isLoading}
         initialText={chatPopoverInitial}
