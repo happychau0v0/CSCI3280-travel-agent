@@ -10,11 +10,11 @@ PLACES_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
 PLACES_DETAILS_URL = "https://places.googleapis.com/v1/places/{place_id}"
 
 SEARCH_FIELD_MASK = (
-    "places.id,places.displayName,places.formattedAddress,"
+    "places.id,places.displayName,places.formattedAddress,places.location,"
     "places.rating,places.photos,places.priceLevel"
 )
 DETAILS_FIELD_MASK = (
-    "id,displayName,formattedAddress,editorialSummary,"
+    "id,displayName,formattedAddress,location,editorialSummary,"
     "regularOpeningHours,reviews,photos,priceLevel,rating,websiteUri"
 )
 
@@ -57,6 +57,7 @@ async def search_places(
     results = []
     for place in data.get("places", []):
         photos = place.get("photos") or []
+        location = place.get("location") or {}
         results.append(
             {
                 "place_id": place.get("id", ""),
@@ -65,6 +66,8 @@ async def search_places(
                 "rating": place.get("rating"),
                 "price_level": place.get("priceLevel"),
                 "photo_url": _photo_url(photos[0]["name"]) if photos else None,
+                "lat": location.get("latitude"),
+                "lng": location.get("longitude"),
             }
         )
     return results
@@ -100,6 +103,7 @@ async def get_place_details(place_id: str) -> dict:
         )
 
     photos = [_photo_url(p["name"]) for p in (data.get("photos") or [])[:5]]
+    location = data.get("location") or {}
 
     return {
         "place_id": data.get("id", place_id),
@@ -112,4 +116,6 @@ async def get_place_details(place_id: str) -> dict:
         "price_level": data.get("priceLevel"),
         "rating": data.get("rating"),
         "website": data.get("websiteUri"),
+        "lat": location.get("latitude"),
+        "lng": location.get("longitude"),
     }
