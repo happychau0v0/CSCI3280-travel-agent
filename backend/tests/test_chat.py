@@ -154,6 +154,37 @@ def test_itinerary_not_found():
     assert response.status_code == 404
 
 
+# ─── /geo/reverse ─────────────────────────────────────────────────────────
+
+
+def test_geo_reverse_returns_city():
+    fake = {"city": "Hong Kong", "country": "Hong Kong", "formatted": "Hong Kong"}
+    with patch("app.routers.geo.reverse_geocode", new=AsyncMock(return_value=fake)):
+        response = client.get("/geo/reverse?lat=22.3193&lng=114.1694")
+    assert response.status_code == 200
+    assert response.json()["city"] == "Hong Kong"
+
+
+def test_geo_reverse_caches_consecutive_calls():
+    fake = {"city": "Tokyo", "country": "Japan", "formatted": "Tokyo, Japan"}
+    mock = AsyncMock(return_value=fake)
+    with patch("app.routers.geo.reverse_geocode", new=mock):
+        client.get("/geo/reverse?lat=35.6762&lng=139.6503")
+        client.get("/geo/reverse?lat=35.6762&lng=139.6503")
+    assert mock.call_count == 1  # second call hit the cache
+
+
+def test_geo_reverse_missing_key_returns_503():
+    from app.tools.errors import ToolUnavailableError
+
+    with patch(
+        "app.routers.geo.reverse_geocode",
+        new=AsyncMock(side_effect=ToolUnavailableError("GOOGLE_MAPS_API_KEY not configured")),
+    ):
+        response = client.get("/geo/reverse?lat=0&lng=0")
+    assert response.status_code == 503
+
+
 # ─── /itinerary/optimize ──────────────────────────────────────────────────
 
 
