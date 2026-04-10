@@ -1,5 +1,19 @@
 /* AI Travel Agent — chat layout */
 
+/* ─── Globe canvas ───────────────────────────────────────── */
+
+.globe-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: auto;
+}
+
+.globe-canvas canvas {
+  display: block;
+}
+
+
 .app {
   display: flex;
   flex-direction: column;
