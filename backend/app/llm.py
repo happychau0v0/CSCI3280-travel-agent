@@ -142,31 +142,91 @@ async def chat(messages: list[dict], preferences: dict | None = None) -> dict:
     }
 
 
-_JSON_BLOCK_RE = re.compile(r"```json\s*(\{.*?\})\s*```", re.DOTALL)
-_RAW_ITINERARY_RE = re.compile(r'(\{\s*"itinerary"\s*:\s*\{.*?\}\s*\})', re.DOTALL)
+_JSON_FENCE_RE = re.compile(r"```json\s*(.*?)```", re.DOTALL)
+_INVALID_ESCAPE_RE = re.compile(r'\\(?!["\\/bfnrtu])')
+
+
+def _sanitize_json(text: str) -> str:
+    """Escape lone backslashes that aren't valid JSON escapes.
+
+    Google's encoded polyline format embeds backslash characters that the
+    LLM tends to copy verbatim into JSON string values, producing invalid
+    escapes like '\\A' or '\\z'. We double them so the parser accepts them.
+    """
+    return _INVALID_ESCAPE_RE.sub(r"\\\\", text)
+
+
+def _balanced_json_object(text: str, start: int) -> str | None:
+    """Return the JSON object starting at `start` in `text`, balanced over braces.
+
+    Naively scans braces while respecting strings (so braces inside string
+    literals don't throw off the count). Returns None if no balanced object found.
+    """
+    if start >= len(text) or text[start] != "{":
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+        else:
+            if ch == '"':
+                in_string = True
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[start : i + 1]
+    return None
 
 
 def _extract_itinerary(text: str) -> dict | None:
-    """Extract a JSON itinerary block from the LLM response."""
+    """Extract a JSON itinerary block from the LLM response.
+
+    Tries fenced ```json blocks first, then falls back to scanning for any
+    `{"itinerary": ...}` object anywhere in the text.
+    """
     if not text:
         return None
 
-    # Prefer fenced ```json blocks
-    for match in _JSON_BLOCK_RE.finditer(text):
-        try:
-            data = json.loads(match.group(1))
+    def _try_parse(candidate: str) -> dict | None:
+        for attempt in (candidate, _sanitize_json(candidate)):
+            try:
+                data = json.loads(attempt)
+            except json.JSONDecodeError:
+                continue
             if isinstance(data, dict) and "itinerary" in data:
                 return data["itinerary"]
-        except json.JSONDecodeError:
-            continue
+        return None
 
-    # Fallback: raw {"itinerary": {...}} anywhere in the text
-    match = _RAW_ITINERARY_RE.search(text)
-    if match:
-        try:
-            data = json.loads(match.group(1))
-            return data.get("itinerary")
-        except json.JSONDecodeError:
-            pass
+    # 1. Look inside ```json``` code fences
+    for match in _JSON_FENCE_RE.finditer(text):
+        result = _try_parse(match.group(1).strip())
+        if result is not None:
+            return result
+
+    # 2. Scan for the literal substring `"itinerary"` and balance braces from
+    #    the nearest preceding `{`
+    idx = 0
+    while True:
+        pos = text.find('"itinerary"', idx)
+        if pos == -1:
+            break
+        brace = text.rfind("{", 0, pos)
+        if brace != -1:
+            obj = _balanced_json_object(text, brace)
+            if obj:
+                result = _try_parse(obj)
+                if result is not None:
+                    return result
+        idx = pos + 1
 
     return None
