@@ -1,5 +1,315 @@
 /* AI Travel Agent — globe-first layout */
 
+/* ─── Round 7 panels ─────────────────────────────────────── */
+
+.panel {
+  pointer-events: auto;
+  flex: 1;
+  display: flex;
+  margin: 0 24px;
+  font-family: var(--mono);
+  color: var(--text-h);
+}
+
+.panel-empty {
+  margin: auto;
+  text-align: center;
+  color: var(--text);
+  padding: 40px;
+  border: 1px dashed var(--border);
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  max-width: 480px;
+}
+
+.panel-empty h2 {
+  font-size: 14px;
+  letter-spacing: 0.16em;
+  color: var(--text-h);
+  margin-bottom: 8px;
+}
+
+.panel-empty p {
+  font-size: 12px;
+  margin: 4px 0;
+}
+
+.panel-empty-meta {
+  margin-top: 16px;
+  color: var(--text-dim);
+}
+
+/* PanelMap status badge over the globe */
+
+.panel-map {
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.panel-map-status {
+  margin-top: 24px;
+  padding: 14px 18px;
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 240px;
+}
+
+.map-status-line {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.map-status-label {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+}
+
+.map-status-value {
+  font-size: 13px;
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+/* PanelTrip command center */
+
+.panel-trip {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 32px 0;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.panel-header {
+  text-align: center;
+  margin-bottom: 32px;
+  pointer-events: auto;
+}
+
+.panel-header h2 {
+  font-size: 22px;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.panel-subtitle {
+  font-size: 12px;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.panel-trip-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.trip-stat {
+  padding: 18px 20px;
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  position: relative;
+}
+
+.trip-stat::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  width: 10px;
+  height: 10px;
+  border-top: 1px solid var(--accent);
+  border-left: 1px solid var(--accent);
+}
+
+.trip-stat-label {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.trip-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.trip-stat-text {
+  font-size: 14px;
+  text-transform: capitalize;
+}
+
+.trip-stat-sub {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-left: 6px;
+  font-weight: 400;
+}
+
+.trip-dates-row {
+  margin-top: 20px;
+  padding: 12px 16px;
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.trip-dates-label {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+}
+
+.trip-dates-value {
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Generic panel-list (left list + right detail) — shared by Profile/Flights/Hotels/Days */
+
+.panel-list {
+  pointer-events: auto;
+  display: flex;
+  gap: 16px;
+  padding: 24px 0;
+}
+
+.panel-list-items {
+  flex: 0 0 240px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.panel-list-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.panel-list-item:last-child {
+  border-bottom: none;
+}
+
+.panel-list-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.panel-list-item.active {
+  background: rgba(0, 217, 255, 0.1);
+  border-left: 2px solid var(--accent);
+  padding-left: 14px;
+}
+
+.panel-list-label {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+}
+
+.panel-list-value {
+  font-size: 13px;
+  color: var(--text-h);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.panel-detail {
+  flex: 1;
+  padding: 24px;
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  position: relative;
+}
+
+.panel-detail::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  width: 12px;
+  height: 12px;
+  border-top: 1px solid var(--accent);
+  border-left: 1px solid var(--accent);
+}
+
+.panel-detail::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 12px;
+  height: 12px;
+  border-bottom: 1px solid var(--accent);
+  border-right: 1px solid var(--accent);
+}
+
+.panel-detail-label {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+
+.panel-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  color: var(--text-h);
+  font-family: var(--mono);
+  font-size: 14px;
+  outline: none;
+  margin-bottom: 12px;
+}
+
+.panel-input:focus {
+  border-color: var(--accent);
+}
+
+select.panel-input {
+  cursor: pointer;
+  color-scheme: dark;
+}
+
+.panel-detail-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
 /* ─── Chat popover (round 7) ─────────────────────────────── */
 
 .chat-popover-backdrop {

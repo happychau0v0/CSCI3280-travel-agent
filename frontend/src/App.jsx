@@ -10,6 +10,9 @@ import TripDateModal from "./components/TripDateModal";
 import MenuShell from "./components/MenuShell";
 import Subtitle from "./components/Subtitle";
 import ChatPopover from "./components/ChatPopover";
+import PanelMap from "./components/panels/PanelMap";
+import PanelTrip from "./components/panels/PanelTrip";
+import PanelProfile from "./components/panels/PanelProfile";
 import { streamChat } from "./api/client";
 import { useGeolocation } from "./hooks/useGeolocation";
 import { useMenuState } from "./hooks/useMenuState";
@@ -406,7 +409,19 @@ function App() {
       {/* NieR-style menu shell — tab strip top, footer hints bottom.
           Empty panel slot for now; populated in commits 7-10. */}
       <MenuShell state={menu.state} onTabClick={menu.setPanel} muted={muted}>
-        {/* Empty for now — panels mount here in upcoming commits */}
+        {menu.state.panel === "MAP" && (
+          <PanelMap itinerary={currentItinerary} userLocation={userLocation} />
+        )}
+        {menu.state.panel === "TRIP" && (
+          <PanelTrip
+            itinerary={currentItinerary}
+            userLocation={userLocation}
+            tripDates={tripDates}
+          />
+        )}
+        {menu.state.panel === "PROFILE" && (
+          <PanelProfile listIndex={menu.state.listIndex} onChange={setPreferences} />
+        )}
       </MenuShell>
 
       {/* Bottom-center subtitle bar — auto-TTS the assistant's reply */}
