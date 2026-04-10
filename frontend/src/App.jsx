@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import ChatWindow from "./components/ChatWindow";
 import ItineraryCard from "./components/ItineraryCard";
+import MapView from "./components/MapView";
 import { postChat } from "./api/client";
 import "./App.css";
 
@@ -54,6 +55,7 @@ function App() {
         />
         {currentItinerary && (
           <aside className="sidebar">
+            <MapView itinerary={currentItinerary} />
             <ItineraryCard itinerary={currentItinerary} />
           </aside>
         )}
