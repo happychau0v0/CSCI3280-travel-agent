@@ -53,33 +53,36 @@ export function useKeyboard({
       }
 
       switch (e.key) {
-        case "ArrowLeft":
-          if (state.scope === "tabs") {
-            e.preventDefault();
-            const idx = PANELS.indexOf(state.panel);
-            const next = (idx - 1 + PANELS.length) % PANELS.length;
-            setPanel(PANELS[next]);
-          }
+        // ←/→ ALWAYS cycle tabs, regardless of current scope. The scope
+        // is just a focus indicator for visual feedback — it shouldn't
+        // gate basic navigation.
+        case "ArrowLeft": {
+          e.preventDefault();
+          const idx = PANELS.indexOf(state.panel);
+          const next = (idx - 1 + PANELS.length) % PANELS.length;
+          setPanel(PANELS[next]);
           break;
+        }
 
-        case "ArrowRight":
-          if (state.scope === "tabs") {
-            e.preventDefault();
-            const idx = PANELS.indexOf(state.panel);
-            const next = (idx + 1) % PANELS.length;
-            setPanel(PANELS[next]);
-          }
+        case "ArrowRight": {
+          e.preventDefault();
+          const idx = PANELS.indexOf(state.panel);
+          const next = (idx + 1) % PANELS.length;
+          setPanel(PANELS[next]);
           break;
+        }
 
+        // ↑/↓ ALWAYS move the list cursor when the current panel has a
+        // list. No need to first press Tab to "enter" list scope.
         case "ArrowUp":
-          if (state.scope === "list" && listSize > 0) {
+          if (PANELS_WITH_LIST.has(state.panel) && listSize > 0) {
             e.preventDefault();
             setListIndex(Math.max(0, state.listIndex - 1));
           }
           break;
 
         case "ArrowDown":
-          if (state.scope === "list" && listSize > 0) {
+          if (PANELS_WITH_LIST.has(state.panel) && listSize > 0) {
             e.preventDefault();
             setListIndex(Math.min(listSize - 1, state.listIndex + 1));
           }
