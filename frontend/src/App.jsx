@@ -8,10 +8,12 @@ import LiveTicker from "./components/LiveTicker";
 import FullscreenButton from "./components/FullscreenButton";
 import TripDateModal from "./components/TripDateModal";
 import MenuShell from "./components/MenuShell";
+import Subtitle from "./components/Subtitle";
 import { streamChat } from "./api/client";
 import { useGeolocation } from "./hooks/useGeolocation";
 import { useMenuState } from "./hooks/useMenuState";
 import { useKeyboard } from "./hooks/useKeyboard";
+import { useSubtitleQueue } from "./hooks/useSubtitleQueue";
 import "./App.css";
 
 const TRIP_DATES_KEY = "travel-trip-dates";
@@ -79,6 +81,7 @@ function App() {
   const pendingMessageRef = useRef(null); // message waiting for date confirmation
   const { location: userLocation, requestPermission } = useGeolocation();
   const menu = useMenuState();
+  const subtitles = useSubtitleQueue({ muted });
 
   // Document-level hotkeys (1-7, arrows, Tab, Enter, Space, Esc, M)
   useKeyboard({
@@ -157,6 +160,9 @@ function App() {
         if (data.itinerary) {
           setCurrentItinerary(data.itinerary);
         }
+        // Push the reply into the subtitle queue (sentence-by-sentence
+        // auto-TTS unless muted)
+        subtitles.pushParagraph(data.reply);
         setLastAction("Ready");
       } catch (err) {
         setError(err);
@@ -166,7 +172,7 @@ function App() {
         setIsLoading(false);
       }
     },
-    [messages, preferences, userLocation, tripDates],
+    [messages, preferences, userLocation, tripDates, subtitles],
   );
 
   // Modal callbacks
@@ -399,6 +405,9 @@ function App() {
       <MenuShell state={menu.state} onTabClick={menu.setPanel} muted={muted}>
         {/* Empty for now — panels mount here in upcoming commits */}
       </MenuShell>
+
+      {/* Bottom-center subtitle bar — auto-TTS the assistant's reply */}
+      <Subtitle text={subtitles.current} />
 
       {/* Top-left LIVE ticker */}
       <LiveTicker
