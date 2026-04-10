@@ -61,6 +61,18 @@ _SEASON_MULT = {
 }
 
 
+# Fixed currency conversion for the demo. A live FX feed would be nicer but
+# adds yet another flaky dependency; the rate moves <2% week-over-week so
+# the estimator's ±30% confidence band swallows any drift.
+HKD_PER_USD = 7.78
+
+
+def _to_hkd(usd: float) -> int:
+    """Convert USD to a whole HKD amount, rounded to the nearest 10 HKD."""
+    hkd = usd * HKD_PER_USD
+    return int(round(hkd / 10) * 10)
+
+
 def _base_price_usd(distance_km: float) -> float:
     """Piecewise base price by distance band, calibrated to median fares."""
     if distance_km < 500:
@@ -83,14 +95,15 @@ def _typical_duration_min(distance_km: float) -> int:
     return int((distance_km / cruise_kmh) * 60 + overhead_min)
 
 
-def _typical_stops(distance_km: float) -> int:
-    """Most short-medium routes are non-stop; ultra-long-haul averages 1."""
-    return 0 if distance_km < 9000 else 1
+def _build_options(distance_km: float, when: str | None) -> list[dict]:
+    """Return 1-3 flight options (non-stop, 1-stop, 1-stop budget) in HKD.
 
-
-def _estimate(distance_km: float, when: str | None) -> dict:
-    """Return a price band, duration, and stops for the given route."""
-    base = _base_price_usd(distance_km)
+    Short hops (< 2000 km) only get the non-stop option since connecting
+    flights would take longer than driving and don't make economic sense.
+    Medium and long-haul routes get all three options so the user can
+    compare convenience vs price.
+    """
+    base_usd = _base_price_usd(distance_km)
     month = datetime.now(timezone.utc).month
     if when:
         try:
@@ -98,13 +111,49 @@ def _estimate(distance_km: float, when: str | None) -> dict:
         except ValueError:
             pass
     mult = _SEASON_MULT.get(month, 1.0)
-    median = base * mult
-    return {
-        "low": round(median * 0.75),
-        "high": round(median * 1.35),
-        "duration_min": _typical_duration_min(distance_km),
-        "stops": _typical_stops(distance_km),
-    }
+    median_usd = base_usd * mult
+    duration_direct = _typical_duration_min(distance_km)
+
+    # Non-stop is always present.
+    options = [
+        {
+            "type": "non-stop",
+            "label": "Non-stop",
+            "price_low": _to_hkd(median_usd * 0.85),
+            "price_high": _to_hkd(median_usd * 1.30),
+            "duration_min": duration_direct,
+            "stops": 0,
+            "recommended": True,
+        }
+    ]
+
+    if distance_km >= 2000:
+        # 1-stop "convenient" — slightly cheaper, longer due to layover
+        options.append(
+            {
+                "type": "1-stop",
+                "label": "1 stop",
+                "price_low": _to_hkd(median_usd * 0.65),
+                "price_high": _to_hkd(median_usd * 1.05),
+                "duration_min": duration_direct + 90,
+                "stops": 1,
+                "recommended": False,
+            }
+        )
+        # 1-stop "budget" — cheapest, longest layover
+        options.append(
+            {
+                "type": "1-stop budget",
+                "label": "1 stop · budget",
+                "price_low": _to_hkd(median_usd * 0.50),
+                "price_high": _to_hkd(median_usd * 0.85),
+                "duration_min": duration_direct + 180,
+                "stops": 1,
+                "recommended": False,
+            }
+        )
+
+    return options
 
 
 # ─── Google Flights deep link ─────────────────────────────────────────────
@@ -194,12 +243,16 @@ async def search_flights(
         date = (datetime.now(timezone.utc) + timedelta(days=30)).date().isoformat()
 
     distance_km = _haversine_km(from_lat, from_lng, to_lat, to_lng)
-    estimate = _estimate(distance_km, date)
+    options = _build_options(distance_km, date)
     deep_link = _google_flights_url(from_iata, to_iata, date)
 
     # Best-effort live data via fast-flights (offloaded to a thread).
     live = await asyncio.to_thread(_try_fast_flights, from_iata, to_iata, date)
     source = "fast-flights" if live else "estimator"
+
+    # Top-level summary fields point at the recommended (non-stop) option so
+    # FlightCards that don't iterate options still render meaningful values.
+    primary = options[0]
 
     return {
         "from_city": origin.split(",")[0].strip(),
@@ -214,12 +267,13 @@ async def search_flights(
         "to_lng": to_lng,
         "date": date,
         "distance_km": round(distance_km),
-        "currency": "USD",
+        "currency": "HKD",
         "results": live,
-        "estimate_low": estimate["low"],
-        "estimate_high": estimate["high"],
-        "duration_min": estimate["duration_min"],
-        "stops_typical": estimate["stops"],
+        "options": options,
+        "estimate_low": primary["price_low"],
+        "estimate_high": primary["price_high"],
+        "duration_min": primary["duration_min"],
+        "stops_typical": primary["stops"],
         "source": source,
         "google_flights_url": deep_link,
     }

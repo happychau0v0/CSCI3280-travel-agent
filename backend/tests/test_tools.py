@@ -278,11 +278,45 @@ async def test_search_flights_estimator_fallback():
     assert result["from_iata"] == "HKG"
     assert result["to_iata"] == "NRT"
     assert result["source"] == "estimator"
+    assert result["currency"] == "HKD"
     assert result["estimate_low"] > 0
     assert result["estimate_high"] > result["estimate_low"]
     assert result["distance_km"] > 2500  # HKG-NRT is ~2900 km
     assert result["distance_km"] < 3500
     assert "google.com/travel/flights" in result["google_flights_url"]
+    # Multi-option output for medium-haul (>2000km)
+    assert isinstance(result["options"], list)
+    assert len(result["options"]) == 3
+    assert result["options"][0]["type"] == "non-stop"
+    assert result["options"][0]["recommended"] is True
+    assert result["options"][1]["stops"] == 1
+    assert result["options"][2]["type"] == "1-stop budget"
+    # Budget option should be cheaper than non-stop
+    assert result["options"][2]["price_low"] < result["options"][0]["price_low"]
+
+
+@pytest.mark.asyncio
+async def test_search_flights_short_hop_only_nonstop():
+    # Hong Kong → Taipei is ~810 km, well below the 2000km cutoff.
+    with patch("app.tools.flights._try_fast_flights", return_value=[]):
+        result = await flights.search_flights("Hong Kong", "Taipei", "2026-05-15")
+
+    assert len(result["options"]) == 1
+    assert result["options"][0]["type"] == "non-stop"
+
+
+def test_to_hkd_conversion():
+    # 100 USD * 7.78 = 778, rounded to nearest 10 = 780
+    assert flights._to_hkd(100) == 780
+    # Negative or zero shouldn't blow up
+    assert flights._to_hkd(0) == 0
+
+
+def test_estimator_prices_are_in_hkd():
+    options = flights._build_options(2900, "2026-05-15")  # HKG-NRT
+    # HKG-NRT non-stop typically lands around HK$2000-4000
+    assert options[0]["price_low"] > 1000
+    assert options[0]["price_low"] < 6000
 
 
 @pytest.mark.asyncio
@@ -337,9 +371,9 @@ def test_haversine_known_distance():
 
 def test_estimator_seasonality():
     # July (peak) should be more expensive than February (off-peak)
-    july = flights._estimate(2900, "2026-07-15")
-    feb = flights._estimate(2900, "2026-02-15")
-    assert july["low"] > feb["low"]
+    july = flights._build_options(2900, "2026-07-15")
+    feb = flights._build_options(2900, "2026-02-15")
+    assert july[0]["price_low"] > feb[0]["price_low"]
 
 
 def test_airport_lookup_handles_punctuation():
