@@ -107,6 +107,25 @@ def _format_user_location(user_location: dict | None) -> str:
     )
 
 
+def _format_trip_dates(trip_dates: dict | None) -> str:
+    """Render a TRIP DATES block telling the agent which dates to plan for."""
+    if not trip_dates:
+        return ""
+    start = trip_dates.get("start")
+    end = trip_dates.get("end")
+    if not start and not end:
+        return ""
+    if start and end and start != end:
+        line = f"{start} to {end}"
+    else:
+        line = start or end
+    return (
+        "\n\nTRIP DATES (the user has already picked these — do NOT ask 'when?'. "
+        "Use them as the start/end of the itinerary and as the date for "
+        "search_flights and any date-sensitive lookups):\n- " + line
+    )
+
+
 EventCallback = Callable[[str, dict], Awaitable[None]]
 
 
@@ -115,6 +134,7 @@ async def _run_loop(
     *,
     preferences: dict | None = None,
     user_location: dict | None = None,
+    trip_dates: dict | None = None,
     on_event: EventCallback | None = None,
 ) -> dict:
     """Internal: shared tool-call loop used by both chat() and chat_stream().
@@ -132,6 +152,7 @@ async def _run_loop(
     system_content = (
         SYSTEM_PROMPT
         + _format_user_location(user_location)
+        + _format_trip_dates(trip_dates)
         + _format_preferences(preferences)
     )
     full_messages: list[dict] = [{"role": "system", "content": system_content}] + list(messages)
@@ -235,6 +256,7 @@ async def chat(
     messages: list[dict],
     preferences: dict | None = None,
     user_location: dict | None = None,
+    trip_dates: dict | None = None,
 ) -> dict:
     """Run the LLM with a tool-call loop and return the final response.
 
@@ -242,6 +264,7 @@ async def chat(
         messages: prior conversation history [{role, content}, ...]
         preferences: optional user profile dict
         user_location: optional {city, country, lat, lng} from browser GPS
+        trip_dates: optional {start, end} ISO dates picked by the user
 
     Returns:
         {reply: str, itinerary: dict | None, tool_calls_made: list[str]}
@@ -250,6 +273,7 @@ async def chat(
         messages,
         preferences=preferences,
         user_location=user_location,
+        trip_dates=trip_dates,
         on_event=None,
     )
 
@@ -258,6 +282,7 @@ async def chat_stream(
     messages: list[dict],
     preferences: dict | None = None,
     user_location: dict | None = None,
+    trip_dates: dict | None = None,
 ) -> AsyncIterator[dict]:
     """Run the LLM and yield events as tool calls fire.
 
@@ -279,6 +304,7 @@ async def chat_stream(
                 messages,
                 preferences=preferences,
                 user_location=user_location,
+                trip_dates=trip_dates,
                 on_event=emit,
             )
             await queue.put({"type": "done", "data": result})
