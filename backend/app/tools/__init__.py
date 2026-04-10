@@ -1,7 +1,7 @@
 """Tool wrappers + OpenAI function-calling definitions for the LLM."""
 from __future__ import annotations
 
-from app.tools import directions, flights, geocode, places, search, weather
+from app.tools import directions, flights, geocode, navigate, places, search, weather
 from app.tools.errors import ToolUnavailableError
 
 __all__ = ["TOOL_DEFINITIONS", "TOOL_DISPATCH", "ToolUnavailableError"]
@@ -165,6 +165,43 @@ TOOL_DEFINITIONS: list[dict] = [
     {
         "type": "function",
         "function": {
+            "name": "navigate_menu",
+            "description": (
+                "Move the user's menu cursor to a specific panel. The user is "
+                "viewing a NieR-style menu with seven tabs (MAP, TRIP, FLIGHTS, "
+                "HOTELS, DAYS, PROFILE, TRANSCRIPT). Call this tool to focus "
+                "their attention on a specific tab — e.g. after building a trip, "
+                "call navigate_menu('MAP') to show them the destination on the "
+                "globe; if they ask about hotels, call navigate_menu('HOTELS')."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "panel": {
+                        "type": "string",
+                        "enum": ["MAP", "TRIP", "FLIGHTS", "HOTELS", "DAYS", "PROFILE", "TRANSCRIPT"],
+                        "description": "The panel to switch to",
+                    },
+                    "item": {
+                        "type": "string",
+                        "description": (
+                            "Optional item to highlight in the panel's list — "
+                            "for FLIGHTS pass a type like 'non-stop', for HOTELS "
+                            "pass a hotel name, for DAYS pass a day number."
+                        ),
+                    },
+                    "filter": {
+                        "type": "object",
+                        "description": "Optional filter/sort hint, e.g. {\"sort\": \"price_asc\"}",
+                    },
+                },
+                "required": ["panel"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "web_search",
             "description": (
                 "Fallback web search for general info not covered by other tools. "
@@ -189,5 +226,6 @@ TOOL_DISPATCH: dict = {
     "get_weather": weather.get_weather,
     "geocode_city": geocode.geocode_city,
     "search_flights": flights.search_flights,
+    "navigate_menu": navigate.navigate_menu,
     "web_search": search.web_search,
 }

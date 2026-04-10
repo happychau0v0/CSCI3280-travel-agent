@@ -235,6 +235,25 @@ def test_chat_stream_emits_error_on_missing_key():
     assert "503" in response.text
 
 
+def test_chat_stream_emits_navigate_event_for_navigate_menu():
+    """When the LLM calls navigate_menu, the SSE stream should include a
+    parallel `navigate` event the frontend can react to."""
+
+    async def fake_stream(messages, **kwargs):
+        yield {"type": "tool_start", "data": {"name": "navigate_menu", "args": {"panel": "FLIGHTS"}}}
+        yield {"type": "navigate", "data": {"panel": "FLIGHTS"}}
+        yield {"type": "tool_end", "data": {"name": "navigate_menu"}}
+        yield {"type": "done", "data": {"reply": "Showing flights.", "itinerary": None, "tool_calls_made": ["navigate_menu"]}}
+
+    with patch("app.routers.chat.llm.chat_stream", new=fake_stream):
+        response = client.post("/chat/stream", json={"message": "show flights"})
+
+    assert response.status_code == 200
+    body = response.text
+    assert "event: navigate" in body
+    assert '"panel": "FLIGHTS"' in body or '"panel":"FLIGHTS"' in body
+
+
 # ─── /itinerary/optimize ──────────────────────────────────────────────────
 
 

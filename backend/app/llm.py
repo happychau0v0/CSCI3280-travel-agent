@@ -217,6 +217,11 @@ async def _run_loop(
 
             if on_event is not None:
                 await on_event("tool_start", {"name": fn_name, "args": fn_args})
+                # navigate_menu is a UI-driving tool — emit a parallel
+                # navigate event so the frontend can update its menu state
+                # immediately, without waiting for the (no-op) tool execution.
+                if fn_name == "navigate_menu":
+                    await on_event("navigate", fn_args)
 
             fn = TOOL_DISPATCH.get(fn_name)
             if fn is None:

@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.tools import directions, flights, geocode, places, search, weather
+from app.tools import directions, flights, geocode, navigate, places, search, weather
 from app.tools.errors import ToolUnavailableError
 
 
@@ -416,6 +416,36 @@ def test_airport_lookup_handles_punctuation():
     assert airports.lookup("Hong Kong, China")[0] == "HKG"
     assert airports.lookup("Tokyo Airport")[0] == "NRT"
     assert airports.lookup("Narnia") is None
+
+
+# ─── navigate_menu ───────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_navigate_menu_echoes_args():
+    result = await navigate.navigate_menu("FLIGHTS", item="non-stop")
+    assert result["navigated"] is True
+    assert result["panel"] == "FLIGHTS"
+    assert result["item"] == "non-stop"
+
+
+@pytest.mark.asyncio
+async def test_navigate_menu_uppercases_panel():
+    result = await navigate.navigate_menu("flights")
+    assert result["panel"] == "FLIGHTS"
+
+
+@pytest.mark.asyncio
+async def test_navigate_menu_rejects_unknown_panel():
+    result = await navigate.navigate_menu("garbage")
+    assert "error" in result
+    assert "Unknown panel" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_navigate_menu_accepts_filter():
+    result = await navigate.navigate_menu("FLIGHTS", filter={"sort": "price_asc"})
+    assert result["filter"] == {"sort": "price_asc"}
 
 
 # ─── web_search stub ─────────────────────────────────────────────────────
