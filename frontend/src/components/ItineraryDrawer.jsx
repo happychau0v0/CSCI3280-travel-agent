@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 import ItineraryCard from "./ItineraryCard";
+import FlightCard from "./FlightCard";
+import HotelCard from "./HotelCard";
 
 /**
  * Slide-in itinerary drawer from the right edge.
@@ -28,7 +30,7 @@ export default function ItineraryDrawer({
   if (!itinerary) return null;
 
   const dayCount = (itinerary.days || []).length;
-  const hotelCount = (itinerary.hotels || []).length;
+  const hotels = itinerary.hotels || [];
 
   return (
     <>
@@ -72,16 +74,29 @@ export default function ItineraryDrawer({
         </header>
 
         <div className="drawer-body">
-          {/* Flight, hotels, and per-day activities. The FlightCard and
-              HotelCard components are added in the next commit; for now we
-              fall back to the existing ItineraryCard which handles days. */}
+          {itinerary.flight && <FlightCard flight={itinerary.flight} />}
+
+          {hotels.length > 0 && (
+            <section className="hotels-section">
+              <h3 className="section-heading">Hotel options</h3>
+              <div className="hotels-list">
+                {hotels.map((h, i) => (
+                  <HotelCard key={h.place_id || i} hotel={h} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {itinerary.local_transport_mode && (
+            <p className="transport-mode">
+              Getting around: <strong>{itinerary.local_transport_mode}</strong>
+            </p>
+          )}
+
           <ItineraryCard
             itinerary={itinerary}
             onItineraryUpdate={onItineraryUpdate}
           />
-          {hotelCount > 0 && (
-            <p className="drawer-hint">{hotelCount} hotel options available — see details in the next commit.</p>
-          )}
         </div>
       </aside>
     </>
