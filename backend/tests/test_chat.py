@@ -152,3 +152,81 @@ def test_itinerary_save_and_retrieve():
 def test_itinerary_not_found():
     response = client.get("/itinerary/nonexistent")
     assert response.status_code == 404
+
+
+# ─── /itinerary/optimize ──────────────────────────────────────────────────
+
+
+def test_optimize_route_reorders_for_shortest_path():
+    # Three stops in Hong Kong arranged in a deliberately bad order:
+    # Central (start) → Shek O (far east, 16km) → Wan Chai (near Central) → back
+    # Optimal order would visit Wan Chai before Shek O.
+    payload = {
+        "activities": [
+            {"name": "Central", "lat": 22.2819, "lng": 114.1577, "extra": {"time": "09:00"}},
+            {"name": "Shek O", "lat": 22.2298, "lng": 114.2519},
+            {"name": "Wan Chai", "lat": 22.2783, "lng": 114.1747},
+        ],
+    }
+    response = client.post("/itinerary/optimize", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+
+    assert len(data["ordered"]) == 3
+    assert data["distance_km_after"] <= data["distance_km_before"]
+    # extras should be carried through
+    central = next(a for a in data["ordered"] if a["name"] == "Central")
+    assert central["time"] == "09:00"
+
+
+def test_optimize_route_rejects_too_few_activities():
+    response = client.post("/itinerary/optimize", json={"activities": [{"name": "X", "lat": 0, "lng": 0}]})
+    assert response.status_code == 400
+
+
+def test_optimize_route_handles_already_optimal():
+    # Two stops — already optimal, should pass through with savings 0.
+    payload = {
+        "activities": [
+            {"name": "A", "lat": 22.2819, "lng": 114.1577},
+            {"name": "B", "lat": 22.2783, "lng": 114.1747},
+        ],
+    }
+    response = client.post("/itinerary/optimize", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["savings_pct"] == 0.0
+
+
+# ─── optimize.py unit tests ───────────────────────────────────────────────
+
+
+def test_haversine_known_distance():
+    from app.optimize import haversine
+
+    # Hong Kong (Central) to Tokyo (Shibuya) ≈ 2880 km
+    d = haversine(22.2819, 114.1577, 35.6595, 139.7004)
+    assert 2800 < d < 2950
+
+
+def test_nearest_neighbor_simple_grid():
+    from app.optimize import nearest_neighbor
+
+    # Four points on a 1x1 grid: (0,0), (0,1), (1,0), (1,1)
+    # Starting at (0,0) the greedy walk picks any neighbor first.
+    points = [(0.0, 0.0), (0.0, 1.0), (1.0, 0.0), (1.0, 1.0)]
+    order = nearest_neighbor(points, start_idx=0)
+    assert sorted(order) == [0, 1, 2, 3]
+    assert order[0] == 0
+
+
+def test_two_opt_improves_bad_initial_order():
+    from app.optimize import total_distance, two_opt_improve
+
+    # Four colinear points; the bad initial order zig-zags.
+    points = [(0.0, 0.0), (0.0, 3.0), (0.0, 1.0), (0.0, 2.0)]
+    bad_order = [0, 1, 2, 3]
+    bad_dist = total_distance(points, bad_order)
+    improved = two_opt_improve(points, bad_order)
+    improved_dist = total_distance(points, improved)
+    assert improved_dist < bad_dist
