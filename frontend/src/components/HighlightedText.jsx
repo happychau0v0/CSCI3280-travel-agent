@@ -1,6 +1,24 @@
 import { useMemo } from "react";
 
 /**
+ * Strip leftover markdown emphasis markers (**bold**, __bold__,
+ * *italic*, `code`) from agent replies before rendering. The system
+ * prompt forbids markdown but the LLM still emits it, so we sanitize
+ * client-side. Exported so PanelHistory / Subtitle / day descriptions
+ * can call it before passing text to HighlightedText.
+ */
+export function stripMarkdown(text) {
+  if (!text) return "";
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "$1") // **bold**
+    .replace(/__(.+?)__/g, "$1") // __bold__
+    .replace(/(?<!\*)\*(?!\*)([^*\n]+?)\*(?!\*)/g, "$1") // *italic* (not **)
+    .replace(/`([^`\n]+?)`/g, "$1") // `inline code`
+    .replace(/\*\*/g, "") // any orphaned **
+    .replace(/__/g, ""); // any orphaned __
+}
+
+/**
  * Renders text with important entities wrapped in styled spans so the
  * user's eye can grab them at a glance — places, prices, dates, IATA
  * codes, durations.
@@ -113,18 +131,21 @@ function findEntities(text) {
 export default function HighlightedText({ text, className }) {
   const segments = useMemo(() => {
     if (!text) return [];
-    const matches = findEntities(text);
+    // Strip leaked markdown before entity detection so entity offsets
+    // don't include `**` markers in the visible output.
+    const clean = stripMarkdown(text);
+    const matches = findEntities(clean);
     const out = [];
     let cursor = 0;
     for (const m of matches) {
       if (m.start > cursor) {
-        out.push({ kind: "text", text: text.slice(cursor, m.start) });
+        out.push({ kind: "text", text: clean.slice(cursor, m.start) });
       }
       out.push({ kind: "entity", type: m.type, text: m.text });
       cursor = m.end;
     }
-    if (cursor < text.length) {
-      out.push({ kind: "text", text: text.slice(cursor) });
+    if (cursor < clean.length) {
+      out.push({ kind: "text", text: clean.slice(cursor) });
     }
     return out;
   }, [text]);
