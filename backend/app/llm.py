@@ -222,6 +222,11 @@ async def _run_loop(
                 # immediately, without waiting for the (no-op) tool execution.
                 if fn_name == "navigate_menu":
                     await on_event("navigate", fn_args)
+                # request_input asks the user for a structured value via
+                # the TRIP form. Emit a parallel request_input event so
+                # the frontend can switch panels and focus the field.
+                elif fn_name == "request_input":
+                    await on_event("request_input", fn_args)
 
             fn = TOOL_DISPATCH.get(fn_name)
             if fn is None:

@@ -1,7 +1,16 @@
 """Tool wrappers + OpenAI function-calling definitions for the LLM."""
 from __future__ import annotations
 
-from app.tools import directions, flights, geocode, navigate, places, search, weather
+from app.tools import (
+    directions,
+    flights,
+    geocode,
+    navigate,
+    places,
+    request_input as request_input_tool,
+    search,
+    weather,
+)
 from app.tools.errors import ToolUnavailableError
 
 __all__ = ["TOOL_DEFINITIONS", "TOOL_DISPATCH", "ToolUnavailableError"]
@@ -202,6 +211,50 @@ TOOL_DEFINITIONS: list[dict] = [
     {
         "type": "function",
         "function": {
+            "name": "request_input",
+            "description": (
+                "Ask the user for a single structured value through the "
+                "TRIP form UI instead of via voice. Use this whenever you "
+                "need a discrete input — destination, transport mode, "
+                "dates, party size — and prefer it over asking via reply "
+                "text. The frontend will switch to the TRIP panel, focus "
+                "the requested field with a pulsing glow, and display "
+                "the prompt above it. The user's answer comes back as a "
+                "follow-up chat message."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "field": {
+                        "type": "string",
+                        "enum": [
+                            "destination",
+                            "start_date",
+                            "end_date",
+                            "transport",
+                            "party_size",
+                            "interests",
+                            "origin",
+                        ],
+                        "description": "Which TRIP form field to focus",
+                    },
+                    "prompt": {
+                        "type": "string",
+                        "description": "Short prompt to display, e.g. 'Driving, transit, or walking?'",
+                    },
+                    "options": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional list of choices for select-style fields",
+                    },
+                },
+                "required": ["field", "prompt"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "web_search",
             "description": (
                 "Fallback web search for general info not covered by other tools. "
@@ -227,5 +280,6 @@ TOOL_DISPATCH: dict = {
     "geocode_city": geocode.geocode_city,
     "search_flights": flights.search_flights,
     "navigate_menu": navigate.navigate_menu,
+    "request_input": request_input_tool.request_input,
     "web_search": search.web_search,
 }

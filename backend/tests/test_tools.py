@@ -5,7 +5,16 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.tools import directions, flights, geocode, navigate, places, search, weather
+from app.tools import (
+    directions,
+    flights,
+    geocode,
+    navigate,
+    places,
+    request_input as request_input_tool,
+    search,
+    weather,
+)
 from app.tools.errors import ToolUnavailableError
 
 
@@ -446,6 +455,41 @@ async def test_navigate_menu_rejects_unknown_panel():
 async def test_navigate_menu_accepts_filter():
     result = await navigate.navigate_menu("FLIGHTS", filter={"sort": "price_asc"})
     assert result["filter"] == {"sort": "price_asc"}
+
+
+# ─── request_input ───────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_request_input_echoes_args():
+    result = await request_input_tool.request_input(
+        "destination", "Where do you want to go?"
+    )
+    assert result["requested"] is True
+    assert result["field"] == "destination"
+    assert result["prompt"] == "Where do you want to go?"
+    assert result["options"] is None
+
+
+@pytest.mark.asyncio
+async def test_request_input_lowercases_field():
+    result = await request_input_tool.request_input("TRANSPORT", "How?")
+    assert result["field"] == "transport"
+
+
+@pytest.mark.asyncio
+async def test_request_input_accepts_options():
+    result = await request_input_tool.request_input(
+        "transport", "Driving, transit, or walking?", options=["driving", "transit", "walking"]
+    )
+    assert result["options"] == ["driving", "transit", "walking"]
+
+
+@pytest.mark.asyncio
+async def test_request_input_rejects_unknown_field():
+    result = await request_input_tool.request_input("garbage", "Hello?")
+    assert "error" in result
+    assert "Unknown field" in result["error"]
 
 
 # ─── web_search stub ─────────────────────────────────────────────────────
