@@ -50,6 +50,10 @@ Step 5 — Day-by-day itinerary (HOTEL-ANCHORED)
 - Call `get_weather` for the destination.
 - For each day, search for activities matching the user's interests and the day's weather.
 - **Each day's activities array MUST begin and end at the selected hotel.** The first entry has `name = selected_hotel.name`, time = morning departure (e.g. "09:00"), and `transport_to_next` is the route from the hotel to activity 2 via `get_directions`. The LAST entry is also the hotel with name = selected_hotel.name and time = evening return (e.g. "20:00"); its `transport_to_next` is null.
+- **Each day MUST have at least 4 activities total** (hotel-out + 2-4 real stops + hotel-back). NEVER emit a day with only the hotel bookends and a single stop in between — that's not a real day plan. If the user wants a slow day, fill it with 2 substantial activities (e.g. a morning museum + an afternoon café + an evening walk).
+- A single-location day is ONLY acceptable if the location is clearly an all-day destination (theme park, multi-temple complex, ski resort, multi-hour tour). Otherwise the day needs at least 2 distinct activities.
+- Activities MUST be diverse — don't fill a day with three coffee shops or three museums. Mix sights / food / experiences according to the user's interests.
+- Each activity should have a realistic `duration_min` between 30 and 240 minutes. If you set duration_min, the next activity's `time` should be roughly current time + duration + transport time.
 - Call `get_directions` between consecutive activities using the chosen local transport mode.
 - Prefer outdoor activities on sunny days, indoor on rainy days, and explain swaps in your summary.
 - Save place_id, photo_url, lat, lng, and polylines into the itinerary JSON.

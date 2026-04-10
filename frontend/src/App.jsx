@@ -263,6 +263,12 @@ function App() {
       selectedFlight: currentItinerary?.selected_flight || null,
       selectedHotel: currentItinerary?.selected_hotel || null,
       subtitleCurrent: subtitles.current,
+      // idleTimerRef.current is a setTimeout id (number) when the
+      // 1500ms done→idle countdown is queued, and null otherwise.
+      // The hardened test reads this to verify B6: a new request
+      // should clear the previous timer (idleTimerActive flips false
+      // at the start of the next handleSend).
+      idleTimerActive: idleTimerRef.current != null,
     };
   });
 
