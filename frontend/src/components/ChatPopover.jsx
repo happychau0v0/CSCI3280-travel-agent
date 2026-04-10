@@ -33,19 +33,30 @@ export default function ChatPopover({
   onRecallLast,
 }) {
   const [text, setText] = useState("");
+  // The "this popover session is an edit" flag lives here, NOT in the
+  // parent. When the popover mounts with a non-empty initialText
+  // (e.g. opened via E or a HISTORY-overlay turn edit), we capture
+  // that fact into local state at mount-time. Subsequent submits in
+  // the same session pass { editLast: isEditSession } directly to
+  // onSend so the parent doesn't need to read its own state from a
+  // stale closure (B5). When the user opens via T (initialText empty)
+  // the flag is false and submits are fresh sends.
+  const [isEditSession, setIsEditSession] = useState(false);
   const inputRef = useRef(null);
 
   // Auto-focus on open and seed with initialText if provided
   useEffect(() => {
     if (open) {
-      setText(initialText || "");
+      const seed = initialText || "";
+      setText(seed);
+      setIsEditSession(seed.length > 0);
       // Defer to next tick so the DOM is ready
       requestAnimationFrame(() => {
         const el = inputRef.current;
         if (el) {
           el.focus();
           // Place cursor at the end so the user can keep typing
-          const len = (initialText || "").length;
+          const len = seed.length;
           try {
             el.setSelectionRange(len, len);
           } catch {
@@ -65,8 +76,9 @@ export default function ChatPopover({
     e.preventDefault();
     const trimmed = text.trim();
     if (!trimmed || isLoading) return;
-    onSend?.(trimmed);
+    onSend?.(trimmed, { editLast: isEditSession });
     setText("");
+    setIsEditSession(false);
     onClose?.();
   };
 
@@ -97,7 +109,8 @@ export default function ChatPopover({
 
   const handleVoiceResult = (transcript) => {
     if (transcript?.trim()) {
-      onSend?.(transcript.trim());
+      onSend?.(transcript.trim(), { editLast: isEditSession });
+      setIsEditSession(false);
       onClose?.();
     }
   };

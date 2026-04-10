@@ -493,13 +493,7 @@ function App() {
       {/* Chat popover (opens on Enter / Cmd+K) */}
       <ChatPopover
         open={chatPopoverOpen}
-        onSend={(text) => {
-          // If the popover was opened via E (initialText is set) and
-          // the message matches the last user message exactly, treat
-          // it as edit-and-rerun. Otherwise it's a fresh send.
-          const isEdit = chatPopoverInitial !== "";
-          handleSend(text, { editLast: isEdit });
-        }}
+        onSend={(text, opts) => handleSend(text, opts)}
         onClose={() => {
           setChatPopoverOpen(false);
           setChatPopoverInitial("");
