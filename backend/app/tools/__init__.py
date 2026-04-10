@@ -1,7 +1,7 @@
 """Tool wrappers + OpenAI function-calling definitions for the LLM."""
 from __future__ import annotations
 
-from app.tools import directions, places, search, weather
+from app.tools import directions, geocode, places, search, weather
 from app.tools.errors import ToolUnavailableError
 
 __all__ = ["TOOL_DEFINITIONS", "TOOL_DISPATCH", "ToolUnavailableError"]
@@ -113,6 +113,27 @@ TOOL_DEFINITIONS: list[dict] = [
     {
         "type": "function",
         "function": {
+            "name": "geocode_city",
+            "description": (
+                "Look up the lat/lng coordinates of a city or country. Use this when "
+                "the user mentions a destination so you can pin it on the map and "
+                "compute travel distance from the user's current location."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "City or place name, e.g. 'Tokyo, Japan' or 'Paris'",
+                    },
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "web_search",
             "description": (
                 "Fallback web search for general info not covered by other tools. "
@@ -135,5 +156,6 @@ TOOL_DISPATCH: dict = {
     "get_place_details": places.get_place_details,
     "get_directions": directions.get_directions,
     "get_weather": weather.get_weather,
+    "geocode_city": geocode.geocode_city,
     "web_search": search.web_search,
 }

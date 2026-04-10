@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.tools import directions, places, search, weather
+from app.tools import directions, geocode, places, search, weather
 from app.tools.errors import ToolUnavailableError
 
 
@@ -15,6 +15,7 @@ def _mock_keys(monkeypatch):
     monkeypatch.setattr(places, "GOOGLE_MAPS_API_KEY", "FAKE_KEY")
     monkeypatch.setattr(directions, "GOOGLE_MAPS_API_KEY", "FAKE_KEY")
     monkeypatch.setattr(weather, "GOOGLE_MAPS_API_KEY", "FAKE_KEY")
+    monkeypatch.setattr(geocode, "GOOGLE_MAPS_API_KEY", "FAKE_KEY")
 
 
 def _mock_response(json_data: dict, status: int = 200):
@@ -192,6 +193,77 @@ async def test_get_weather_geocode_failure_returns_empty():
 
     assert result["temp"] is None
     assert "Atlantis" in result["condition"]
+
+
+# ─── geocode_city ────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_geocode_city_returns_coords():
+    fake_response = {
+        "results": [
+            {
+                "formatted_address": "Tokyo, Japan",
+                "geometry": {"location": {"lat": 35.6762, "lng": 139.6503}},
+                "address_components": [
+                    {"long_name": "Tokyo", "types": ["locality", "political"]},
+                    {"long_name": "Japan", "types": ["country", "political"]},
+                ],
+            }
+        ]
+    }
+    with patch("app.tools.geocode.httpx.AsyncClient") as mock_client:
+        mock_client.return_value.__aenter__.return_value.get = AsyncMock(
+            return_value=_mock_response(fake_response)
+        )
+        result = await geocode.geocode_city("Tokyo")
+
+    assert result["name"] == "Tokyo"
+    assert result["country"] == "Japan"
+    assert result["lat"] == 35.6762
+    assert result["lng"] == 139.6503
+
+
+@pytest.mark.asyncio
+async def test_geocode_city_no_results_returns_error():
+    with patch("app.tools.geocode.httpx.AsyncClient") as mock_client:
+        mock_client.return_value.__aenter__.return_value.get = AsyncMock(
+            return_value=_mock_response({"results": []})
+        )
+        result = await geocode.geocode_city("Atlantis")
+
+    assert "error" in result
+    assert "Atlantis" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_geocode_city_missing_key(monkeypatch):
+    monkeypatch.setattr(geocode, "GOOGLE_MAPS_API_KEY", "")
+    with pytest.raises(ToolUnavailableError):
+        await geocode.geocode_city("Tokyo")
+
+
+@pytest.mark.asyncio
+async def test_reverse_geocode_returns_city():
+    fake_response = {
+        "results": [
+            {
+                "formatted_address": "Hong Kong",
+                "address_components": [
+                    {"long_name": "Hong Kong", "types": ["locality", "political"]},
+                    {"long_name": "Hong Kong", "types": ["country", "political"]},
+                ],
+            }
+        ]
+    }
+    with patch("app.tools.geocode.httpx.AsyncClient") as mock_client:
+        mock_client.return_value.__aenter__.return_value.get = AsyncMock(
+            return_value=_mock_response(fake_response)
+        )
+        result = await geocode.reverse_geocode(22.3193, 114.1694)
+
+    assert result["city"] == "Hong Kong"
+    assert result["country"] == "Hong Kong"
 
 
 # ─── web_search stub ─────────────────────────────────────────────────────
