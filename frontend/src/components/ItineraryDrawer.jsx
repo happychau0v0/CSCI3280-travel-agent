@@ -4,11 +4,19 @@ import FlightCard from "./FlightCard";
 import HotelCard from "./HotelCard";
 
 /**
- * Slide-in itinerary drawer from the right edge.
+ * Persistent itinerary sidebar on the right edge.
  *
- * Shows nothing visible until `currentItinerary` exists. Once one
- * arrives, a small handle on the right edge becomes clickable; the
- * drawer slides over the right portion of the globe.
+ * Once an itinerary exists this is always visible — no backdrop dim,
+ * no modal behavior. The user can still minimize it to a thin strip
+ * via the – button so they can see the full globe, or restore it via
+ * the + button.
+ *
+ * Props:
+ *   itinerary: the current Itinerary object | null
+ *   isOpen:    bool — controlled by parent (false = minimized, not hidden)
+ *   onOpen:    () => void — restore from minimized state
+ *   onClose:   () => void — collapse to minimized strip
+ *   onItineraryUpdate: (newItinerary) => void
  */
 export default function ItineraryDrawer({
   itinerary,
@@ -17,7 +25,7 @@ export default function ItineraryDrawer({
   onClose,
   onItineraryUpdate,
 }) {
-  // Esc closes the drawer
+  // Esc minimizes the sidebar (no longer hides it entirely)
   useEffect(() => {
     if (!isOpen) return;
     const handleKey = (e) => {
@@ -32,73 +40,70 @@ export default function ItineraryDrawer({
   const dayCount = (itinerary.days || []).length;
   const hotels = itinerary.hotels || [];
 
+  // Minimized strip mode — vertical bar on the right edge
+  if (!isOpen) {
+    return (
+      <button
+        type="button"
+        className="drawer-strip"
+        onClick={onOpen}
+        title="Expand itinerary"
+      >
+        <span className="drawer-strip-icon">+</span>
+        <span className="drawer-strip-label">
+          {dayCount} day{dayCount !== 1 ? "s" : ""} · {itinerary.destination}
+        </span>
+      </button>
+    );
+  }
+
   return (
-    <>
-      {/* Persistent handle on the right edge */}
-      {!isOpen && (
-        <button
-          type="button"
-          className="drawer-handle"
-          onClick={onOpen}
-          title="Show itinerary"
-        >
-          <span className="drawer-handle-icon">✦</span>
-          <span className="drawer-handle-label">
-            {dayCount} day{dayCount !== 1 ? "s" : ""} · {itinerary.destination}
-          </span>
-        </button>
-      )}
-
-      {/* Backdrop */}
-      {isOpen && <div className="drawer-backdrop" onClick={onClose} />}
-
-      {/* The drawer itself */}
-      <aside className={`itinerary-drawer${isOpen ? " open" : ""}`} aria-hidden={!isOpen}>
-        <header className="drawer-header">
-          <div>
-            <h2>{itinerary.title || itinerary.destination}</h2>
-            {itinerary.origin && (
-              <p className="drawer-route">
-                {itinerary.origin} → {itinerary.destination}
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            className="drawer-close"
-            onClick={onClose}
-            aria-label="Close itinerary"
-          >
-            ×
-          </button>
-        </header>
-
-        <div className="drawer-body">
-          {itinerary.flight && <FlightCard flight={itinerary.flight} />}
-
-          {hotels.length > 0 && (
-            <section className="hotels-section">
-              <h3 className="section-heading">Hotel options</h3>
-              <div className="hotels-list">
-                {hotels.map((h, i) => (
-                  <HotelCard key={h.place_id || i} hotel={h} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {itinerary.local_transport_mode && (
-            <p className="transport-mode">
-              Getting around: <strong>{itinerary.local_transport_mode}</strong>
+    <aside className="itinerary-drawer open">
+      <header className="drawer-header">
+        <div>
+          <h2>{itinerary.title || itinerary.destination}</h2>
+          {itinerary.origin && (
+            <p className="drawer-route">
+              {itinerary.origin} → {itinerary.destination}
             </p>
           )}
-
-          <ItineraryCard
-            itinerary={itinerary}
-            onItineraryUpdate={onItineraryUpdate}
-          />
         </div>
-      </aside>
-    </>
+        <button
+          type="button"
+          className="drawer-close"
+          onClick={onClose}
+          aria-label="Minimize itinerary"
+          title="Minimize"
+        >
+          –
+        </button>
+      </header>
+
+      <div className="drawer-body">
+        {itinerary.flight && <FlightCard flight={itinerary.flight} />}
+
+        {hotels.length > 0 && (
+          <section className="hotels-section">
+            <h3 className="section-heading">Hotel options</h3>
+            <div className="hotels-list">
+              {hotels.map((h, i) => (
+                <HotelCard key={h.place_id || i} hotel={h} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {itinerary.local_transport_mode && (
+          <p className="transport-mode">
+            Getting around: <strong>{itinerary.local_transport_mode}</strong>
+          </p>
+        )}
+
+        <ItineraryCard
+          itinerary={itinerary}
+          onItineraryUpdate={onItineraryUpdate}
+        />
+      </div>
+    </aside>
   );
 }
