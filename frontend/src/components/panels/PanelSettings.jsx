@@ -71,6 +71,7 @@ export default function PanelSettings({
   muted = false,
   onToggleMute,
   onClearAll,
+  rowDispatchRef,
 }) {
   const [prefs, setPrefs] = useState(() => loadPrefs());
   const [savedFlash, setSavedFlash] = useState(false);
@@ -130,6 +131,19 @@ export default function PanelSettings({
     onSelect?.(i);
     if (row.kind === "action") row.onActivate?.();
   };
+
+  // Register an imperative row activator so the global Space hotkey
+  // can fire the focused row's action without going through a click.
+  useEffect(() => {
+    if (!rowDispatchRef) return undefined;
+    rowDispatchRef.current = (i) => {
+      const row = rows[Math.min(i, rows.length - 1)];
+      if (row?.kind === "action") row.onActivate?.();
+    };
+    return () => {
+      if (rowDispatchRef.current) rowDispatchRef.current = null;
+    };
+  }, [rowDispatchRef, rows]);
 
   return (
     <section className="panel panel-list" aria-label="Settings">

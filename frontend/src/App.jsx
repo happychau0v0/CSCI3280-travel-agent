@@ -90,6 +90,10 @@ function App() {
   // Tracks the in-flight done→idle setTimeout so a new request can
   // cancel it before it overwrites the new "working" state (B6).
   const idleTimerRef = useRef(null);
+  // Per-panel imperative handle: panels with actionable rows expose
+  // an `activateRow(index)` method via ref. App.jsx's onActivate
+  // (Space hotkey) reads the current panel's ref and invokes it.
+  const activeRowDispatchRef = useRef(null);
   // Ref mirror so handleSend's running invocation can read the
   // post-stream value of pendingInputRequest without being trapped
   // by its useCallback closure (B4). Keep in sync via a tiny effect.
@@ -195,6 +199,11 @@ function App() {
     },
     onActivate: () => {
       cues.select();
+      // Dispatch to the current panel's row activator if it has one.
+      // Settings/HOME form rows register an activateRow handler via
+      // activeRowDispatchRef. Other panels can opt in similarly.
+      const dispatch = activeRowDispatchRef.current;
+      if (dispatch) dispatch(menu.state.listIndex);
     },
     onBack: () => {
       if (chatPopoverOpen) {
@@ -477,6 +486,7 @@ function App() {
             muted={muted}
             onToggleMute={() => setMuted((m) => !m)}
             onClearAll={handleClearAll}
+            rowDispatchRef={activeRowDispatchRef}
           />
         )}
         {menu.state.panel === "FLIGHTS" && (
