@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from "react";
-import VoiceRecorder from "./VoiceRecorder";
+import { useEffect, useRef } from "react";
 import AudioPlayer from "./AudioPlayer";
 
 /**
- * Chat window with message history, text input, and voice input button.
+ * Overlay-only chat window. Renders the message history as iMessage-style
+ * frosted-glass bubbles in the top-left of the viewport. The input form
+ * lives in InputDock now.
+ *
  * Strips JSON code blocks from displayed messages — the structured itinerary
- * is shown in the sidebar instead.
+ * is shown in the slide-in drawer instead.
  */
 function stripJsonBlocks(text) {
   return (text || "").replace(/```json[\s\S]*?```/g, "").trim();
@@ -25,39 +27,26 @@ function renderMarkdown(text) {
   });
 }
 
-export default function ChatWindow({ messages, onSend, isLoading }) {
-  const [input, setInput] = useState("");
+export default function ChatWindow({ messages, isLoading }) {
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const trimmed = input.trim();
-    if (!trimmed || isLoading) return;
-    onSend(trimmed);
-    setInput("");
-  };
-
-  const handleVoiceResult = (transcript) => {
-    if (transcript?.trim()) onSend(transcript.trim());
-  };
-
   return (
-    <div className="chat-window">
-      <div className="message-list">
-        {messages.length === 0 && !isLoading && (
-          <div className="empty-state">
-            <h2>Where would you like to go?</h2>
-            <p>
-              Type or speak your travel plans. I'll search for real places,
-              check directions, and build your itinerary.
-            </p>
-          </div>
-        )}
+    <div className="chat-overlay">
+      {messages.length === 0 && !isLoading && (
+        <div className="chat-empty">
+          <h2>Where would you like to go?</h2>
+          <p>
+            Type or speak your travel plans. I'll search for real places,
+            check directions, and build your itinerary.
+          </p>
+        </div>
+      )}
 
+      <div className="message-list">
         {messages.map((msg, i) => {
           const display =
             msg.role === "assistant" ? stripJsonBlocks(msg.content) : msg.content;
@@ -86,20 +75,6 @@ export default function ChatWindow({ messages, onSend, isLoading }) {
         )}
         <div ref={messagesEndRef} />
       </div>
-
-      <form className="chat-input-form" onSubmit={handleSubmit}>
-        <VoiceRecorder onResult={handleVoiceResult} disabled={isLoading} />
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Plan a 3-day trip to Tokyo..."
-          disabled={isLoading}
-        />
-        <button type="submit" disabled={!input.trim() || isLoading}>
-          Send
-        </button>
-      </form>
     </div>
   );
 }
