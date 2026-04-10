@@ -64,6 +64,14 @@ User ◄── SpeechSynthesis (TTS) ◄── Response ◄──────┘
 - **Clarify ambiguity:** Ask users about trip duration, budget, interests when the request is vague
 - **OpenRouter, not OpenAI direct:** Use `OPENROUTER_API_KEY` with OpenAI SDK's `base_url` override
 
+## Claude Code Plugins
+
+These plugins are enabled and should be used during development:
+
+- **context7** — Fetch up-to-date docs for any library (FastAPI, OpenAI SDK, React, Google Maps, etc.). Use instead of guessing API syntax.
+- **playwright** — Browser automation for end-to-end testing of the frontend (chat flow, voice UI, itinerary rendering).
+- **frontend-design** — Design guidance when building UI components. Use when creating or redesigning chat UI, itinerary cards, and map views.
+
 ## Environment Setup
 
 1. Copy `.env.example` to `.env` and fill in API keys
