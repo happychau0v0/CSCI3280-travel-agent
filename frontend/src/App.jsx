@@ -9,6 +9,7 @@ import FullscreenButton from "./components/FullscreenButton";
 import TripDateModal from "./components/TripDateModal";
 import MenuShell from "./components/MenuShell";
 import Subtitle from "./components/Subtitle";
+import ChatPopover from "./components/ChatPopover";
 import { streamChat } from "./api/client";
 import { useGeolocation } from "./hooks/useGeolocation";
 import { useMenuState } from "./hooks/useMenuState";
@@ -78,6 +79,7 @@ function App() {
   const [tripDates, setTripDates] = useState(() => loadTripDates());
   const [dateModalOpen, setDateModalOpen] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [chatPopoverOpen, setChatPopoverOpen] = useState(false);
   const pendingMessageRef = useRef(null); // message waiting for date confirmation
   const { location: userLocation, requestPermission } = useGeolocation();
   const menu = useMenuState();
@@ -90,15 +92,16 @@ function App() {
     setListIndex: menu.setListIndex,
     setScope: menu.setScope,
     listSize: 0, // panels will own this once they exist
-    onOpenChat: () => {
-      // Will trigger ChatPopover in commit 6; for now focus the input dock
-      document.querySelector('.input-dock input[type="text"]')?.focus();
-    },
+    onOpenChat: () => setChatPopoverOpen(true),
     onActivate: () => {
       // Hooked up by individual panels in commits 7-10
     },
     onBack: () => {
-      if (menu.state.scope !== "tabs") menu.setScope("tabs");
+      if (chatPopoverOpen) {
+        setChatPopoverOpen(false);
+      } else if (menu.state.scope !== "tabs") {
+        menu.setScope("tabs");
+      }
     },
     onToggleMute: () => setMuted((m) => !m),
   });
@@ -408,6 +411,14 @@ function App() {
 
       {/* Bottom-center subtitle bar — auto-TTS the assistant's reply */}
       <Subtitle text={subtitles.current} />
+
+      {/* Chat popover — opens on Enter / Cmd+K */}
+      <ChatPopover
+        open={chatPopoverOpen}
+        onSend={handleSend}
+        onClose={() => setChatPopoverOpen(false)}
+        isLoading={isLoading}
+      />
 
       {/* Top-left LIVE ticker */}
       <LiveTicker

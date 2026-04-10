@@ -1,5 +1,119 @@
 /* AI Travel Agent — globe-first layout */
 
+/* ─── Chat popover (round 7) ─────────────────────────────── */
+
+.chat-popover-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.chat-popover {
+  position: fixed;
+  bottom: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  width: min(640px, calc(100vw - 64px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent-border);
+  font-family: var(--mono);
+  box-shadow: 0 0 40px rgba(0, 217, 255, 0.2), 0 24px 48px rgba(0, 0, 0, 0.5);
+}
+
+.chat-popover-bracket {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--accent);
+}
+
+.chat-popover-bracket-tl {
+  top: -2px;
+  left: -2px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.chat-popover-bracket-tr {
+  top: -2px;
+  right: -2px;
+  border-left: none;
+  border-bottom: none;
+}
+
+.chat-popover-bracket-bl {
+  bottom: -2px;
+  left: -2px;
+  border-right: none;
+  border-top: none;
+}
+
+.chat-popover-bracket-br {
+  bottom: -2px;
+  right: -2px;
+  border-left: none;
+  border-top: none;
+}
+
+.chat-popover input[type="text"] {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--text-h);
+  font-family: var(--mono);
+  font-size: 15px;
+  outline: none;
+}
+
+.chat-popover input[type="text"]:focus {
+  border-color: var(--accent);
+}
+
+.chat-popover-send {
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #002;
+  font-size: 20px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.chat-popover-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.chat-popover-close {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.chat-popover-close:hover {
+  border-color: var(--text-h);
+  color: var(--text-h);
+}
+
 /* ─── Subtitle bar (round 7) ─────────────────────────────── */
 
 .subtitle {
