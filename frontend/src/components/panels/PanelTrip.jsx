@@ -15,6 +15,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 const STORAGE_KEY = "travel-trip-form";
 
 const FIELDS = [
+  // ORIGIN is normally seeded from GPS and read-only-ish, but it's in
+  // the field list so the backend's request_input("origin", …) can
+  // highlight and edit it. The backend's VALID_FIELDS set accepts it.
+  { key: "origin", label: "ORIGIN", type: "text", placeholder: "Hong Kong" },
   { key: "destination", label: "DESTINATION", type: "text", placeholder: "Tokyo, Japan" },
   { key: "start_date", label: "START DATE", type: "date" },
   { key: "end_date", label: "END DATE", type: "date" },
@@ -96,13 +100,14 @@ export default function PanelTrip({
     }
   }, [pendingInputRequest]);
 
-  // Seed defaults from the existing itinerary on first mount so the
-  // form reflects the user's last trip.
+  // Seed defaults from the existing itinerary + GPS on first mount so
+  // the form reflects the user's last trip and current location.
   useEffect(() => {
-    if (itinerary && Object.keys(form).length === 0) {
+    if (Object.keys(form).length === 0) {
       const seeded = {
-        destination: itinerary.destination || "",
-        transport: itinerary.local_transport_mode || "",
+        origin: itinerary?.origin || userLocation?.city || "",
+        destination: itinerary?.destination || "",
+        transport: itinerary?.local_transport_mode || "",
       };
       setForm(seeded);
       saveForm(seeded);

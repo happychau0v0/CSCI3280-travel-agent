@@ -98,7 +98,7 @@ function App() {
   const listSize = useMemo(() => {
     switch (menu.state.panel) {
       case "TRIP":
-        return 6; // destination, start, end, transport, party, interests
+        return 7; // origin, destination, start, end, transport, party, interests
       case "FLIGHTS":
         return currentItinerary?.flight?.options?.length || 0;
       case "HOTELS":
