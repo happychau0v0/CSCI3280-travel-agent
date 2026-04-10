@@ -1,4 +1,29 @@
-"""Google Places API (New) — search and details."""
+"""Google Places API (New) — search and details.
+
+Two functions exposed to the LLM as tools:
+
+- ``search_places(query, location?, radius_km?)`` — text search for any
+  query like "best ramen in Tokyo", returns a list of normalized result
+  dicts.
+- ``get_place_details(place_id)`` — fetch hours, reviews, photos, and
+  full description for a specific place.
+
+Both functions hit the *Places API (New)*, which is a different surface
+from the legacy Places API. The new API uses GET/POST with two required
+headers:
+
+- ``X-Goog-Api-Key`` — the Google Maps Platform API key. We send it in
+  the header rather than the query string so it doesn't end up in
+  request logs.
+- ``X-Goog-FieldMask`` — a comma-separated list of fields to return.
+  This is *required*; the API rejects requests without it. Field masks
+  are also how Google bills the API: requesting fewer fields is cheaper.
+
+Photo URLs are returned as relative paths (``/photo/places/...``) that
+hit our backend proxy in ``app/routers/photo.py``. This lets the
+frontend render images via ``<img src=...>`` without ever seeing the
+API key.
+"""
 from __future__ import annotations
 
 import httpx
@@ -9,6 +34,10 @@ from app.tools.errors import ToolUnavailableError
 PLACES_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
 PLACES_DETAILS_URL = "https://places.googleapis.com/v1/places/{place_id}"
 
+# Field masks select which fields the API returns. The set below covers
+# everything ItineraryCard renders (photo, location, rating, address) plus
+# the place_id we need to call get_place_details later. Adding more fields
+# costs more per request — see Google's pricing tiers for the breakdown.
 SEARCH_FIELD_MASK = (
     "places.id,places.displayName,places.formattedAddress,places.location,"
     "places.rating,places.photos,places.priceLevel"
@@ -22,7 +51,12 @@ DETAILS_FIELD_MASK = (
 def _photo_url(photo_name: str) -> str:
     """Return a relative URL pointing at our backend photo proxy.
 
-    The frontend prepends its API_BASE so the API key never reaches the browser.
+    The Places API returns photos as resource names like
+    ``places/ChIJ.../photos/Ae...``. The actual image bytes live behind
+    ``https://places.googleapis.com/v1/{name}/media?key=...`` which would
+    expose our key if we sent that URL to the browser. Instead we send the
+    relative path ``/photo/{name}`` and let our backend proxy
+    (``app/routers/photo.py``) substitute the key server-side.
     """
     return f"/photo/{photo_name}"
 

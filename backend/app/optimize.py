@@ -1,8 +1,23 @@
 """Route optimization helpers — TSP approximation for itinerary activities.
 
-Uses nearest-neighbor as a fast initial solution then 2-opt local search to
-improve it. Both are simple, deterministic, dependency-free, and fast enough
-for the 5-15 stops a typical day-trip itinerary contains.
+The Travelling Salesman Problem is NP-hard in general, but for the small
+instances a tourist itinerary contains (5-15 stops per day) we don't need
+an exact solver. We use a two-stage heuristic:
+
+1. **Nearest neighbor** builds a quick initial tour by greedily picking the
+   closest unvisited stop at each step. Runs in O(n^2) and produces a tour
+   that's typically 25%-30% longer than optimal — fine as a starting point.
+
+2. **2-opt local search** then takes that tour and repeatedly looks for
+   pairs of edges (A→B) and (C→D) where swapping them — i.e. reversing the
+   segment B..C — would shorten the total. Each pass is O(n^2); we stop when
+   a full pass produces no improvement. For tours of 5-15 stops this
+   converges within a handful of passes and gets us to within ~5% of
+   optimal in practice.
+
+Both functions take a sequence of (lat, lng) tuples and operate on indices,
+which lets the caller carry around any extra activity metadata without the
+optimizer needing to know about it.
 """
 from __future__ import annotations
 
@@ -14,7 +29,14 @@ EARTH_RADIUS_KM = 6371.0
 
 
 def haversine(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
-    """Great-circle distance in kilometers between two lat/lng points."""
+    """Great-circle distance in kilometers between two lat/lng points.
+
+    The haversine formula handles points anywhere on the globe correctly,
+    including antipodal pairs and points spanning the international date
+    line. We use it instead of plain Euclidean distance because cities like
+    Tokyo and Hong Kong span enough latitude that the small-distance
+    approximation breaks down.
+    """
     phi1 = math.radians(lat1)
     phi2 = math.radians(lat2)
     dphi = math.radians(lat2 - lat1)
@@ -40,8 +62,11 @@ def nearest_neighbor(points: Sequence[tuple[float, float]], start_idx: int = 0) 
     """Greedy nearest-neighbor TSP heuristic.
 
     Starts at `start_idx`, then repeatedly visits the closest unvisited point.
-    Cheap (O(n^2)) but locally short-sighted — `two_opt_improve` cleans up
-    the obvious mistakes.
+    Cheap (O(n^2)) but locally short-sighted — for example, given four points
+    arranged like a thin "L", greedy will sometimes leave a single far stop
+    for last and pay a huge penalty walking out to it. `two_opt_improve`
+    cleans up exactly those kinds of mistakes by looking at edge pairs
+    instead of single steps.
     """
     n = len(points)
     if n == 0:
@@ -77,9 +102,16 @@ def two_opt_improve(
 ) -> list[int]:
     """Improve an existing tour with 2-opt edge swaps.
 
-    Repeatedly tries reversing each pair of edges; keeps the swap if it
-    reduces total distance. Stops when a full pass produces no improvement
-    or `max_iter` iterations are exhausted.
+    The 2-opt move picks two edges (A→B) and (C→D) in the current tour and
+    replaces them with (A→C) and (B→D), which is equivalent to reversing the
+    segment between B and C. If that swap shortens the tour we keep it.
+    Repeating until no swap helps converges to a local optimum that's
+    typically within a few percent of the true optimum for small instances.
+
+    Math: only the four endpoints (A, B, C, D) determine whether the swap
+    helps — every internal edge in the reversed segment gets traversed in
+    the opposite direction, which doesn't change its length. So we can
+    evaluate each candidate swap in O(1) instead of recomputing the tour.
     """
     if len(order) < 4:
         return list(order)

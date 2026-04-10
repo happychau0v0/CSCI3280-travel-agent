@@ -1,4 +1,27 @@
-"""LLM orchestrator: OpenRouter via OpenAI SDK with tool-calling loop."""
+"""LLM orchestrator: OpenRouter via OpenAI SDK with tool-calling loop.
+
+Architecture (matches the TA brief's "Brain → Hands → Interface" diagram):
+
+    user message ─► chat() ─► OpenAI SDK pointed at OpenRouter
+                       ▲                  │
+                       │                  ▼
+                       │           model response
+                       │                  │
+                       │       has tool calls? ─── no ─► return reply
+                       │                  │
+                       │                  yes
+                       │                  │
+                       │           dispatch each tool
+                       │           via TOOL_DISPATCH
+                       │                  │
+                       └─── feed results ─┘
+                            back to model
+
+The loop repeats up to MAX_TOOL_ROUNDS times, after which we return
+whatever text we have. The system prompt (see prompts.py) instructs the
+model to embed structured itineraries as ```json blocks; we extract them
+with a brace-balancing parser at the end.
+"""
 from __future__ import annotations
 
 import json
@@ -13,7 +36,11 @@ from app.tools import TOOL_DEFINITIONS, TOOL_DISPATCH, ToolUnavailableError
 
 logger = logging.getLogger(__name__)
 
-MAX_TOOL_ROUNDS = 10  # safety limit on tool-call iterations
+# A typical multi-day itinerary takes 3-6 tool calls (one weather lookup,
+# 2-4 place searches, a handful of directions). 10 rounds gives plenty of
+# headroom while still capping pathological loops where the model keeps
+# calling tools without producing a final reply.
+MAX_TOOL_ROUNDS = 10
 
 _client: AsyncOpenAI | None = None
 
@@ -62,12 +89,18 @@ async def chat(messages: list[dict], preferences: dict | None = None) -> dict:
     """
     client = _get_client()
 
+    # User preferences are injected as an addendum to the system prompt rather
+    # than a separate message — this keeps them visible to the model on every
+    # tool-call iteration without polluting the conversation history.
     system_content = SYSTEM_PROMPT + _format_preferences(preferences)
     full_messages: list[dict] = [{"role": "system", "content": system_content}] + list(messages)
     tool_calls_made: list[str] = []
     last_text = ""
 
     for round_idx in range(MAX_TOOL_ROUNDS):
+        # Each iteration is a full chat completion. The model decides whether
+        # to call tools (by returning .tool_calls) or to produce a final text
+        # reply (by leaving .tool_calls empty).
         response = await client.chat.completions.create(
             model=LLM_MODEL,
             messages=full_messages,
@@ -79,9 +112,14 @@ async def chat(messages: list[dict], preferences: dict | None = None) -> dict:
         last_text = msg.content or last_text
 
         if not msg.tool_calls:
+            # Model is done — return whatever text it produced.
             break
 
-        # Append the assistant's tool-call message to history
+        # Persist the assistant's tool-call message into the running history
+        # so the next iteration sees its own decisions. The OpenAI API requires
+        # the assistant message and the matching tool result messages to be
+        # paired in order; the role="tool" messages we append below carry the
+        # tool_call_id that ties them back to this assistant message.
         full_messages.append(
             {
                 "role": "assistant",
@@ -100,7 +138,11 @@ async def chat(messages: list[dict], preferences: dict | None = None) -> dict:
             }
         )
 
-        # Execute each tool call
+        # Execute each tool call requested by the model. Tools may run in any
+        # order (we go sequentially for simplicity); errors are caught and
+        # reported back to the model as a structured error so it can recover
+        # gracefully — e.g. tell the user "the weather service is unavailable"
+        # instead of crashing the request.
         for tc in msg.tool_calls:
             fn_name = tc.function.name
             try:
@@ -149,9 +191,22 @@ _INVALID_ESCAPE_RE = re.compile(r'\\(?!["\\/bfnrtu])')
 def _sanitize_json(text: str) -> str:
     """Escape lone backslashes that aren't valid JSON escapes.
 
-    Google's encoded polyline format embeds backslash characters that the
-    LLM tends to copy verbatim into JSON string values, producing invalid
-    escapes like '\\A' or '\\z'. We double them so the parser accepts them.
+    Google's encoded polyline format (the result of get_directions) is a
+    string of ASCII characters in the range 0x3F-0x7E that frequently
+    contains backslashes. When the LLM copies a polyline value verbatim
+    into a JSON string literal, those backslashes become invalid escape
+    sequences (e.g. ``\\A``, ``\\z``) that strict JSON parsers reject.
+
+    Example of what the model produces and what this function fixes::
+
+        before: {"polyline": "|Ar@zAkD\\Bf@_Bt@yC..."}
+                                   ^^^ invalid escape
+        after:  {"polyline": "|Ar@zAkD\\\\Bf@_Bt@yC..."}
+                                   ^^^^^ doubled, now a literal "\\B"
+
+    We only touch backslashes that don't begin a valid JSON escape (one of
+    " \\ / b f n r t u). This is a pragmatic fix — a fully strict
+    alternative would be a custom JSON tokenizer.
     """
     return _INVALID_ESCAPE_RE.sub(r"\\\\", text)
 
@@ -159,8 +214,15 @@ def _sanitize_json(text: str) -> str:
 def _balanced_json_object(text: str, start: int) -> str | None:
     """Return the JSON object starting at `start` in `text`, balanced over braces.
 
-    Naively scans braces while respecting strings (so braces inside string
-    literals don't throw off the count). Returns None if no balanced object found.
+    A naive regex like ``\\{.*?\\}`` (non-greedy) returns the SHORTEST match,
+    which for nested JSON objects yields just the innermost ``{}``. A greedy
+    ``\\{.*\\}`` extends past the closing brace into any text that follows.
+    Neither works for the deeply-nested itinerary objects we deal with, so we
+    walk the string character by character, tracking brace depth and being
+    careful not to count braces that appear inside string literals.
+
+    Returns None if `start` doesn't point at a ``{`` or no matching ``}`` is
+    found before the end of the input.
     """
     if start >= len(text) or text[start] != "{":
         return None
@@ -170,6 +232,9 @@ def _balanced_json_object(text: str, start: int) -> str | None:
     for i in range(start, len(text)):
         ch = text[i]
         if in_string:
+            # Inside a "..." literal — don't count braces, but do honor
+            # backslash escapes so we don't mistake an escaped quote for the
+            # end of the string.
             if escape:
                 escape = False
             elif ch == "\\":
@@ -184,6 +249,7 @@ def _balanced_json_object(text: str, start: int) -> str | None:
             elif ch == "}":
                 depth -= 1
                 if depth == 0:
+                    # Closed the object that started at `start`.
                     return text[start : i + 1]
     return None
 
