@@ -318,6 +318,35 @@
   color: var(--text-h);
 }
 
+.trip-form-resolve-btn {
+  margin-top: 12px;
+  padding: 12px 18px;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--bg);
+  background: #5eead4;
+  border: 1px solid #5eead4;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.15s ease;
+  width: 100%;
+}
+
+.trip-form-resolve-btn:hover:not(:disabled) {
+  box-shadow: 0 0 24px rgba(94, 234, 212, 0.6);
+  background: #99f6e4;
+  border-color: #99f6e4;
+}
+
+.trip-form-resolve-btn:disabled {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-dim);
+  border-color: var(--border);
+  cursor: not-allowed;
+}
+
 .trip-prompt-preview {
   margin-top: 18px;
   padding: 12px 14px;

@@ -261,6 +261,14 @@ function App() {
             } else if (type === "navigate") {
               menu.navigate(payload);
               cues.select();
+            } else if (type === "request_input") {
+              // The LLM is asking for a single structured value via
+              // the TRIP form. Switch to TRIP, focus the field, and
+              // surface the prompt as a subtitle so it's spoken.
+              setPendingInputRequest(payload);
+              menu.setPanel("TRIP");
+              if (payload?.prompt) subtitles.push(payload.prompt);
+              cues.select();
             }
           },
         });
@@ -429,6 +437,11 @@ function App() {
             listIndex={menu.state.listIndex}
             isLoading={isLoading}
             onPlan={handleSend}
+            pendingInputRequest={pendingInputRequest}
+            onResolveInput={(field, value) => {
+              setPendingInputRequest(null);
+              handleSend(`${field}: ${value}`);
+            }}
           />
         )}
         {menu.state.panel === "SETTINGS" && (

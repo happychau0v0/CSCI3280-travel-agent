@@ -80,6 +80,7 @@ export default function PanelTrip({
   isLoading = false,
   pendingInputRequest = null,
   onPlan,
+  onResolveInput,
 }) {
   const [form, setForm] = useState(() => loadForm());
 
@@ -104,8 +105,31 @@ export default function PanelTrip({
   };
 
   const origin = userLocation?.city || "";
-  const selectedIdx = Math.min(listIndex, FIELDS.length - 1);
+  // When the LLM has asked for a specific field, prefer that field's
+  // index over the user's current cursor so the editor jumps right
+  // to it on arrival.
+  const requestedIdx = pendingInputRequest
+    ? FIELDS.findIndex((f) => f.key === pendingInputRequest.field)
+    : -1;
+  const selectedIdx =
+    requestedIdx >= 0 ? requestedIdx : Math.min(listIndex, FIELDS.length - 1);
   const selected = FIELDS[selectedIdx];
+
+  // Submit the focused field's value back to the agent when the user
+  // presses Enter on the inline input. Resolves the pending request.
+  const handleResolveSubmit = () => {
+    if (!pendingInputRequest) return;
+    const value = form[pendingInputRequest.field];
+    if (value == null || value === "") return;
+    onResolveInput?.(pendingInputRequest.field, value);
+  };
+
+  const handleEditorKeyDown = (e) => {
+    if (e.key === "Enter" && pendingInputRequest) {
+      e.preventDefault();
+      handleResolveSubmit();
+    }
+  };
   const hasItinerary = !!itinerary;
   const planLabel = hasItinerary ? "REPLAN TRIP →" : "PLAN TRIP →";
 
@@ -168,6 +192,7 @@ export default function PanelTrip({
             type="text"
             value={form[selected.key] || ""}
             onChange={update(selected.key)}
+            onKeyDown={handleEditorKeyDown}
             placeholder={selected.placeholder}
             className="panel-input"
             autoFocus
@@ -178,6 +203,7 @@ export default function PanelTrip({
             type="date"
             value={form[selected.key] || ""}
             onChange={update(selected.key)}
+            onKeyDown={handleEditorKeyDown}
             className="panel-input"
             autoFocus
           />
@@ -189,6 +215,7 @@ export default function PanelTrip({
             max={selected.max}
             value={form[selected.key] || ""}
             onChange={update(selected.key)}
+            onKeyDown={handleEditorKeyDown}
             className="panel-input"
             autoFocus
           />
@@ -206,6 +233,16 @@ export default function PanelTrip({
               </option>
             ))}
           </select>
+        )}
+        {pendingInputRequest && pendingInputRequest.field === selected.key && (
+          <button
+            type="button"
+            className="trip-form-resolve-btn"
+            onClick={handleResolveSubmit}
+            disabled={!form[selected.key]}
+          >
+            SEND ANSWER →
+          </button>
         )}
         <p className="panel-detail-hint">
           Use ↑/↓ to move between fields. Click PLAN TRIP when ready.
