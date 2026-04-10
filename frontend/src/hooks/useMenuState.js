@@ -6,10 +6,18 @@ import { useCallback, useState } from "react";
  * State shape:
  *   {
  *     panel:     "MAP" | "TRIP" | "FLIGHTS" | "HOTELS" | "DAYS" | "PROFILE" | "TRANSCRIPT",
- *     scope:     "tabs" | "list" | "detail",  // which area the keyboard cursor is in
+ *     scope:     "tabs" | "list",             // which area the keyboard cursor is in
  *     listIndex: number,                      // which item in the left list is highlighted
  *     filter:    object | null,               // optional sort/filter set by the LLM
  *   }
+ *
+ * Scope semantics:
+ *   - "tabs" is the default scope on entry. ←/→ cycles tabs.
+ *   - "list" is entered explicitly via Tab key or by clicking a list
+ *     item. ←/→ is absorbed (no tab cycling) so the user can browse the
+ *     list without accidentally jumping panels.
+ *   - ↑/↓ ALWAYS moves the list cursor on a list-bearing panel,
+ *     regardless of scope — the meaning is unambiguous.
  *
  * Mutated by:
  *  - Manual user input (clicks, keyboard arrows, tab number presses)
@@ -43,9 +51,11 @@ export function useMenuState() {
     setState((s) => ({
       ...s,
       panel,
-      // Reset list cursor and scope when switching panels
+      // Reset list cursor and scope when switching panels. Always
+      // start in "tabs" scope so ←/→ keeps cycling tabs after a jump
+      // — the user has to explicitly Tab/click into list scope.
       listIndex: 0,
-      scope: PANELS_WITH_LIST.has(panel) ? "list" : "tabs",
+      scope: "tabs",
     }));
   }, []);
 
@@ -62,7 +72,9 @@ export function useMenuState() {
     ({ panel, item, filter } = {}) => {
       setState((s) => ({
         panel: PANELS.includes(panel) ? panel : s.panel,
-        scope: PANELS_WITH_LIST.has(panel) ? "list" : "tabs",
+        // Always land in tabs scope on programmatic navigation. The
+        // LLM may want to drive ←/→ via subsequent navigate calls.
+        scope: "tabs",
         listIndex: 0, // item-by-name resolution happens in the panel itself
         filter: filter || null,
       }));

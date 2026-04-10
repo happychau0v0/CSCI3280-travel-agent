@@ -4,16 +4,23 @@ import { PANELS, PANELS_WITH_LIST } from "./useMenuState";
 /**
  * Document-level hotkey dispatcher for the NieR-style menu shell.
  *
+ * Scope model:
+ *   - "tabs"  — default. ←/→ cycles tabs.
+ *   - "list"  — entered explicitly via Tab key or by clicking a list
+ *               item. ←/→ is absorbed (no tab cycling) so the user can
+ *               browse the list without accidentally jumping panels.
+ *
  * Hotkeys:
- *   1-7        — jump to tab N
- *   ← / →      — when scope=tabs, move tab cursor
- *   ↑ / ↓      — when scope=list, move list cursor
- *   Tab        — cycle scope (tabs → list → detail → tabs)
+ *   1-7        — jump to tab N (always lands in scope=tabs)
+ *   ← / →      — cycle tabs ONLY when scope=tabs
+ *   ↑ / ↓      — move list cursor (works in any scope on list panels)
+ *   Tab        — toggle scope tabs ↔ list (only meaningful on list panels)
  *   Enter      — open chat popover
  *   Cmd/Ctrl+K — same as Enter
  *   Space      — activate currently focused item
- *   Esc        — back (closes popover, then leaves scope, then no-op)
+ *   Esc        — back (closes popover, then leaves list scope)
  *   M          — toggle mute (auto-TTS)
+ *   E          — open chat popover prefilled with last user message
  *
  * The hook is a passive listener — it calls back into the parent via
  * the handlers object. The parent owns the menu state.
@@ -31,6 +38,7 @@ export function useKeyboard({
   onActivate,
   onBack,
   onToggleMute,
+  onEditLast,
   enabled = true,
 }) {
   useEffect(() => {
@@ -53,10 +61,11 @@ export function useKeyboard({
       }
 
       switch (e.key) {
-        // ←/→ ALWAYS cycle tabs, regardless of current scope. The scope
-        // is just a focus indicator for visual feedback — it shouldn't
-        // gate basic navigation.
+        // ←/→ cycles tabs ONLY when scope=tabs. When the user has
+        // explicitly entered list scope (via Tab key or click), ←/→
+        // is absorbed so panels don't get yanked away.
         case "ArrowLeft": {
+          if (state.scope !== "tabs") break;
           e.preventDefault();
           const idx = PANELS.indexOf(state.panel);
           const next = (idx - 1 + PANELS.length) % PANELS.length;
@@ -65,6 +74,7 @@ export function useKeyboard({
         }
 
         case "ArrowRight": {
+          if (state.scope !== "tabs") break;
           e.preventDefault();
           const idx = PANELS.indexOf(state.panel);
           const next = (idx + 1) % PANELS.length;
@@ -72,8 +82,9 @@ export function useKeyboard({
           break;
         }
 
-        // ↑/↓ ALWAYS move the list cursor when the current panel has a
-        // list. No need to first press Tab to "enter" list scope.
+        // ↑/↓ ALWAYS moves the list cursor on a list-bearing panel,
+        // regardless of scope. The meaning is unambiguous, so there's
+        // no reason to gate it on scope.
         case "ArrowUp":
           if (PANELS_WITH_LIST.has(state.panel) && listSize > 0) {
             e.preventDefault();
@@ -89,14 +100,10 @@ export function useKeyboard({
           break;
 
         case "Tab":
-          e.preventDefault();
-          // Cycle: tabs → list (if available) → detail → tabs
-          if (state.scope === "tabs") {
-            setScope(PANELS_WITH_LIST.has(state.panel) ? "list" : "tabs");
-          } else if (state.scope === "list") {
-            setScope("detail");
-          } else {
-            setScope("tabs");
+          // Toggle scope tabs ↔ list. Only meaningful on list panels.
+          if (PANELS_WITH_LIST.has(state.panel)) {
+            e.preventDefault();
+            setScope(state.scope === "tabs" ? "list" : "tabs");
           }
           break;
 
@@ -114,7 +121,7 @@ export function useKeyboard({
           break;
 
         case " ":
-          if (state.scope === "list" || state.scope === "detail") {
+          if (state.scope === "list") {
             e.preventDefault();
             onActivate?.();
           }
@@ -130,6 +137,14 @@ export function useKeyboard({
           if (!e.metaKey && !e.ctrlKey) {
             e.preventDefault();
             onToggleMute?.();
+          }
+          break;
+
+        case "e":
+        case "E":
+          if (!e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            onEditLast?.();
           }
           break;
 
@@ -153,5 +168,6 @@ export function useKeyboard({
     onActivate,
     onBack,
     onToggleMute,
+    onEditLast,
   ]);
 }

@@ -21,7 +21,7 @@ function weatherIcon(weather) {
   return WEATHER_ICONS[key] || "🌡️";
 }
 
-export default function PanelDays({ itinerary, listIndex }) {
+export default function PanelDays({ itinerary, listIndex, onSelect }) {
   const days = itinerary?.days || [];
 
   if (days.length === 0) {
@@ -45,6 +45,7 @@ export default function PanelDays({ itinerary, listIndex }) {
           <li
             key={day.day}
             className={`panel-list-item${i === selectedIdx ? " active" : ""}`}
+            onClick={() => onSelect?.(i)}
           >
             <span className="panel-list-label">DAY {day.day}{day.date && ` · ${day.date}`}</span>
             <span className="panel-list-value">{day.theme || "—"}</span>

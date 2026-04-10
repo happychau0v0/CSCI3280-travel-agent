@@ -104,6 +104,17 @@ function App() {
     },
     [cues, menu],
   );
+  // Mouse click on a list item: move the cursor AND enter list scope
+  // explicitly. The scope flip is what makes ←/→ stop cycling tabs and
+  // signals to the user that they're now "inside" the panel.
+  const selectListItem = useCallback(
+    (index) => {
+      cues.tick();
+      menu.setListIndex(index);
+      menu.setScope("list");
+    },
+    [cues, menu],
+  );
 
   // Document-level hotkeys
   useKeyboard({
@@ -122,7 +133,7 @@ function App() {
     onBack: () => {
       if (chatPopoverOpen) {
         setChatPopoverOpen(false);
-      } else if (menu.state.scope !== "tabs") {
+      } else if (menu.state.scope === "list") {
         menu.setScope("tabs");
       }
     },
@@ -280,16 +291,32 @@ function App() {
           />
         )}
         {menu.state.panel === "PROFILE" && (
-          <PanelProfile listIndex={menu.state.listIndex} onChange={setPreferences} />
+          <PanelProfile
+            listIndex={menu.state.listIndex}
+            onChange={setPreferences}
+            onSelect={selectListItem}
+          />
         )}
         {menu.state.panel === "FLIGHTS" && (
-          <PanelFlights itinerary={currentItinerary} listIndex={menu.state.listIndex} />
+          <PanelFlights
+            itinerary={currentItinerary}
+            listIndex={menu.state.listIndex}
+            onSelect={selectListItem}
+          />
         )}
         {menu.state.panel === "HOTELS" && (
-          <PanelHotels itinerary={currentItinerary} listIndex={menu.state.listIndex} />
+          <PanelHotels
+            itinerary={currentItinerary}
+            listIndex={menu.state.listIndex}
+            onSelect={selectListItem}
+          />
         )}
         {menu.state.panel === "DAYS" && (
-          <PanelDays itinerary={currentItinerary} listIndex={menu.state.listIndex} />
+          <PanelDays
+            itinerary={currentItinerary}
+            listIndex={menu.state.listIndex}
+            onSelect={selectListItem}
+          />
         )}
         {menu.state.panel === "TRANSCRIPT" && (
           <PanelTranscript messages={messages} listIndex={menu.state.listIndex} />

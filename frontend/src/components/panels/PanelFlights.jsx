@@ -24,7 +24,7 @@ function stopsLabel(stops) {
   return `${stops} stops`;
 }
 
-export default function PanelFlights({ itinerary, listIndex }) {
+export default function PanelFlights({ itinerary, listIndex, onSelect }) {
   const flight = itinerary?.flight;
   const options = flight?.options || [];
 
@@ -50,6 +50,7 @@ export default function PanelFlights({ itinerary, listIndex }) {
           <li
             key={i}
             className={`panel-list-item${i === selectedIdx ? " active" : ""}`}
+            onClick={() => onSelect?.(i)}
           >
             <span className="panel-list-label">
               {opt.label || stopsLabel(opt.stops)}

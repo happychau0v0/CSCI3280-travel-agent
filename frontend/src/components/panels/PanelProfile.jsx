@@ -58,7 +58,7 @@ export function preferencesForApi(prefs) {
   return Object.keys(out).length > 0 ? out : null;
 }
 
-export default function PanelProfile({ listIndex, onChange }) {
+export default function PanelProfile({ listIndex, onChange, onSelect }) {
   const [prefs, setPrefs] = useState(() => loadPrefs());
 
   useEffect(() => {
@@ -86,6 +86,7 @@ export default function PanelProfile({ listIndex, onChange }) {
             <li
               key={field.key}
               className={`panel-list-item${i === listIndex ? " active" : ""}`}
+              onClick={() => onSelect?.(i)}
             >
               <span className="panel-list-label">{field.label}</span>
               <span className="panel-list-value">{display}</span>

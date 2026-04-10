@@ -13,7 +13,7 @@ const PRICE_LEVEL_LABELS = {
   PRICE_LEVEL_VERY_EXPENSIVE: "$$$$",
 };
 
-export default function PanelHotels({ itinerary, listIndex }) {
+export default function PanelHotels({ itinerary, listIndex, onSelect }) {
   const hotels = itinerary?.hotels || [];
 
   if (hotels.length === 0) {
@@ -44,6 +44,7 @@ export default function PanelHotels({ itinerary, listIndex }) {
           <li
             key={h.place_id || i}
             className={`panel-list-item${i === selectedIdx ? " active" : ""}`}
+            onClick={() => onSelect?.(i)}
           >
             <span className="panel-list-label">
               {h.rating ? `★ ${h.rating.toFixed(1)}` : ""}
