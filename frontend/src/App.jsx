@@ -3,6 +3,7 @@ import ChatWindow from "./components/ChatWindow";
 import ItineraryCard from "./components/ItineraryCard";
 import MapView from "./components/MapView";
 import ProfilePanel from "./components/ProfilePanel";
+import ErrorBanner from "./components/ErrorBanner";
 import { postChat } from "./api/client";
 import "./App.css";
 
@@ -39,6 +40,7 @@ function App() {
   const [currentItinerary, setCurrentItinerary] = useState(initial.itinerary);
   const [isLoading, setIsLoading] = useState(false);
   const [preferences, setPreferences] = useState(null);
+  const [error, setError] = useState(null);
 
   // Persist on every change
   useEffect(() => {
@@ -53,6 +55,7 @@ function App() {
       setMessages((prev) => [...prev, userMsg]);
       setIsLoading(true);
 
+      setError(null);
       try {
         const data = await postChat(text, history, preferences);
         const assistantMsg = {
@@ -64,16 +67,29 @@ function App() {
           setCurrentItinerary(data.itinerary);
         }
       } catch (err) {
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: `⚠ ${err.message}` },
-        ]);
+        setError(err);
       } finally {
         setIsLoading(false);
       }
     },
     [messages, preferences],
   );
+
+  // Keyboard shortcuts: Cmd/Ctrl+K focuses input, Esc stops TTS + voice
+  useEffect(() => {
+    const handleKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        document.querySelector('.chat-input-form input[type="text"]')?.focus();
+      } else if (e.key === "Escape") {
+        if (window.speechSynthesis?.speaking) {
+          window.speechSynthesis.cancel();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
 
   const handleClear = useCallback(() => {
     setMessages([]);
@@ -87,6 +103,7 @@ function App() {
 
   return (
     <div className="app">
+      <ErrorBanner error={error} onDismiss={() => setError(null)} />
       <header className="app-header">
         <h1>AI Travel Agent</h1>
         <span className="tagline">Plan trips with real data, not hallucinations</span>
