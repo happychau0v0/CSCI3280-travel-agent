@@ -58,7 +58,7 @@ export function preferencesForApi(prefs) {
   return Object.keys(out).length > 0 ? out : null;
 }
 
-export default function PanelProfile({ listIndex, onChange, onSelect }) {
+export default function PanelSettings({ listIndex, onChange, onSelect }) {
   const [prefs, setPrefs] = useState(() => loadPrefs());
 
   useEffect(() => {

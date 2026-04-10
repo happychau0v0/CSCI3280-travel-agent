@@ -168,10 +168,10 @@ TOOL_DEFINITIONS: list[dict] = [
             "name": "navigate_menu",
             "description": (
                 "Move the user's menu cursor to a specific panel. The user is "
-                "viewing a NieR-style menu with seven tabs (MAP, TRIP, FLIGHTS, "
-                "HOTELS, DAYS, PROFILE, TRANSCRIPT). Call this tool to focus "
+                "viewing a NieR-style menu with seven tabs (HOME, TRIP, FLIGHTS, "
+                "HOTELS, DAYS, SETTINGS, HISTORY). Call this tool to focus "
                 "their attention on a specific tab — e.g. after building a trip, "
-                "call navigate_menu('MAP') to show them the destination on the "
+                "call navigate_menu('HOME') to show them the dashboard with the "
                 "globe; if they ask about hotels, call navigate_menu('HOTELS')."
             ),
             "parameters": {
@@ -179,7 +179,7 @@ TOOL_DEFINITIONS: list[dict] = [
                 "properties": {
                     "panel": {
                         "type": "string",
-                        "enum": ["MAP", "TRIP", "FLIGHTS", "HOTELS", "DAYS", "PROFILE", "TRANSCRIPT"],
+                        "enum": ["HOME", "TRIP", "FLIGHTS", "HOTELS", "DAYS", "SETTINGS", "HISTORY"],
                         "description": "The panel to switch to",
                     },
                     "item": {

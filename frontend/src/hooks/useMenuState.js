@@ -5,7 +5,7 @@ import { useCallback, useState } from "react";
  *
  * State shape:
  *   {
- *     panel:     "MAP" | "TRIP" | "FLIGHTS" | "HOTELS" | "DAYS" | "PROFILE" | "TRANSCRIPT",
+ *     panel:     "HOME" | "TRIP" | "FLIGHTS" | "HOTELS" | "DAYS" | "SETTINGS" | "HISTORY",
  *     scope:     "tabs" | "list",             // which area the keyboard cursor is in
  *     listIndex: number,                      // which item in the left list is highlighted
  *     filter:    object | null,               // optional sort/filter set by the LLM
@@ -25,19 +25,28 @@ import { useCallback, useState } from "react";
  *    that App.jsx routes through `navigate({panel, item, filter})`
  */
 export const PANELS = [
-  "MAP",
+  "HOME",
   "TRIP",
   "FLIGHTS",
   "HOTELS",
   "DAYS",
-  "PROFILE",
-  "TRANSCRIPT",
+  "SETTINGS",
+  "HISTORY",
 ];
 
-export const PANELS_WITH_LIST = new Set(["FLIGHTS", "HOTELS", "DAYS", "PROFILE", "TRANSCRIPT"]);
+// HOME has 4 corner cards (not a vertical list — handled separately).
+// TRIP has a list of editable form fields. The rest of the list-bearing
+// panels are detail/list views over the itinerary or conversation.
+export const PANELS_WITH_LIST = new Set([
+  "TRIP",
+  "FLIGHTS",
+  "HOTELS",
+  "DAYS",
+  "SETTINGS",
+]);
 
 const INITIAL_STATE = {
-  panel: "MAP",
+  panel: "HOME",
   scope: "tabs",
   listIndex: 0,
   filter: null,

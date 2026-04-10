@@ -16,7 +16,7 @@ function summarize(text, max = 60) {
   return clean.length > max ? clean.slice(0, max) + "…" : clean;
 }
 
-export default function PanelTranscript({ messages, listIndex }) {
+export default function PanelHistory({ messages, listIndex }) {
   if (!messages || messages.length === 0) {
     return (
       <section className="panel panel-list" aria-label="Transcript">

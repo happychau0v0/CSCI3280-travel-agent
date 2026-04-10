@@ -11,7 +11,7 @@ back as the "tool result", which it can include in the conversation history.
 """
 from __future__ import annotations
 
-VALID_PANELS = {"MAP", "TRIP", "FLIGHTS", "HOTELS", "DAYS", "PROFILE", "TRANSCRIPT"}
+VALID_PANELS = {"HOME", "TRIP", "FLIGHTS", "HOTELS", "DAYS", "SETTINGS", "HISTORY"}
 
 
 async def navigate_menu(
@@ -22,7 +22,7 @@ async def navigate_menu(
     """Move the user's menu cursor to a specific panel/item.
 
     Args:
-        panel: one of MAP, TRIP, FLIGHTS, HOTELS, DAYS, PROFILE, TRANSCRIPT
+        panel: one of HOME, TRIP, FLIGHTS, HOTELS, DAYS, SETTINGS, HISTORY
         item: optional identifier — for FLIGHTS pass a type ("non-stop"),
               for HOTELS pass a hotel name, for DAYS pass a day number
         filter: optional sort/filter dict, e.g. {"sort": "price_asc"}

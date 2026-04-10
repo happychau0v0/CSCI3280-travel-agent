@@ -3,13 +3,13 @@ import ErrorBanner from "./components/ErrorBanner";
 import MenuShell from "./components/MenuShell";
 import Subtitle from "./components/Subtitle";
 import ChatPopover from "./components/ChatPopover";
-import PanelMap from "./components/panels/PanelMap";
+import PanelHome from "./components/panels/PanelHome";
 import PanelTrip from "./components/panels/PanelTrip";
-import PanelProfile from "./components/panels/PanelProfile";
+import PanelSettings from "./components/panels/PanelSettings";
 import PanelFlights from "./components/panels/PanelFlights";
 import PanelHotels from "./components/panels/PanelHotels";
 import PanelDays from "./components/panels/PanelDays";
-import PanelTranscript from "./components/panels/PanelTranscript";
+import PanelHistory from "./components/panels/PanelHistory";
 import { streamChat } from "./api/client";
 import { useGeolocation } from "./hooks/useGeolocation";
 import { useMenuState } from "./hooks/useMenuState";
@@ -74,20 +74,20 @@ function App() {
   // hook can clamp ↑/↓ navigation.
   const listSize = useMemo(() => {
     switch (menu.state.panel) {
+      case "TRIP":
+        return 6; // destination, start, end, transport, party, interests
       case "FLIGHTS":
         return currentItinerary?.flight?.options?.length || 0;
       case "HOTELS":
         return currentItinerary?.hotels?.length || 0;
       case "DAYS":
         return currentItinerary?.days?.length || 0;
-      case "PROFILE":
-        return 5;
-      case "TRANSCRIPT":
-        return messages.length;
+      case "SETTINGS":
+        return 8; // 5 prefs + mute + clear + globe-stars
       default:
         return 0;
     }
-  }, [menu.state.panel, currentItinerary, messages.length]);
+  }, [menu.state.panel, currentItinerary]);
 
   // Cue audio on cursor moves and tab switches
   const setPanelWithCue = useCallback(
@@ -280,8 +280,12 @@ function App() {
 
       {/* NieR-style menu shell */}
       <MenuShell state={menu.state} onTabClick={setPanelWithCue} muted={muted}>
-        {menu.state.panel === "MAP" && (
-          <PanelMap itinerary={currentItinerary} userLocation={userLocation} />
+        {menu.state.panel === "HOME" && (
+          <PanelHome
+            itinerary={currentItinerary}
+            userLocation={userLocation}
+            onJumpTo={setPanelWithCue}
+          />
         )}
         {menu.state.panel === "TRIP" && (
           <PanelTrip
@@ -290,8 +294,8 @@ function App() {
             tripDates={tripDates}
           />
         )}
-        {menu.state.panel === "PROFILE" && (
-          <PanelProfile
+        {menu.state.panel === "SETTINGS" && (
+          <PanelSettings
             listIndex={menu.state.listIndex}
             onChange={setPreferences}
             onSelect={selectListItem}
@@ -318,8 +322,8 @@ function App() {
             onSelect={selectListItem}
           />
         )}
-        {menu.state.panel === "TRANSCRIPT" && (
-          <PanelTranscript messages={messages} listIndex={menu.state.listIndex} />
+        {menu.state.panel === "HISTORY" && (
+          <PanelHistory messages={messages} listIndex={menu.state.listIndex} />
         )}
       </MenuShell>
 

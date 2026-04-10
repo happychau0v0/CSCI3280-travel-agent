@@ -40,42 +40,115 @@
   color: var(--text-dim);
 }
 
-/* PanelMap status badge over the globe */
+/* PanelHome dashboard — 4 corner cards with the globe in the center */
 
-.panel-map {
-  align-items: flex-start;
-  justify-content: flex-start;
+.panel-home {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) 1fr minmax(260px, 1fr);
+  grid-template-rows: minmax(120px, 1fr) 2fr minmax(120px, 1fr);
+  gap: 24px;
+  padding: 32px 0;
+  margin: 0;
+  width: 100%;
+  pointer-events: none;
 }
 
-.panel-map-status {
-  margin-top: 24px;
-  padding: 14px 18px;
+.home-card {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px 22px;
   background: var(--bg-glass);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 240px;
+  text-align: left;
+  font-family: var(--mono);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+  position: relative;
 }
 
-.map-status-line {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.home-card::before,
+.home-card::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--accent);
 }
 
-.map-status-label {
-  font-size: 9px;
+.home-card::before {
+  top: -1px;
+  left: -1px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.home-card::after {
+  bottom: -1px;
+  right: -1px;
+  border-left: none;
+  border-top: none;
+}
+
+.home-card:hover,
+.home-card:focus {
+  border-color: var(--accent);
+  background: rgba(0, 217, 255, 0.08);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.home-card-tl { grid-column: 1; grid-row: 1; }
+.home-card-tr { grid-column: 3; grid-row: 1; }
+.home-card-bl { grid-column: 1; grid-row: 3; }
+.home-card-br { grid-column: 3; grid-row: 3; }
+
+.home-card-label {
+  font-size: 10px;
   letter-spacing: 0.12em;
   color: var(--text-dim);
+  text-transform: uppercase;
 }
 
-.map-status-value {
-  font-size: 13px;
+.home-card-value {
+  font-size: 18px;
   color: var(--text-h);
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-card-empty {
+  color: var(--accent);
+  letter-spacing: 0.08em;
+}
+
+.home-card-sub {
+  font-size: 11px;
+  color: var(--text);
+  letter-spacing: 0.04em;
+}
+
+.home-card.agent-working {
+  border-color: var(--accent);
+  background: rgba(0, 217, 255, 0.1);
+  animation: home-card-pulse 1.6s ease-in-out infinite;
+}
+
+.home-card.agent-error {
+  border-color: var(--danger);
+  background: rgba(255, 85, 119, 0.1);
+}
+
+@keyframes home-card-pulse {
+  0%, 100% { box-shadow: 0 0 16px rgba(0, 217, 255, 0.2); }
+  50% { box-shadow: 0 0 32px rgba(0, 217, 255, 0.5); }
 }
 
 /* PanelTrip command center */

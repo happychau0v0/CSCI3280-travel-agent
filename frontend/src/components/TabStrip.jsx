@@ -1,13 +1,13 @@
 import { PANELS } from "../hooks/useMenuState";
 
 const TAB_LABELS = {
-  MAP: "MAP",
+  HOME: "HOME",
   TRIP: "TRIP",
   FLIGHTS: "FLIGHTS",
   HOTELS: "HOTELS",
   DAYS: "DAYS",
-  PROFILE: "PROFILE",
-  TRANSCRIPT: "TRANSCRIPT",
+  SETTINGS: "SETTINGS",
+  HISTORY: "HISTORY",
 };
 
 /**
