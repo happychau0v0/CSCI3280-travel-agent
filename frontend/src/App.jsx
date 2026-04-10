@@ -457,7 +457,13 @@ function App() {
             isLoading={isLoading}
             onPlan={handleSend}
             pendingInputRequest={pendingInputRequest}
-            onResolveInput={(field, value) => {
+            onResolveInput={(field, value, fieldIdx) => {
+              // Move the cursor to the resolved field BEFORE clearing
+              // pendingInputRequest, so the user doesn't see the
+              // cursor visibly snap back to row 0 (B7).
+              if (typeof fieldIdx === "number" && fieldIdx >= 0) {
+                menu.setListIndex(fieldIdx);
+              }
               setPendingInputRequest(null);
               handleSend(`${field}: ${value}`);
             }}

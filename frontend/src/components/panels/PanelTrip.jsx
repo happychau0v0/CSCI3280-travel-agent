@@ -134,11 +134,14 @@ export default function PanelTrip({
 
   // Submit the focused field's value back to the agent when the user
   // presses Enter on the inline input. Resolves the pending request.
+  // Pass the resolved field's index so the parent can keep the cursor
+  // on that row (B7).
   const handleResolveSubmit = () => {
     if (!pendingInputRequest) return;
     const value = form[pendingInputRequest.field];
     if (value == null || value === "") return;
-    onResolveInput?.(pendingInputRequest.field, value);
+    const fieldIdx = FIELDS.findIndex((f) => f.key === pendingInputRequest.field);
+    onResolveInput?.(pendingInputRequest.field, value, fieldIdx);
   };
 
   const handleEditorKeyDown = (e) => {
