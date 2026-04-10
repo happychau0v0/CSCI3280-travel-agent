@@ -1,12 +1,5 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import ChatWindow from "./components/ChatWindow";
-import InputDock from "./components/InputDock";
-import ItineraryDrawer from "./components/ItineraryDrawer";
-import ProfilePanel from "./components/ProfilePanel";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import ErrorBanner from "./components/ErrorBanner";
-import LiveTicker from "./components/LiveTicker";
-import FullscreenButton from "./components/FullscreenButton";
-import TripDateModal from "./components/TripDateModal";
 import MenuShell from "./components/MenuShell";
 import Subtitle from "./components/Subtitle";
 import ChatPopover from "./components/ChatPopover";
@@ -22,38 +15,18 @@ import { useGeolocation } from "./hooks/useGeolocation";
 import { useMenuState } from "./hooks/useMenuState";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useSubtitleQueue } from "./hooks/useSubtitleQueue";
+import { useAudioCues } from "./hooks/useAudioCues";
 import "./App.css";
-
-const TRIP_DATES_KEY = "travel-trip-dates";
-const TRIP_INTENT_REGEX =
-  /\b(trip|visit|travel|plan a|go to|fly to|holiday in|vacation in|tour of)\b/i;
-
-function loadTripDates() {
-  try {
-    const raw = localStorage.getItem(TRIP_DATES_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveTripDates(dates) {
-  try {
-    if (dates) localStorage.setItem(TRIP_DATES_KEY, JSON.stringify(dates));
-    else localStorage.removeItem(TRIP_DATES_KEY);
-  } catch {
-    // ignore
-  }
-}
 
 // Lazy-load the globe so the Three.js bundle doesn't block first paint.
 const GlobeView = lazy(() => import("./components/GlobeView"));
 
-const STORAGE_KEY = "travel-chat-state";
+const STATE_KEY = "travel-chat-state";
+const TRIP_DATES_KEY = "travel-trip-dates";
 
 function loadState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STATE_KEY);
     if (!raw) return { messages: [], itinerary: null };
     const parsed = JSON.parse(raw);
     return {
@@ -67,9 +40,18 @@ function loadState() {
 
 function saveState(messages, itinerary) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ messages, itinerary }));
+    localStorage.setItem(STATE_KEY, JSON.stringify({ messages, itinerary }));
   } catch {
-    // Storage may be unavailable; fail silently
+    /* ignore */
+  }
+}
+
+function loadTripDates() {
+  try {
+    const raw = localStorage.getItem(TRIP_DATES_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
   }
 }
 
@@ -80,20 +62,16 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [preferences, setPreferences] = useState(null);
   const [error, setError] = useState(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [lastAction, setLastAction] = useState("");
-  const [currentTool, setCurrentTool] = useState(null);
-  const [tripDates, setTripDates] = useState(() => loadTripDates());
-  const [dateModalOpen, setDateModalOpen] = useState(false);
   const [muted, setMuted] = useState(false);
   const [chatPopoverOpen, setChatPopoverOpen] = useState(false);
-  const pendingMessageRef = useRef(null); // message waiting for date confirmation
+  const tripDates = loadTripDates(); // edited via PanelProfile in the future
   const { location: userLocation, requestPermission } = useGeolocation();
   const menu = useMenuState();
   const subtitles = useSubtitleQueue({ muted });
+  const cues = useAudioCues({ muted });
 
   // Compute the size of the active panel's left list so the keyboard
-  // hook can clamp ↑/↓ navigation. This is panel-specific.
+  // hook can clamp ↑/↓ navigation.
   const listSize = useMemo(() => {
     switch (menu.state.panel) {
       case "FLIGHTS":
@@ -103,7 +81,7 @@ function App() {
       case "DAYS":
         return currentItinerary?.days?.length || 0;
       case "PROFILE":
-        return 5; // five fields
+        return 5;
       case "TRANSCRIPT":
         return messages.length;
       default:
@@ -111,16 +89,35 @@ function App() {
     }
   }, [menu.state.panel, currentItinerary, messages.length]);
 
-  // Document-level hotkeys (1-7, arrows, Tab, Enter, Space, Esc, M)
+  // Cue audio on cursor moves and tab switches
+  const setPanelWithCue = useCallback(
+    (panel) => {
+      cues.select();
+      menu.setPanel(panel);
+    },
+    [cues, menu],
+  );
+  const setListIndexWithCue = useCallback(
+    (index) => {
+      cues.tick();
+      menu.setListIndex(index);
+    },
+    [cues, menu],
+  );
+
+  // Document-level hotkeys
   useKeyboard({
     state: menu.state,
-    setPanel: menu.setPanel,
-    setListIndex: menu.setListIndex,
+    setPanel: setPanelWithCue,
+    setListIndex: setListIndexWithCue,
     setScope: menu.setScope,
     listSize,
-    onOpenChat: () => setChatPopoverOpen(true),
+    onOpenChat: () => {
+      cues.select();
+      setChatPopoverOpen(true);
+    },
     onActivate: () => {
-      // Hooked up by individual panels in commits 7-10
+      cues.select();
     },
     onBack: () => {
       if (chatPopoverOpen) {
@@ -132,29 +129,13 @@ function App() {
     onToggleMute: () => setMuted((m) => !m),
   });
 
-  // Persist on every change
+  // Persist messages + itinerary
   useEffect(() => {
     saveState(messages, currentItinerary);
   }, [messages, currentItinerary]);
 
-  // Auto-open the drawer the first time an itinerary lands
-  useEffect(() => {
-    if (currentItinerary && !drawerOpen) {
-      setDrawerOpen(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentItinerary?.title, currentItinerary?.destination]);
-
   const handleSend = useCallback(
     async (text) => {
-      // Trip-intent gate: if the message looks like a trip request and we
-      // don't have dates yet, intercept and pop the date modal first.
-      if (!tripDates && TRIP_INTENT_REGEX.test(text)) {
-        pendingMessageRef.current = text;
-        setDateModalOpen(true);
-        return;
-      }
-
       const userMsg = { role: "user", content: text };
       const history = messages.map((m) => ({ role: m.role, content: m.content }));
 
@@ -163,8 +144,6 @@ function App() {
       setError(null);
 
       try {
-        setLastAction("Thinking…");
-        setCurrentTool(null);
         const data = await streamChat({
           message: text,
           history,
@@ -173,18 +152,10 @@ function App() {
           tripDates,
           onEvent: ({ type, data: payload }) => {
             if (type === "tool_start") {
-              setCurrentTool(payload.name);
-              setLastAction(`Calling ${payload.name}`);
-            } else if (type === "tool_end") {
-              setCurrentTool(null);
-              setLastAction(`Finished ${payload.name}`);
+              cues.bloop();
             } else if (type === "navigate") {
-              // The LLM is driving the menu cursor via navigate_menu().
-              // Update the menu state machine to switch panels / move
-              // the list cursor.
               menu.navigate(payload);
-            } else if (type === "done") {
-              setCurrentTool(null);
+              cues.select();
             }
           },
         });
@@ -193,107 +164,20 @@ function App() {
         setMessages((prev) => [...prev, assistantMsg]);
         if (data.itinerary) {
           setCurrentItinerary(data.itinerary);
+          cues.chime();
         }
-        // Push the reply into the subtitle queue (sentence-by-sentence
-        // auto-TTS unless muted)
         subtitles.pushParagraph(data.reply);
-        setLastAction("Ready");
       } catch (err) {
         setError(err);
-        setLastAction("Error");
-        setCurrentTool(null);
+        cues.error();
       } finally {
         setIsLoading(false);
       }
     },
-    [messages, preferences, userLocation, tripDates, subtitles, menu],
+    [messages, preferences, userLocation, tripDates, subtitles, menu, cues],
   );
 
-  // Modal callbacks
-  const handleDatesConfirmed = useCallback(
-    (dates) => {
-      setTripDates(dates);
-      saveTripDates(dates);
-      setDateModalOpen(false);
-      const pending = pendingMessageRef.current;
-      pendingMessageRef.current = null;
-      if (pending) {
-        // Now that dates are set, replay the original message — handleSend
-        // will skip the gate this time because tripDates is non-null.
-        // We can't call handleSend directly (the closure has the old
-        // tripDates), so re-trigger via a microtask.
-        queueMicrotask(() => handleSendWithDates(pending, dates));
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-
-  const handleDatesSkipped = useCallback(() => {
-    setDateModalOpen(false);
-    const pending = pendingMessageRef.current;
-    pendingMessageRef.current = null;
-    if (pending) {
-      // Mark dates as null-but-asked so we don't loop the modal forever
-      saveTripDates({ start: null, end: null });
-      setTripDates({ start: null, end: null });
-      queueMicrotask(() => handleSendWithDates(pending, null));
-    }
-  }, []);
-
-  // Internal helper that bypasses the trip-intent gate (used after the
-  // modal resolves so we don't re-prompt on the same message).
-  const handleSendWithDates = useCallback(
-    async (text, dates) => {
-      const userMsg = { role: "user", content: text };
-      const history = messages.map((m) => ({ role: m.role, content: m.content }));
-
-      setMessages((prev) => [...prev, userMsg]);
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        setLastAction("Thinking…");
-        setCurrentTool(null);
-        const data = await streamChat({
-          message: text,
-          history,
-          preferences,
-          userLocation,
-          tripDates: dates,
-          onEvent: ({ type, data: payload }) => {
-            if (type === "tool_start") {
-              setCurrentTool(payload.name);
-              setLastAction(`Calling ${payload.name}`);
-            } else if (type === "tool_end") {
-              setCurrentTool(null);
-              setLastAction(`Finished ${payload.name}`);
-            } else if (type === "navigate") {
-              menu.navigate(payload);
-            } else if (type === "done") {
-              setCurrentTool(null);
-            }
-          },
-        });
-        if (!data) throw new Error("Stream ended without a response");
-        const assistantMsg = { role: "assistant", content: data.reply };
-        setMessages((prev) => [...prev, assistantMsg]);
-        if (data.itinerary) setCurrentItinerary(data.itinerary);
-        subtitles.pushParagraph(data.reply);
-        setLastAction("Ready");
-      } catch (err) {
-        setError(err);
-        setLastAction("Error");
-        setCurrentTool(null);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [messages, preferences, userLocation],
-  );
-
-  // Trigger the GPS prompt on the first user gesture so browsers don't
-  // reject it as unsolicited.
+  // Trigger the GPS prompt on the first user gesture
   useEffect(() => {
     if (userLocation) return;
     const onFirstGesture = () => {
@@ -303,58 +187,6 @@ function App() {
     window.addEventListener("pointerdown", onFirstGesture, { once: true });
     return () => window.removeEventListener("pointerdown", onFirstGesture);
   }, [userLocation, requestPermission]);
-
-  // Keyboard shortcuts: Cmd/Ctrl+K focuses input, Esc stops TTS
-  useEffect(() => {
-    const handleKey = (e) => {
-      const key = e.key?.toLowerCase();
-      if ((e.metaKey || e.ctrlKey) && key === "k") {
-        e.preventDefault();
-        document.querySelector('.input-dock input[type="text"]')?.focus();
-      } else if (key === "escape") {
-        if (window.speechSynthesis?.speaking) {
-          window.speechSynthesis.cancel();
-        }
-      }
-    };
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, []);
-
-  // Edit-and-resend the most recent user message: truncate history to
-  // before that user message, then re-send with the new text.
-  const handleEditAndResend = useCallback(
-    (newText) => {
-      // Find the index of the last user message
-      let lastUserIdx = -1;
-      for (let i = messages.length - 1; i >= 0; i--) {
-        if (messages[i].role === "user") {
-          lastUserIdx = i;
-          break;
-        }
-      }
-      if (lastUserIdx === -1) return;
-      const truncated = messages.slice(0, lastUserIdx);
-      setMessages(truncated);
-      // Re-fire the gate so trip-intent + dates still work, but pass via
-      // a microtask so the state update from setMessages is committed first.
-      queueMicrotask(() => handleSend(newText));
-    },
-    [messages, handleSend],
-  );
-
-  const handleClear = useCallback(() => {
-    setMessages([]);
-    setCurrentItinerary(null);
-    setDrawerOpen(false);
-    setTripDates(null);
-    saveTripDates(null);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // ignore
-    }
-  }, []);
 
   // Derive globe arcs and points from the current itinerary + user location
   const { arcs, points } = useMemo(() => {
@@ -392,7 +224,6 @@ function App() {
       });
     }
 
-    // Activity dots
     for (const day of currentItinerary?.days || []) {
       for (const a of day.activities || []) {
         if (a.lat != null && a.lng != null) {
@@ -407,7 +238,6 @@ function App() {
       }
     }
 
-    // Hotel dots
     for (const h of currentItinerary?.hotels || []) {
       if (h.lat != null && h.lng != null) {
         points.push({
@@ -427,19 +257,18 @@ function App() {
     <div className="app">
       <ErrorBanner error={error} onDismiss={() => setError(null)} />
 
-      {/* Background globe — always rendered */}
+      {/* Background globe */}
       <Suspense fallback={<div className="globe-loading">Loading globe…</div>}>
         <GlobeView
           userLocation={userLocation}
           arcs={arcs}
           points={points}
-          drawerOpen={drawerOpen}
+          drawerOpen={false}
         />
       </Suspense>
 
-      {/* NieR-style menu shell — tab strip top, footer hints bottom.
-          Empty panel slot for now; populated in commits 7-10. */}
-      <MenuShell state={menu.state} onTabClick={menu.setPanel} muted={muted}>
+      {/* NieR-style menu shell */}
+      <MenuShell state={menu.state} onTabClick={setPanelWithCue} muted={muted}>
         {menu.state.panel === "MAP" && (
           <PanelMap itinerary={currentItinerary} userLocation={userLocation} />
         )}
@@ -467,69 +296,15 @@ function App() {
         )}
       </MenuShell>
 
-      {/* Bottom-center subtitle bar — auto-TTS the assistant's reply */}
+      {/* Bottom-center subtitle bar with auto-TTS */}
       <Subtitle text={subtitles.current} />
 
-      {/* Chat popover — opens on Enter / Cmd+K */}
+      {/* Chat popover (opens on Enter / Cmd+K) */}
       <ChatPopover
         open={chatPopoverOpen}
         onSend={handleSend}
         onClose={() => setChatPopoverOpen(false)}
         isLoading={isLoading}
-      />
-
-      {/* Top-left LIVE ticker */}
-      <LiveTicker
-        userLocation={userLocation}
-        isLoading={isLoading}
-        lastAction={lastAction}
-        currentTool={currentTool}
-      />
-
-      {/* Top-right controls */}
-      <div className="top-right-controls">
-        {(messages.length > 0 || currentItinerary) && (
-          <button
-            type="button"
-            className="clear-btn"
-            onClick={handleClear}
-            title="Clear chat history"
-          >
-            Clear
-          </button>
-        )}
-        <ProfilePanel onChange={setPreferences} />
-      </div>
-
-      {/* Chat overlay */}
-      <ChatWindow
-        messages={messages}
-        isLoading={isLoading}
-        onEditAndResend={handleEditAndResend}
-      />
-
-      {/* Bottom-left input dock + fullscreen toggle */}
-      <InputDock
-        onSend={handleSend}
-        isLoading={isLoading}
-        userLocation={userLocation}
-      />
-      <FullscreenButton />
-
-      {/* Slide-in itinerary drawer */}
-      <ItineraryDrawer
-        itinerary={currentItinerary}
-        isOpen={drawerOpen}
-        onOpen={() => setDrawerOpen(true)}
-        onClose={() => setDrawerOpen(false)}
-        onItineraryUpdate={setCurrentItinerary}
-      />
-
-      {/* Trip date modal — pops on first trip request */}
-      <TripDateModal
-        open={dateModalOpen}
-        onConfirm={handleDatesConfirmed}
-        onCancel={handleDatesSkipped}
       />
     </div>
   );
