@@ -13,7 +13,7 @@ const PRICE_LEVEL_LABELS = {
   PRICE_LEVEL_VERY_EXPENSIVE: "$$$$",
 };
 
-export default function PanelHotels({ itinerary, listIndex, onSelect }) {
+export default function PanelHotels({ itinerary, listIndex, onSelect, onPick }) {
   const hotels = itinerary?.hotels || [];
 
   if (hotels.length === 0) {
@@ -21,7 +21,7 @@ export default function PanelHotels({ itinerary, listIndex, onSelect }) {
       <section className="panel panel-list" aria-label="Hotels">
         <div className="panel-empty">
           <h2>NO HOTELS YET</h2>
-          <p>Press Enter and ask the agent to find accommodation.</p>
+          <p>Press T and ask the agent to find accommodation.</p>
         </div>
       </section>
     );
@@ -29,6 +29,14 @@ export default function PanelHotels({ itinerary, listIndex, onSelect }) {
 
   const selectedIdx = Math.min(listIndex, hotels.length - 1);
   const selected = hotels[selectedIdx];
+  // The "picked" hotel matches by place_id (preferred) or name. Picking
+  // a hotel triggers an auto-replan via onPick.
+  const picked = itinerary?.selected_hotel;
+  const pickedIdx = picked
+    ? hotels.findIndex(
+        (h) => (picked.place_id && h.place_id === picked.place_id) || h.name === picked.name,
+      )
+    : -1;
   const photo = photoSrc(selected?.photo_url);
   const priceLabel = PRICE_LEVEL_LABELS[selected?.price_level] || "";
   const mapsUrl = selected?.place_id
@@ -43,12 +51,16 @@ export default function PanelHotels({ itinerary, listIndex, onSelect }) {
         {hotels.map((h, i) => (
           <li
             key={h.place_id || i}
-            className={`panel-list-item${i === selectedIdx ? " active" : ""}`}
+            className={
+              `panel-list-item${i === selectedIdx ? " active" : ""}` +
+              (i === pickedIdx ? " picked" : "")
+            }
             onClick={() => onSelect?.(i)}
           >
             <span className="panel-list-label">
               {h.rating ? `★ ${h.rating.toFixed(1)}` : ""}
               {PRICE_LEVEL_LABELS[h.price_level] && ` · ${PRICE_LEVEL_LABELS[h.price_level]}`}
+              {i === pickedIdx && <span className="panel-list-picked-tag"> ✓ PICKED</span>}
             </span>
             <span className="panel-list-value">{h.name}</span>
           </li>
@@ -89,6 +101,17 @@ export default function PanelHotels({ itinerary, listIndex, onSelect }) {
             <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 16 }}>
               {selected.address}
             </div>
+            <button
+              type="button"
+              className="trip-plan-btn"
+              onClick={() => onPick?.(selectedIdx)}
+              disabled={selectedIdx === pickedIdx}
+              data-testid="hotel-pick-btn"
+              style={{ marginTop: 16, marginBottom: 12 }}
+            >
+              {selectedIdx === pickedIdx ? "✓ PICKED · REPLANNING…" : "PICK & REPLAN DAYS →"}
+            </button>
+
             {mapsUrl && (
               <a
                 href={mapsUrl}

@@ -490,6 +490,24 @@ function App() {
             itinerary={currentItinerary}
             listIndex={menu.state.listIndex}
             onSelect={selectListItem}
+            onPick={(i) => {
+              const hotel = currentItinerary?.hotels?.[i];
+              if (!hotel) return;
+              // Stamp the pick locally so the HOME card and the .picked
+              // class update immediately without waiting for the agent.
+              setCurrentItinerary({
+                ...currentItinerary,
+                selected_hotel: hotel,
+              });
+              cues.chime();
+              // Auto-fire a replan chat. The backend SYSTEM_PROMPT
+              // (R3b) instructs the LLM to anchor each day at this
+              // hotel.
+              const prompt =
+                `Set "${hotel.name}" as the base hotel. ` +
+                `Replan every day so each route starts and ends at this hotel.`;
+              handleSend(prompt);
+            }}
           />
         )}
         {menu.state.panel === "DAYS" && (
