@@ -5,6 +5,7 @@ import Subtitle from "./components/Subtitle";
 import ChatPopover from "./components/ChatPopover";
 import AgentStatusBar from "./components/AgentStatusBar";
 import HistoryOverlay from "./components/HistoryOverlay";
+import SettingsOverlay from "./components/SettingsOverlay";
 import PanelHome from "./components/panels/PanelHome";
 import PanelFlights from "./components/panels/PanelFlights";
 import PanelHotels from "./components/panels/PanelHotels";
@@ -548,6 +549,16 @@ function App() {
         messages={messages}
         onClose={() => setHistoryOpen(false)}
         onEditTurn={handleEditTurn}
+      />
+
+      {/* SETTINGS overlay (S key) */}
+      <SettingsOverlay
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onChange={setPreferences}
+        muted={muted}
+        onToggleMute={() => setMuted((m) => !m)}
+        onClearAll={handleClearAll}
       />
 
       {/* Bottom-center subtitle bar with auto-TTS */}

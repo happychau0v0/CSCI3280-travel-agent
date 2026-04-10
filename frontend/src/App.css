@@ -654,6 +654,37 @@
   box-shadow: 0 0 24px rgba(0, 217, 255, 0.18);
 }
 
+/* SettingsOverlay reuses HistoryOverlay's frame */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  outline: none;
+}
+
+.settings-overlay-frame {
+  max-width: 720px;
+}
+
+.settings-overlay-body {
+  display: flex;
+  gap: 16px;
+  padding: 18px;
+  flex: 1;
+  min-height: 0;
+}
+
+.settings-overlay-list {
+  flex: 0 0 240px;
+}
+
+.settings-overlay-detail {
+  flex: 1;
+}
+
 /* PanelHistory — legacy scrolling pane (kept for fallback selectors) */
 
 .panel-history {
