@@ -1,10 +1,23 @@
-const API_BASE = "http://localhost:8000";
+export const API_BASE = "http://localhost:8000";
 
-export async function postChat(message, history = []) {
+/**
+ * Build an absolute URL for a relative photo path returned from the backend
+ * (e.g. "/photo/places/ChIJ.../photos/Ae...").
+ */
+export function photoSrc(relativePath) {
+  if (!relativePath) return null;
+  if (relativePath.startsWith("http")) return relativePath;
+  return `${API_BASE}${relativePath}`;
+}
+
+export async function postChat(message, history = [], preferences = null) {
+  const body = { message, history };
+  if (preferences) body.preferences = preferences;
+
   const response = await fetch(`${API_BASE}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify(body),
   });
   if (!response.ok) {
     let detail = `HTTP ${response.status}`;
@@ -14,7 +27,9 @@ export async function postChat(message, history = []) {
     } catch {
       // ignore JSON parse errors
     }
-    throw new Error(detail);
+    const error = new Error(detail);
+    error.status = response.status;
+    throw error;
   }
   return response.json();
 }
