@@ -11,6 +11,20 @@ function stripJsonBlocks(text) {
   return (text || "").replace(/```json[\s\S]*?```/g, "").trim();
 }
 
+/**
+ * Render a string with minimal markdown support: **bold** segments become
+ * <strong>. Splits on the bold pattern and rebuilds as a React fragment.
+ */
+function renderMarkdown(text) {
+  if (!text) return null;
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    const m = part.match(/^\*\*([^*]+)\*\*$/);
+    if (m) return <strong key={i}>{m[1]}</strong>;
+    return <span key={i}>{part}</span>;
+  });
+}
+
 export default function ChatWindow({ messages, onSend, isLoading }) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef(null);
@@ -50,7 +64,9 @@ export default function ChatWindow({ messages, onSend, isLoading }) {
           return (
             <div key={i} className={`message message-${msg.role}`}>
               <div className="message-bubble">
-                <div className="message-content">{display}</div>
+                <div className="message-content">
+                  {msg.role === "assistant" ? renderMarkdown(display) : display}
+                </div>
                 {msg.role === "assistant" && display && (
                   <AudioPlayer text={display} />
                 )}
