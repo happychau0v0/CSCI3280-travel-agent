@@ -8,7 +8,6 @@ from app.tools.errors import ToolUnavailableError
 
 PLACES_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
 PLACES_DETAILS_URL = "https://places.googleapis.com/v1/places/{place_id}"
-PLACES_PHOTO_URL = "https://places.googleapis.com/v1/{photo_name}/media"
 
 SEARCH_FIELD_MASK = (
     "places.id,places.displayName,places.formattedAddress,"
@@ -21,7 +20,11 @@ DETAILS_FIELD_MASK = (
 
 
 def _photo_url(photo_name: str) -> str:
-    return f"{PLACES_PHOTO_URL.format(photo_name=photo_name)}?maxWidthPx=400&key={GOOGLE_MAPS_API_KEY}"
+    """Return a relative URL pointing at our backend photo proxy.
+
+    The frontend prepends its API_BASE so the API key never reaches the browser.
+    """
+    return f"/photo/{photo_name}"
 
 
 async def search_places(

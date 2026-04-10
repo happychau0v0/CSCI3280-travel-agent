@@ -52,7 +52,7 @@ async def test_search_places_returns_normalized_list():
     assert result[0]["name"] == "Senso-ji Temple"
     assert result[0]["place_id"] == "ChIJabc"
     assert result[0]["rating"] == 4.5
-    assert result[0]["photo_url"] is not None
+    assert result[0]["photo_url"] == "/photo/places/ChIJabc/photos/xyz"
 
 
 @pytest.mark.asyncio
