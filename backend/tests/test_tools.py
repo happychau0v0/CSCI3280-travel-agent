@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.tools import directions, geocode, places, search, weather
+from app.tools import directions, flights, geocode, places, search, weather
 from app.tools.errors import ToolUnavailableError
 
 
@@ -264,6 +264,92 @@ async def test_reverse_geocode_returns_city():
 
     assert result["city"] == "Hong Kong"
     assert result["country"] == "Hong Kong"
+
+
+# ─── search_flights ──────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_search_flights_estimator_fallback():
+    # Force fast-flights to fail by patching it to return [].
+    with patch("app.tools.flights._try_fast_flights", return_value=[]):
+        result = await flights.search_flights("Hong Kong", "Tokyo", "2026-05-15")
+
+    assert result["from_iata"] == "HKG"
+    assert result["to_iata"] == "NRT"
+    assert result["source"] == "estimator"
+    assert result["estimate_low"] > 0
+    assert result["estimate_high"] > result["estimate_low"]
+    assert result["distance_km"] > 2500  # HKG-NRT is ~2900 km
+    assert result["distance_km"] < 3500
+    assert "google.com/travel/flights" in result["google_flights_url"]
+
+
+@pytest.mark.asyncio
+async def test_search_flights_uses_live_data_when_available():
+    fake_live = [
+        {
+            "airline": "Cathay Pacific",
+            "price": "$480",
+            "duration": "4h 5min",
+            "stops": 0,
+            "departure": "10:00",
+            "arrival": "15:05",
+            "is_best": True,
+        }
+    ]
+    with patch("app.tools.flights._try_fast_flights", return_value=fake_live):
+        result = await flights.search_flights("Hong Kong", "Tokyo", "2026-05-15")
+
+    assert result["source"] == "fast-flights"
+    assert len(result["results"]) == 1
+    assert result["results"][0]["airline"] == "Cathay Pacific"
+
+
+@pytest.mark.asyncio
+async def test_search_flights_unknown_origin_returns_error():
+    result = await flights.search_flights("Atlantis", "Tokyo")
+    assert "error" in result
+    assert "Atlantis" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_search_flights_unknown_destination_returns_error():
+    result = await flights.search_flights("Hong Kong", "Narnia")
+    assert "error" in result
+    assert "Narnia" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_search_flights_handles_city_with_country():
+    """Cities like 'Tokyo, Japan' should resolve via the comma-strip path."""
+    with patch("app.tools.flights._try_fast_flights", return_value=[]):
+        result = await flights.search_flights("Hong Kong, China", "Tokyo, Japan")
+    assert result["from_iata"] == "HKG"
+    assert result["to_iata"] == "NRT"
+
+
+def test_haversine_known_distance():
+    # HKG to NRT is roughly 2880 km
+    d = flights._haversine_km(22.3080, 113.9185, 35.7720, 140.3929)
+    assert 2700 < d < 3100
+
+
+def test_estimator_seasonality():
+    # July (peak) should be more expensive than February (off-peak)
+    july = flights._estimate(2900, "2026-07-15")
+    feb = flights._estimate(2900, "2026-02-15")
+    assert july["low"] > feb["low"]
+
+
+def test_airport_lookup_handles_punctuation():
+    from app.tools import airports
+
+    assert airports.lookup("Hong Kong")[0] == "HKG"
+    assert airports.lookup("hong kong")[0] == "HKG"
+    assert airports.lookup("Hong Kong, China")[0] == "HKG"
+    assert airports.lookup("Tokyo Airport")[0] == "NRT"
+    assert airports.lookup("Narnia") is None
 
 
 # ─── web_search stub ─────────────────────────────────────────────────────

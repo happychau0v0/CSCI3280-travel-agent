@@ -1,7 +1,7 @@
 """Tool wrappers + OpenAI function-calling definitions for the LLM."""
 from __future__ import annotations
 
-from app.tools import directions, geocode, places, search, weather
+from app.tools import directions, flights, geocode, places, search, weather
 from app.tools.errors import ToolUnavailableError
 
 __all__ = ["TOOL_DEFINITIONS", "TOOL_DISPATCH", "ToolUnavailableError"]
@@ -113,6 +113,37 @@ TOOL_DEFINITIONS: list[dict] = [
     {
         "type": "function",
         "function": {
+            "name": "search_flights",
+            "description": (
+                "Search for flights between two cities. Use this when planning a trip "
+                "to a destination far enough that flying makes sense (>500km). Returns "
+                "real flight prices when available, or a deterministic price estimate "
+                "as a fallback. Always returns a Google Flights deep link the user can "
+                "click to verify live prices."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "origin": {
+                        "type": "string",
+                        "description": "Origin city name, e.g. 'Hong Kong'. Major cities only.",
+                    },
+                    "destination": {
+                        "type": "string",
+                        "description": "Destination city name, e.g. 'Tokyo'. Major cities only.",
+                    },
+                    "date": {
+                        "type": "string",
+                        "description": "Optional ISO date (YYYY-MM-DD). Defaults to 30 days from now.",
+                    },
+                },
+                "required": ["origin", "destination"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "geocode_city",
             "description": (
                 "Look up the lat/lng coordinates of a city or country. Use this when "
@@ -157,5 +188,6 @@ TOOL_DISPATCH: dict = {
     "get_directions": directions.get_directions,
     "get_weather": weather.get_weather,
     "geocode_city": geocode.geocode_city,
+    "search_flights": flights.search_flights,
     "web_search": search.web_search,
 }

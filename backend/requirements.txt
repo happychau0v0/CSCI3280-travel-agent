@@ -4,6 +4,7 @@ openai
 httpx
 python-dotenv
 pydantic
+fast-flights
 ruff
 pytest
 pytest-asyncio
