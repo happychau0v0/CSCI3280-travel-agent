@@ -178,6 +178,11 @@ function App() {
             } else if (type === "tool_end") {
               setCurrentTool(null);
               setLastAction(`Finished ${payload.name}`);
+            } else if (type === "navigate") {
+              // The LLM is driving the menu cursor via navigate_menu().
+              // Update the menu state machine to switch panels / move
+              // the list cursor.
+              menu.navigate(payload);
             } else if (type === "done") {
               setCurrentTool(null);
             }
@@ -201,7 +206,7 @@ function App() {
         setIsLoading(false);
       }
     },
-    [messages, preferences, userLocation, tripDates, subtitles],
+    [messages, preferences, userLocation, tripDates, subtitles, menu],
   );
 
   // Modal callbacks
@@ -263,6 +268,8 @@ function App() {
             } else if (type === "tool_end") {
               setCurrentTool(null);
               setLastAction(`Finished ${payload.name}`);
+            } else if (type === "navigate") {
+              menu.navigate(payload);
             } else if (type === "done") {
               setCurrentTool(null);
             }
@@ -272,6 +279,7 @@ function App() {
         const assistantMsg = { role: "assistant", content: data.reply };
         setMessages((prev) => [...prev, assistantMsg]);
         if (data.itinerary) setCurrentItinerary(data.itinerary);
+        subtitles.pushParagraph(data.reply);
         setLastAction("Ready");
       } catch (err) {
         setError(err);
