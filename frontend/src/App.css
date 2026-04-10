@@ -32,6 +32,23 @@
   flex: 1;
 }
 
+.clear-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  margin-right: 8px;
+}
+
+.clear-btn:hover {
+  border-color: #e74c3c;
+  color: #e74c3c;
+}
+
 /* ─── Profile panel ─────────────────────────────────────── */
 
 .profile-panel {
