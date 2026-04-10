@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ErrorBanner from "./components/ErrorBanner";
 import MenuShell from "./components/MenuShell";
 import Subtitle from "./components/Subtitle";
@@ -87,6 +87,13 @@ function App() {
   const [currentTool, setCurrentTool] = useState(null);
   const [requestStartedAt, setRequestStartedAt] = useState(null);
   const [pendingInputRequest, setPendingInputRequest] = useState(null);
+  // Ref mirror so handleSend's running invocation can read the
+  // post-stream value of pendingInputRequest without being trapped
+  // by its useCallback closure (B4). Keep in sync via a tiny effect.
+  const pendingInputRequestRef = useRef(null);
+  useEffect(() => {
+    pendingInputRequestRef.current = pendingInputRequest;
+  }, [pendingInputRequest]);
   const tripDates = loadTripDates(); // edited via PanelProfile in the future
   const { location: userLocation, requestPermission } = useGeolocation();
   const menu = useMenuState();
@@ -288,10 +295,11 @@ function App() {
         // Auto-reopen the chat popover on a follow-up question. If the
         // LLM's reply ends with "?", schedule the popover to pop after
         // a short delay so the TTS finishes first. Skipped when a
-        // request_input is already pending — that takes precedence and
-        // drives the user to the TRIP form instead.
+        // request_input was just set during this same stream — that
+        // takes precedence and drives the user to the TRIP form. Read
+        // via the ref so we see the fresh value, not the closure.
         const trimmedReply = (data.reply || "").trim();
-        if (trimmedReply.endsWith("?") && !pendingInputRequest) {
+        if (trimmedReply.endsWith("?") && !pendingInputRequestRef.current) {
           setTimeout(() => setChatPopoverOpen(true), 2000);
         }
       } catch (err) {
@@ -311,7 +319,6 @@ function App() {
       subtitles,
       menu,
       cues,
-      pendingInputRequest,
     ],
   );
 
