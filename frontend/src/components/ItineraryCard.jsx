@@ -59,7 +59,6 @@ export default function ItineraryCard({ itinerary }) {
                       src={photo}
                       alt={act.name}
                       className="activity-photo"
-                      loading="lazy"
                       onError={(e) => {
                         e.currentTarget.style.display = "none";
                       }}

@@ -78,17 +78,19 @@ function App() {
   // Keyboard shortcuts: Cmd/Ctrl+K focuses input, Esc stops TTS + voice
   useEffect(() => {
     const handleKey = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      const key = e.key?.toLowerCase();
+      if ((e.metaKey || e.ctrlKey) && key === "k") {
         e.preventDefault();
-        document.querySelector('.chat-input-form input[type="text"]')?.focus();
-      } else if (e.key === "Escape") {
+        const input = document.querySelector('.chat-input-form input[type="text"]');
+        input?.focus();
+      } else if (key === "escape") {
         if (window.speechSynthesis?.speaking) {
           window.speechSynthesis.cancel();
         }
       }
     };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
   }, []);
 
   const handleClear = useCallback(() => {
