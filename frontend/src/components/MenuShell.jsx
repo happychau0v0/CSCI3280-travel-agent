@@ -10,9 +10,17 @@ import FooterHints from "./FooterHints";
  *   state:       menu state from useMenuState
  *   onTabClick:  (panel) => void  manual tab click
  *   muted:       bool — show 🔇 MUTED badge in footer
+ *   overlay:     null | "history" | "settings" — for context-aware
+ *                FooterHints
  *   children:    the active panel content (rendered in the panel slot)
  */
-export default function MenuShell({ state, onTabClick, muted, children }) {
+export default function MenuShell({
+  state,
+  onTabClick,
+  muted,
+  overlay = null,
+  children,
+}) {
   return (
     <div className="menu-shell">
       <TabStrip
@@ -21,7 +29,12 @@ export default function MenuShell({ state, onTabClick, muted, children }) {
         onTabClick={onTabClick}
       />
       <main className={`panel-slot scope-${state.scope}`}>{children}</main>
-      <FooterHints muted={muted} scope={state.scope} />
+      <FooterHints
+        muted={muted}
+        scope={state.scope}
+        panel={state.panel}
+        overlay={overlay}
+      />
     </div>
   );
 }

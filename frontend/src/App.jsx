@@ -467,7 +467,12 @@ function App() {
       />
 
       {/* NieR-style menu shell */}
-      <MenuShell state={menu.state} onTabClick={setPanelWithCue} muted={muted}>
+      <MenuShell
+        state={menu.state}
+        onTabClick={setPanelWithCue}
+        muted={muted}
+        overlay={historyOpen ? "history" : settingsOpen ? "settings" : null}
+      >
         {menu.state.panel === "HOME" && (
           <PanelHome
             itinerary={currentItinerary}
