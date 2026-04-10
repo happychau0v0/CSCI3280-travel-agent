@@ -7,8 +7,11 @@ import ErrorBanner from "./components/ErrorBanner";
 import LiveTicker from "./components/LiveTicker";
 import FullscreenButton from "./components/FullscreenButton";
 import TripDateModal from "./components/TripDateModal";
+import MenuShell from "./components/MenuShell";
 import { streamChat } from "./api/client";
 import { useGeolocation } from "./hooks/useGeolocation";
+import { useMenuState } from "./hooks/useMenuState";
+import { useKeyboard } from "./hooks/useKeyboard";
 import "./App.css";
 
 const TRIP_DATES_KEY = "travel-trip-dates";
@@ -72,8 +75,30 @@ function App() {
   const [currentTool, setCurrentTool] = useState(null);
   const [tripDates, setTripDates] = useState(() => loadTripDates());
   const [dateModalOpen, setDateModalOpen] = useState(false);
+  const [muted, setMuted] = useState(false);
   const pendingMessageRef = useRef(null); // message waiting for date confirmation
   const { location: userLocation, requestPermission } = useGeolocation();
+  const menu = useMenuState();
+
+  // Document-level hotkeys (1-7, arrows, Tab, Enter, Space, Esc, M)
+  useKeyboard({
+    state: menu.state,
+    setPanel: menu.setPanel,
+    setListIndex: menu.setListIndex,
+    setScope: menu.setScope,
+    listSize: 0, // panels will own this once they exist
+    onOpenChat: () => {
+      // Will trigger ChatPopover in commit 6; for now focus the input dock
+      document.querySelector('.input-dock input[type="text"]')?.focus();
+    },
+    onActivate: () => {
+      // Hooked up by individual panels in commits 7-10
+    },
+    onBack: () => {
+      if (menu.state.scope !== "tabs") menu.setScope("tabs");
+    },
+    onToggleMute: () => setMuted((m) => !m),
+  });
 
   // Persist on every change
   useEffect(() => {
@@ -368,6 +393,12 @@ function App() {
           drawerOpen={drawerOpen}
         />
       </Suspense>
+
+      {/* NieR-style menu shell — tab strip top, footer hints bottom.
+          Empty panel slot for now; populated in commits 7-10. */}
+      <MenuShell state={menu.state} onTabClick={menu.setPanel} muted={muted}>
+        {/* Empty for now — panels mount here in upcoming commits */}
+      </MenuShell>
 
       {/* Top-left LIVE ticker */}
       <LiveTicker

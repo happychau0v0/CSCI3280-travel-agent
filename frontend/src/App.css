@@ -1,5 +1,168 @@
 /* AI Travel Agent — globe-first layout */
 
+/* ─── Menu shell (round 7 NieR-style overlay) ────────────── */
+
+.menu-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none; /* lets clicks through except on tabs/footer */
+  display: flex;
+  flex-direction: column;
+  font-family: var(--mono);
+}
+
+.menu-shell > * {
+  pointer-events: auto;
+}
+
+.panel-slot {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  pointer-events: none; /* panels themselves opt back in */
+}
+
+/* Tab strip — top of screen */
+
+.tab-strip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 24px 12px;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 14, 26, 0.85) 0%,
+    rgba(10, 14, 26, 0.6) 80%,
+    transparent 100%
+  );
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+}
+
+.tab:hover {
+  color: var(--text-h);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tab.active {
+  color: var(--text-h);
+  background: rgba(0, 217, 255, 0.08);
+  border-color: var(--accent-border);
+  box-shadow: 0 0 16px rgba(0, 217, 255, 0.15);
+}
+
+.tab.focused {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tab-bracket {
+  color: var(--accent);
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.tab.active .tab-bracket {
+  opacity: 1;
+}
+
+.tab-num {
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 4px;
+  border-radius: 2px;
+  min-width: 12px;
+  text-align: center;
+}
+
+.tab.active .tab-num {
+  color: var(--accent);
+  background: rgba(0, 217, 255, 0.12);
+}
+
+.tab-label {
+  font-size: 11px;
+}
+
+/* Footer hint strip — bottom of screen */
+
+.footer-hints {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 10px 24px 14px;
+  background: linear-gradient(
+    0deg,
+    rgba(10, 14, 26, 0.85) 0%,
+    rgba(10, 14, 26, 0.6) 80%,
+    transparent 100%
+  );
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text);
+  text-transform: uppercase;
+}
+
+.hint-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-h);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.hint-label {
+  color: var(--text-dim);
+}
+
+.hint.hint-muted {
+  color: var(--danger);
+  background: rgba(255, 85, 119, 0.1);
+  padding: 3px 8px;
+  border-radius: 3px;
+}
+
+
 .app {
   position: relative;
   width: 100vw;
