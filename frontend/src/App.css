@@ -310,6 +310,12 @@ select.panel-input {
   font-style: italic;
 }
 
+/* PanelDays detail can scroll independently */
+.panel-day-detail {
+  overflow-y: auto;
+  max-height: 100%;
+}
+
 /* ─── Chat popover (round 7) ─────────────────────────────── */
 
 .chat-popover-backdrop {

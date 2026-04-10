@@ -15,6 +15,7 @@ import PanelTrip from "./components/panels/PanelTrip";
 import PanelProfile from "./components/panels/PanelProfile";
 import PanelFlights from "./components/panels/PanelFlights";
 import PanelHotels from "./components/panels/PanelHotels";
+import PanelDays from "./components/panels/PanelDays";
 import { streamChat } from "./api/client";
 import { useGeolocation } from "./hooks/useGeolocation";
 import { useMenuState } from "./hooks/useMenuState";
@@ -448,6 +449,9 @@ function App() {
         )}
         {menu.state.panel === "HOTELS" && (
           <PanelHotels itinerary={currentItinerary} listIndex={menu.state.listIndex} />
+        )}
+        {menu.state.panel === "DAYS" && (
+          <PanelDays itinerary={currentItinerary} listIndex={menu.state.listIndex} />
         )}
       </MenuShell>
 
