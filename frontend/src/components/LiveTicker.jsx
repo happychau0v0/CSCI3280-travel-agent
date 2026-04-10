@@ -1,19 +1,39 @@
 import { useEffect, useState } from "react";
 
 /**
+ * Friendly labels for each tool name. Used by LiveTicker to narrate
+ * progress in plain English while the agent is working.
+ */
+const TOOL_LABELS = {
+  search_places: "Searching places",
+  get_place_details: "Looking up details",
+  get_directions: "Routing transit",
+  get_weather: "Checking weather",
+  geocode_city: "Locating destination",
+  search_flights: "Searching flights",
+  web_search: "Searching the web",
+};
+
+/**
  * Top-left LIVE chip — mirrors the "LIVE / Today's order highlights"
  * element from the Shopify Liveview reference. Shows the user's city,
- * a pulsing red dot, and a one-line status of the agent's last action.
+ * a pulsing red dot, and a live narration of which tool the agent is
+ * calling right now (driven by SSE events from /chat/stream).
  *
  * Props:
  *   userLocation: {city, country, lat, lng} | null
  *   isLoading:    bool — agent currently working?
- *   lastAction:   string — short status like "Searching flights HKG → NRT"
+ *   lastAction:   string — fallback status text between tool calls
+ *   currentTool:  string | null — tool currently executing
  */
-export default function LiveTicker({ userLocation, isLoading, lastAction }) {
-  // Cycle through a few "thinking" phrases when isLoading and there's no
-  // explicit lastAction, so the chip never sits silent during a long
-  // tool-call loop.
+export default function LiveTicker({
+  userLocation,
+  isLoading,
+  lastAction,
+  currentTool,
+}) {
+  // Animate trailing dots when working but no specific tool is running
+  // (i.e. the model is thinking between tool calls).
   const [thinkingDots, setThinkingDots] = useState(".");
   useEffect(() => {
     if (!isLoading) return;
@@ -23,9 +43,14 @@ export default function LiveTicker({ userLocation, isLoading, lastAction }) {
     return () => clearInterval(id);
   }, [isLoading]);
 
-  const status = isLoading
-    ? lastAction || `Working${thinkingDots}`
-    : lastAction || "Ready";
+  let status;
+  if (currentTool) {
+    status = `${TOOL_LABELS[currentTool] || currentTool}${thinkingDots}`;
+  } else if (isLoading) {
+    status = `Thinking${thinkingDots}`;
+  } else {
+    status = lastAction || "Ready";
+  }
 
   return (
     <div className="live-ticker">

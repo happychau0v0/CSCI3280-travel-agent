@@ -6,7 +6,7 @@ import ProfilePanel from "./components/ProfilePanel";
 import ErrorBanner from "./components/ErrorBanner";
 import LiveTicker from "./components/LiveTicker";
 import FullscreenButton from "./components/FullscreenButton";
-import { postChat } from "./api/client";
+import { streamChat } from "./api/client";
 import { useGeolocation } from "./hooks/useGeolocation";
 import "./App.css";
 
@@ -46,6 +46,7 @@ function App() {
   const [error, setError] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [lastAction, setLastAction] = useState("");
+  const [currentTool, setCurrentTool] = useState(null);
   const { location: userLocation, requestPermission } = useGeolocation();
 
   // Persist on every change
@@ -72,23 +73,35 @@ function App() {
 
       try {
         setLastAction("Thinking…");
-        const data = await postChat(text, history, preferences, userLocation);
+        setCurrentTool(null);
+        const data = await streamChat({
+          message: text,
+          history,
+          preferences,
+          userLocation,
+          onEvent: ({ type, data: payload }) => {
+            if (type === "tool_start") {
+              setCurrentTool(payload.name);
+              setLastAction(`Calling ${payload.name}`);
+            } else if (type === "tool_end") {
+              setCurrentTool(null);
+              setLastAction(`Finished ${payload.name}`);
+            } else if (type === "done") {
+              setCurrentTool(null);
+            }
+          },
+        });
+        if (!data) throw new Error("Stream ended without a response");
         const assistantMsg = { role: "assistant", content: data.reply };
         setMessages((prev) => [...prev, assistantMsg]);
         if (data.itinerary) {
           setCurrentItinerary(data.itinerary);
         }
-        // Surface the most informative last tool call so the LIVE chip
-        // tells the user what just happened.
-        const lastTool = (data.tool_calls_made || []).slice(-1)[0];
-        if (lastTool) {
-          setLastAction(`Called ${lastTool}`);
-        } else {
-          setLastAction("Ready");
-        }
+        setLastAction("Ready");
       } catch (err) {
         setError(err);
         setLastAction("Error");
+        setCurrentTool(null);
       } finally {
         setIsLoading(false);
       }
@@ -222,6 +235,7 @@ function App() {
         userLocation={userLocation}
         isLoading={isLoading}
         lastAction={lastAction}
+        currentTool={currentTool}
       />
 
       {/* Top-right controls */}

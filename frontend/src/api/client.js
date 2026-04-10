@@ -67,6 +67,86 @@ export async function reverseGeocode(lat, lng) {
 }
 
 /**
+ * Stream a chat request via Server-Sent Events. Calls onEvent({type, data})
+ * for each event the backend emits — tool_start, tool_end, done, error.
+ *
+ * Returns a promise that resolves with the final "done" payload or
+ * rejects on error.
+ */
+export async function streamChat({
+  message,
+  history = [],
+  preferences = null,
+  userLocation = null,
+  tripDates = null,
+  onEvent,
+}) {
+  const body = { message, history };
+  if (preferences) body.preferences = preferences;
+  if (userLocation) body.user_location = userLocation;
+  if (tripDates) body.trip_dates = tripDates;
+
+  const response = await fetch(`${API_BASE}/chat/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok || !response.body) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let final = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    // SSE events are separated by blank lines (\n\n)
+    let separatorIdx;
+    while ((separatorIdx = buffer.indexOf("\n\n")) !== -1) {
+      const rawEvent = buffer.slice(0, separatorIdx);
+      buffer = buffer.slice(separatorIdx + 2);
+
+      const lines = rawEvent.split("\n");
+      let eventType = "message";
+      let dataStr = "";
+      for (const line of lines) {
+        if (line.startsWith("event:")) {
+          eventType = line.slice(6).trim();
+        } else if (line.startsWith("data:")) {
+          dataStr += line.slice(5).trim();
+        }
+      }
+      if (!dataStr) continue;
+
+      let data;
+      try {
+        data = JSON.parse(dataStr);
+      } catch {
+        continue;
+      }
+
+      onEvent?.({ type: eventType, data });
+
+      if (eventType === "done") {
+        final = data;
+      } else if (eventType === "error") {
+        const err = new Error(data.message || "stream error");
+        err.status = data.status;
+        throw err;
+      }
+    }
+  }
+
+  return final;
+}
+
+/**
  * Reorder a list of activities for shortest total travel distance.
  * Each activity must have lat and lng. Other fields ride along in `extra`.
  */
