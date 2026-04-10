@@ -80,6 +80,7 @@ function App() {
   const [error, setError] = useState(null);
   const [muted, setMuted] = useState(false);
   const [chatPopoverOpen, setChatPopoverOpen] = useState(false);
+  const [chatPopoverInitial, setChatPopoverInitial] = useState("");
   // Agent status state used by the AgentStatusBar — addresses the
   // round-7 "feels unresponsive" complaint with overlapping indicators.
   const [agentState, setAgentState] = useState("idle"); // idle|working|done|error
@@ -110,6 +111,22 @@ function App() {
         return 0;
     }
   }, [menu.state.panel, currentItinerary]);
+
+  // Find the most recent user message text (used by E hotkey + ↑ recall)
+  const lastUserMessage = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") return messages[i].content;
+    }
+    return null;
+  }, [messages]);
+
+  // E hotkey: open the chat popover prefilled with the last user
+  // message so the user can refine and re-run.
+  const handleEditLast = useCallback(() => {
+    if (!lastUserMessage) return;
+    setChatPopoverInitial(lastUserMessage);
+    setChatPopoverOpen(true);
+  }, [lastUserMessage]);
 
   // SETTINGS → "clear all data" handler. Wipes conversation, itinerary
   // and trip form, leaves preferences alone.
@@ -163,6 +180,7 @@ function App() {
     listSize,
     onOpenChat: () => {
       cues.select();
+      setChatPopoverInitial("");
       setChatPopoverOpen(true);
     },
     onActivate: () => {
@@ -176,6 +194,7 @@ function App() {
       }
     },
     onToggleMute: () => setMuted((m) => !m),
+    onEditLast: handleEditLast,
   });
 
   // Persist messages + itinerary
@@ -184,11 +203,26 @@ function App() {
   }, [messages, currentItinerary]);
 
   const handleSend = useCallback(
-    async (text) => {
+    async (text, { editLast = false } = {}) => {
       const userMsg = { role: "user", content: text };
-      const history = messages.map((m) => ({ role: m.role, content: m.content }));
 
-      setMessages((prev) => [...prev, userMsg]);
+      // Edit-and-rerun: truncate the conversation back to before the
+      // most recent user message so the agent responds to the edited
+      // prompt as if the original never happened.
+      let baseMessages = messages;
+      if (editLast) {
+        let idx = -1;
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if (messages[i].role === "user") {
+            idx = i;
+            break;
+          }
+        }
+        if (idx >= 0) baseMessages = messages.slice(0, idx);
+      }
+      const history = baseMessages.map((m) => ({ role: m.role, content: m.content }));
+
+      setMessages([...baseMessages, userMsg]);
       setIsLoading(true);
       setError(null);
 
@@ -439,9 +473,20 @@ function App() {
       {/* Chat popover (opens on Enter / Cmd+K) */}
       <ChatPopover
         open={chatPopoverOpen}
-        onSend={handleSend}
-        onClose={() => setChatPopoverOpen(false)}
+        onSend={(text) => {
+          // If the popover was opened via E (initialText is set) and
+          // the message matches the last user message exactly, treat
+          // it as edit-and-rerun. Otherwise it's a fresh send.
+          const isEdit = chatPopoverInitial !== "";
+          handleSend(text, { editLast: isEdit });
+        }}
+        onClose={() => {
+          setChatPopoverOpen(false);
+          setChatPopoverInitial("");
+        }}
         isLoading={isLoading}
+        initialText={chatPopoverInitial}
+        onRecallLast={() => lastUserMessage}
       />
     </div>
   );
