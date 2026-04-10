@@ -78,6 +78,10 @@ function App() {
   const [muted, setMuted] = useState(false);
   const [chatPopoverOpen, setChatPopoverOpen] = useState(false);
   const [chatPopoverInitial, setChatPopoverInitial] = useState("");
+  // Overlay state — HISTORY (H key) and SETTINGS (S key) replace the
+  // dedicated tabs in the round-8.5 redesign.
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   // Agent status state used by the AgentStatusBar — addresses the
   // round-7 "feels unresponsive" complaint with overlapping indicators.
   const [agentState, setAgentState] = useState("idle"); // idle|working|done|error
@@ -180,7 +184,8 @@ function App() {
     [cues, menu],
   );
 
-  // Document-level hotkeys
+  // Document-level hotkeys. Disabled while an overlay is open so the
+  // overlay can own its own keyboard handling without leaking events.
   useKeyboard({
     state: menu.state,
     setPanel: setPanelWithCue,
@@ -208,7 +213,15 @@ function App() {
       }
     },
     onToggleMute: () => setMuted((m) => !m),
-    onEditLast: handleEditLast,
+    onOpenHistory: () => {
+      cues.select();
+      setHistoryOpen(true);
+    },
+    onOpenSettings: () => {
+      cues.select();
+      setSettingsOpen(true);
+    },
+    enabled: !historyOpen && !settingsOpen,
   });
 
   // Persist messages + itinerary

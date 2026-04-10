@@ -11,16 +11,18 @@ import { PANELS, PANELS_WITH_LIST } from "./useMenuState";
  *               browse the list without accidentally jumping panels.
  *
  * Hotkeys:
- *   1-7        — jump to tab N (always lands in scope=tabs)
+ *   1-N        — jump to tab N (always lands in scope=tabs)
  *   ← / →      — cycle tabs ONLY when scope=tabs
  *   ↑ / ↓      — move list cursor (works in any scope on list panels)
  *   Tab        — toggle scope tabs ↔ list (only meaningful on list panels)
- *   Enter      — open chat popover
- *   Cmd/Ctrl+K — same as Enter
+ *   T          — open chat popover (was Enter — Enter now free for forms)
+ *   Cmd/Ctrl+K — same as T
  *   Space      — activate currently focused item
- *   Esc        — back (closes popover, then leaves list scope)
+ *   Esc        — back (closes overlay, then closes popover, then leaves list scope)
  *   M          — toggle mute (auto-TTS)
- *   E          — open chat popover prefilled with last user message
+ *   H          — toggle HISTORY overlay
+ *   S          — toggle SETTINGS overlay
+ *   E          — handled inside HISTORY overlay only
  *
  * The hook is a passive listener — it calls back into the parent via
  * the handlers object. The parent owns the menu state.
@@ -38,7 +40,8 @@ export function useKeyboard({
   onActivate,
   onBack,
   onToggleMute,
-  onEditLast,
+  onOpenHistory,
+  onOpenSettings,
   enabled = true,
 }) {
   useEffect(() => {
@@ -108,9 +111,12 @@ export function useKeyboard({
           }
           break;
 
-        case "Enter":
-          e.preventDefault();
-          onOpenChat?.();
+        case "t":
+        case "T":
+          if (!e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            onOpenChat?.();
+          }
           break;
 
         case "k":
@@ -118,6 +124,22 @@ export function useKeyboard({
           if (e.metaKey || e.ctrlKey) {
             e.preventDefault();
             onOpenChat?.();
+          }
+          break;
+
+        case "h":
+        case "H":
+          if (!e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            onOpenHistory?.();
+          }
+          break;
+
+        case "s":
+        case "S":
+          if (!e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            onOpenSettings?.();
           }
           break;
 
@@ -141,14 +163,6 @@ export function useKeyboard({
           }
           break;
 
-        case "e":
-        case "E":
-          if (!e.metaKey && !e.ctrlKey) {
-            e.preventDefault();
-            onEditLast?.();
-          }
-          break;
-
         default:
           break;
       }
@@ -169,6 +183,7 @@ export function useKeyboard({
     onActivate,
     onBack,
     onToggleMute,
-    onEditLast,
+    onOpenHistory,
+    onOpenSettings,
   ]);
 }
