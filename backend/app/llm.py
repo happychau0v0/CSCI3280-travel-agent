@@ -77,22 +77,54 @@ def _format_preferences(preferences: dict | None) -> str:
     return "\n\nUSER PROFILE (honor these on every recommendation):\n" + "\n".join(parts)
 
 
-async def chat(messages: list[dict], preferences: dict | None = None) -> dict:
+def _format_user_location(user_location: dict | None) -> str:
+    """Render a USER LOCATION block to prepend the system prompt with origin context."""
+    if not user_location:
+        return ""
+    city = user_location.get("city", "")
+    country = user_location.get("country", "")
+    lat = user_location.get("lat")
+    lng = user_location.get("lng")
+    if not city and lat is None:
+        return ""
+    line = f"{city}"
+    if country and country != city:
+        line += f", {country}"
+    if lat is not None and lng is not None:
+        line += f" (lat={lat}, lng={lng})"
+    return (
+        "\n\nUSER LOCATION (the user is RIGHT NOW at this place — use it as the trip origin "
+        "without asking):\n- " + line
+    )
+
+
+async def chat(
+    messages: list[dict],
+    preferences: dict | None = None,
+    user_location: dict | None = None,
+) -> dict:
     """Run the LLM with a tool-call loop.
 
     Args:
         messages: prior conversation history [{role, content}, ...]
         preferences: optional user profile dict to inject into system prompt
+        user_location: optional {city, country, lat, lng} from the browser GPS,
+            also injected into the system prompt so the agent knows the trip origin
 
     Returns:
         {reply: str, itinerary: dict | None, tool_calls_made: list[str]}
     """
     client = _get_client()
 
-    # User preferences are injected as an addendum to the system prompt rather
-    # than a separate message — this keeps them visible to the model on every
-    # tool-call iteration without polluting the conversation history.
-    system_content = SYSTEM_PROMPT + _format_preferences(preferences)
+    # User preferences and live location are injected as addenda to the system
+    # prompt rather than separate messages — this keeps them visible to the
+    # model on every tool-call iteration without polluting the conversation
+    # history.
+    system_content = (
+        SYSTEM_PROMPT
+        + _format_user_location(user_location)
+        + _format_preferences(preferences)
+    )
     full_messages: list[dict] = [{"role": "system", "content": system_content}] + list(messages)
     tool_calls_made: list[str] = []
     last_text = ""

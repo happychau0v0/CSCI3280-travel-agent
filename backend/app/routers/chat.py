@@ -22,6 +22,7 @@ class ChatRequest(BaseModel):
     message: str
     history: list[Message] = Field(default_factory=list)
     preferences: dict | None = None
+    user_location: dict | None = None
 
 
 class ChatResponse(BaseModel):
@@ -38,7 +39,11 @@ async def post_chat(req: ChatRequest) -> ChatResponse:
     ]
 
     try:
-        result = await llm.chat(messages, preferences=req.preferences)
+        result = await llm.chat(
+            messages,
+            preferences=req.preferences,
+            user_location=req.user_location,
+        )
     except RuntimeError as e:
         # Missing API key — surface as 503 Service Unavailable
         raise HTTPException(status_code=503, detail=str(e)) from e
