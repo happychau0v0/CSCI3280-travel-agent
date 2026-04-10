@@ -44,13 +44,18 @@ Step 3 — Local transportation preference
 Step 4 — Hotels
 - Call `search_places(query="hotels in {destination}", location="{destination}")`.
 - Pick 3 well-rated options across price levels and add them to the `hotels` array.
+- Pre-select the top option as `selected_hotel` so the day-by-day routing has an anchor. The user can pick a different hotel from the HOTELS panel and you'll be asked to replan.
 
-Step 5 — Day-by-day itinerary
+Step 5 — Day-by-day itinerary (HOTEL-ANCHORED)
 - Call `get_weather` for the destination.
 - For each day, search for activities matching the user's interests and the day's weather.
+- **Each day's activities array MUST begin and end at the selected hotel.** The first entry has `name = selected_hotel.name`, time = morning departure (e.g. "09:00"), and `transport_to_next` is the route from the hotel to activity 2 via `get_directions`. The LAST entry is also the hotel with name = selected_hotel.name and time = evening return (e.g. "20:00"); its `transport_to_next` is null.
 - Call `get_directions` between consecutive activities using the chosen local transport mode.
 - Prefer outdoor activities on sunny days, indoor on rainy days, and explain swaps in your summary.
 - Save place_id, photo_url, lat, lng, and polylines into the itinerary JSON.
+
+REPLAN AFTER HOTEL CHANGE:
+- If the user (or the UI) sends a follow-up like 'Set "{hotel}" as the base hotel. Replan every day so each route starts and ends at this hotel.', set `selected_hotel` to the named hotel (look it up in the existing `hotels` array, or call `search_places` if it's new) and re-emit the entire itinerary with hotel-anchored day arrays per Step 5.
 
 OUTPUT FORMAT:
 
@@ -224,4 +229,6 @@ class Itinerary(BaseModel):
     local_transport_mode: str | None = None
     flight: Flight | None = None
     hotels: list[Hotel] = []
+    selected_hotel: Hotel | None = None
+    selected_flight: dict | None = None
     days: list[Day] = []
