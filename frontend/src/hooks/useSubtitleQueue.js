@@ -37,10 +37,24 @@ export function splitSentences(text) {
  */
 export function useSubtitleQueue({ muted = false } = {}) {
   const [current, setCurrent] = useState(null);
+  // currentRef mirrors `current` so that callbacks which run in the
+  // same synchronous tick as a state update (e.g. clear() followed by
+  // push() inside handleSend) see the fresh value instead of the
+  // stale closure-captured one. This fixes B3: the "▸ preview" echo
+  // was silently dropping on every request after the first because
+  // push's useCallback closure saw the previous sentence as `current`
+  // and the `!current` guard returned false, so advance() was never
+  // called.
+  const currentRef = useRef(null);
   const queueRef = useRef([]);
   const timerRef = useRef(null);
   const speakingRef = useRef(false);
   const mutedRef = useRef(muted);
+
+  const setCurrentBoth = useCallback((v) => {
+    currentRef.current = v;
+    setCurrent(v);
+  }, []);
 
   // Keep mutedRef in sync so the queue advancer reads the latest value
   useEffect(() => {
@@ -57,11 +71,11 @@ export function useSubtitleQueue({ muted = false } = {}) {
     }
     const next = queueRef.current.shift();
     if (!next) {
-      setCurrent(null);
+      setCurrentBoth(null);
       speakingRef.current = false;
       return;
     }
-    setCurrent(next);
+    setCurrentBoth(next);
 
     // Speak if not muted
     if (!mutedRef.current && typeof window !== "undefined" && window.speechSynthesis) {
@@ -79,19 +93,22 @@ export function useSubtitleQueue({ muted = false } = {}) {
     // Compute display duration: ~60ms per char, min 2.5s
     const ms = Math.max(2500, next.length * 60);
     timerRef.current = setTimeout(advance, ms);
-  }, []);
+  }, [setCurrentBoth]);
 
   const push = useCallback(
     (text) => {
       if (!text) return;
       queueRef.current.push(text);
-      // If nothing is currently showing, kick off the queue
-      if (!current && !speakingRef.current) {
+      // Read `current` from currentRef so that a push() called in the
+      // same tick as a clear() sees the already-cleared value, not the
+      // stale state closure. Without this, the first push after clear
+      // silently fails to kick off advance().
+      if (!currentRef.current && !speakingRef.current) {
         speakingRef.current = true;
         advance();
       }
     },
-    [current, advance],
+    [advance],
   );
 
   const pushParagraph = useCallback(
@@ -108,12 +125,12 @@ export function useSubtitleQueue({ muted = false } = {}) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    setCurrent(null);
+    setCurrentBoth(null);
     speakingRef.current = false;
     if (typeof window !== "undefined" && window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
-  }, []);
+  }, [setCurrentBoth]);
 
   // Cleanup on unmount
   useEffect(() => {
