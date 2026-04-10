@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * TRIP panel — primary trip-control surface. Editable form for the
@@ -83,6 +83,18 @@ export default function PanelTrip({
   onResolveInput,
 }) {
   const [form, setForm] = useState(() => loadForm());
+  const editorRef = useRef(null);
+
+  // Focus the inline editor ONLY when the LLM has asked for a specific
+  // field via request_input. Otherwise leave focus on document body so
+  // the global keyboard handler processes arrow keys — otherwise
+  // autoFocus on every listIndex change would trap the user inside the
+  // input after one ↑/↓ press.
+  useEffect(() => {
+    if (pendingInputRequest && editorRef.current) {
+      editorRef.current.focus();
+    }
+  }, [pendingInputRequest]);
 
   // Seed defaults from the existing itinerary on first mount so the
   // form reflects the user's last trip.
@@ -189,27 +201,28 @@ export default function PanelTrip({
         )}
         {selected.type === "text" && (
           <input
+            ref={editorRef}
             type="text"
             value={form[selected.key] || ""}
             onChange={update(selected.key)}
             onKeyDown={handleEditorKeyDown}
             placeholder={selected.placeholder}
             className="panel-input"
-            autoFocus
           />
         )}
         {selected.type === "date" && (
           <input
+            ref={editorRef}
             type="date"
             value={form[selected.key] || ""}
             onChange={update(selected.key)}
             onKeyDown={handleEditorKeyDown}
             className="panel-input"
-            autoFocus
           />
         )}
         {selected.type === "number" && (
           <input
+            ref={editorRef}
             type="number"
             min={selected.min}
             max={selected.max}
@@ -217,15 +230,14 @@ export default function PanelTrip({
             onChange={update(selected.key)}
             onKeyDown={handleEditorKeyDown}
             className="panel-input"
-            autoFocus
           />
         )}
         {selected.type === "select" && (
           <select
+            ref={editorRef}
             value={form[selected.key] || ""}
             onChange={update(selected.key)}
             className="panel-input"
-            autoFocus
           >
             {selected.options.map(([v, label]) => (
               <option key={v} value={v}>
