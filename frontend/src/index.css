@@ -1,14 +1,35 @@
+/* Force dark theme — matches the Shopify Liveview reference layout. */
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #0891b2;
-  --accent-bg: rgba(8, 145, 178, 0.1);
-  --accent-border: rgba(8, 145, 178, 0.5);
+  /* Background layers */
+  --bg: #0a0e1a;             /* deep navy, behind the globe */
+  --bg-elevated: #131826;    /* cards, drawer */
+  --bg-glass: rgba(13, 18, 30, 0.55); /* frosted-glass overlays */
+
+  /* Text */
+  --text: #8b95a8;           /* secondary, captions, labels */
+  --text-h: #f0f4ff;         /* primary, headings, input */
+  --text-dim: #5a6478;       /* tertiary, hints */
+
+  /* Accent (cyan) */
+  --accent: #00d9ff;
+  --accent-2: #5eead4;
+  --accent-bg: rgba(0, 217, 255, 0.12);
+  --accent-glow: rgba(0, 217, 255, 0.4);
+  --accent-border: rgba(0, 217, 255, 0.5);
+
+  /* Surfaces */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --code-bg: #1a2030;
+
+  /* Status */
+  --danger: #ff5577;
+  --success: #5eead4;
+
   --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+    rgba(0, 0, 0, 0.5) 0 16px 40px -12px,
+    rgba(0, 217, 255, 0.08) 0 0 0 1px;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -16,7 +37,7 @@
 
   font: 16px/145% var(--sans);
   letter-spacing: 0.1px;
-  color-scheme: light dark;
+  color-scheme: dark;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
@@ -25,36 +46,29 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #22d3ee;
-    --accent-bg: rgba(34, 211, 238, 0.15);
-    --accent-border: rgba(34, 211, 238, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
 }
 
 body {
-  margin: 0;
+  /* Subtle radial vignette so the globe sits in a softer void */
+  background:
+    radial-gradient(ellipse at center, #0d1424 0%, var(--bg) 60%, #050811 100%);
+  min-height: 100svh;
 }
 
 #root {
   min-height: 100svh;
-  display: flex;
-  flex-direction: column;
 }
 
-h1, h2, h3 {
+h1, h2, h3, h4 {
   font-family: var(--heading);
   font-weight: 600;
   color: var(--text-h);
   margin: 0;
+  letter-spacing: -0.01em;
 }
 
 p {
@@ -72,4 +86,26 @@ code {
   background: var(--code-bg);
   border-radius: 4px;
   color: var(--text-h);
+}
+
+/* Selection */
+::selection {
+  background: var(--accent-bg);
+  color: var(--text-h);
+}
+
+/* Scrollbar (webkit) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
 }

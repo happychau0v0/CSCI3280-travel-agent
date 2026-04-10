@@ -391,46 +391,6 @@
   background: var(--bg);
 }
 
-.map-view {
-  height: 280px;
-  width: 100%;
-  border-radius: 12px;
-  overflow: hidden;
-  margin-bottom: 16px;
-  border: 1px solid var(--border);
-}
-
-.map-view-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--code-bg);
-  color: var(--text);
-  font-size: 13px;
-  text-align: center;
-  padding: 16px;
-}
-
-.numbered-marker {
-  background: transparent;
-  border: none;
-}
-
-.marker-pin {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: #0891b2;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 13px;
-  border: 3px solid white;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-}
-
 .itinerary-card {
   text-align: left;
 }
