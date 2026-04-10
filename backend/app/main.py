@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import chat, itinerary
+from app.routers import chat, itinerary, photo
 
 app = FastAPI(title="AI Travel Agent")
 
@@ -15,6 +15,7 @@ app.add_middleware(
 
 app.include_router(chat.router)
 app.include_router(itinerary.router)
+app.include_router(photo.router)
 
 
 @app.get("/health")
