@@ -13,6 +13,8 @@ import ChatPopover from "./components/ChatPopover";
 import PanelMap from "./components/panels/PanelMap";
 import PanelTrip from "./components/panels/PanelTrip";
 import PanelProfile from "./components/panels/PanelProfile";
+import PanelFlights from "./components/panels/PanelFlights";
+import PanelHotels from "./components/panels/PanelHotels";
 import { streamChat } from "./api/client";
 import { useGeolocation } from "./hooks/useGeolocation";
 import { useMenuState } from "./hooks/useMenuState";
@@ -88,13 +90,32 @@ function App() {
   const menu = useMenuState();
   const subtitles = useSubtitleQueue({ muted });
 
+  // Compute the size of the active panel's left list so the keyboard
+  // hook can clamp ↑/↓ navigation. This is panel-specific.
+  const listSize = useMemo(() => {
+    switch (menu.state.panel) {
+      case "FLIGHTS":
+        return currentItinerary?.flight?.options?.length || 0;
+      case "HOTELS":
+        return currentItinerary?.hotels?.length || 0;
+      case "DAYS":
+        return currentItinerary?.days?.length || 0;
+      case "PROFILE":
+        return 5; // five fields
+      case "TRANSCRIPT":
+        return messages.length;
+      default:
+        return 0;
+    }
+  }, [menu.state.panel, currentItinerary, messages.length]);
+
   // Document-level hotkeys (1-7, arrows, Tab, Enter, Space, Esc, M)
   useKeyboard({
     state: menu.state,
     setPanel: menu.setPanel,
     setListIndex: menu.setListIndex,
     setScope: menu.setScope,
-    listSize: 0, // panels will own this once they exist
+    listSize,
     onOpenChat: () => setChatPopoverOpen(true),
     onActivate: () => {
       // Hooked up by individual panels in commits 7-10
@@ -421,6 +442,12 @@ function App() {
         )}
         {menu.state.panel === "PROFILE" && (
           <PanelProfile listIndex={menu.state.listIndex} onChange={setPreferences} />
+        )}
+        {menu.state.panel === "FLIGHTS" && (
+          <PanelFlights itinerary={currentItinerary} listIndex={menu.state.listIndex} />
+        )}
+        {menu.state.panel === "HOTELS" && (
+          <PanelHotels itinerary={currentItinerary} listIndex={menu.state.listIndex} />
         )}
       </MenuShell>
 
