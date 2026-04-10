@@ -119,14 +119,6 @@ export default function GlobeView({
     globeRef.current.pointOfView({ lat: midLat, lng: midLng, altitude: 2.4 }, 2000);
   }, [arcs, drawerOpen]);
 
-  // Pause auto-rotate while there's an active arc to draw the eye to it
-  useEffect(() => {
-    if (!globeRef.current) return;
-    const controls = globeRef.current.controls();
-    if (!controls) return;
-    controls.autoRotate = arcs.length === 0;
-  }, [arcs]);
-
   // Build the rings dataset from points that have ring=true
   const ringsData = useMemo(
     () =>
