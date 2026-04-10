@@ -10,9 +10,15 @@ export function photoSrc(relativePath) {
   return `${API_BASE}${relativePath}`;
 }
 
-export async function postChat(message, history = [], preferences = null) {
+export async function postChat(
+  message,
+  history = [],
+  preferences = null,
+  userLocation = null,
+) {
   const body = { message, history };
   if (preferences) body.preferences = preferences;
+  if (userLocation) body.user_location = userLocation;
 
   const response = await fetch(`${API_BASE}/chat`, {
     method: "POST",
@@ -46,6 +52,16 @@ export async function saveItinerary(itinerary) {
 
 export async function getItinerary(id) {
   const res = await fetch(`${API_BASE}/itinerary/${id}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+/**
+ * Reverse-geocode a lat/lng pair to {city, country, formatted}.
+ * Hits our backend proxy so the Google Maps API key stays server-side.
+ */
+export async function reverseGeocode(lat, lng) {
+  const res = await fetch(`${API_BASE}/geo/reverse?lat=${lat}&lng=${lng}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }

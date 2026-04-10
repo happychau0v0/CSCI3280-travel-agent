@@ -4,6 +4,7 @@ import ItineraryCard from "./components/ItineraryCard";
 import ProfilePanel from "./components/ProfilePanel";
 import ErrorBanner from "./components/ErrorBanner";
 import { postChat } from "./api/client";
+import { useGeolocation } from "./hooks/useGeolocation";
 import "./App.css";
 
 const STORAGE_KEY = "travel-chat-state";
@@ -40,6 +41,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [preferences, setPreferences] = useState(null);
   const [error, setError] = useState(null);
+  const { location: userLocation, requestPermission } = useGeolocation();
 
   // Persist on every change
   useEffect(() => {
@@ -56,7 +58,7 @@ function App() {
 
       setError(null);
       try {
-        const data = await postChat(text, history, preferences);
+        const data = await postChat(text, history, preferences, userLocation);
         const assistantMsg = {
           role: "assistant",
           content: data.reply,
@@ -71,8 +73,21 @@ function App() {
         setIsLoading(false);
       }
     },
-    [messages, preferences],
+    [messages, preferences, userLocation],
   );
+
+  // Trigger the GPS prompt on the first user gesture (clicking anywhere or
+  // sending a message). We don't want a prompt the moment the page loads —
+  // browsers ignore unsolicited prompts and users find them jarring.
+  useEffect(() => {
+    if (userLocation) return;
+    const onFirstGesture = () => {
+      requestPermission();
+      window.removeEventListener("pointerdown", onFirstGesture);
+    };
+    window.addEventListener("pointerdown", onFirstGesture, { once: true });
+    return () => window.removeEventListener("pointerdown", onFirstGesture);
+  }, [userLocation, requestPermission]);
 
   // Keyboard shortcuts: Cmd/Ctrl+K focuses input, Esc stops TTS + voice
   useEffect(() => {
