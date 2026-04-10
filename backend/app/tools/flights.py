@@ -2,11 +2,17 @@
 deterministic haversine estimator as fallback.
 
 The fast-flights library reverse-engineers Google Flights' internal protobuf
-URL parameters to fetch real airline pricing. It works most of the time but
-occasionally returns 401 "no token provided" when Google rotates auth — for
-those moments we fall back to a deterministic price band derived from the
-great-circle distance and the time of year. The user always sees a Google
-Flights deep link they can click to verify live prices.
+URL parameters to fetch real airline pricing. The endpoint is sensitive to
+the originating IP — VPN/datacenter ranges get 401 "no token provided"
+responses, while residential and most consumer ISPs work fine. We:
+
+1. Temporarily clear HTTP_PROXY/HTTPS_PROXY env vars before calling
+   fast-flights so a local Clash/Shadowsocks proxy doesn't route the
+   request through a flagged datacenter exit.
+2. Fall back to a deterministic haversine + season estimator if the call
+   still fails (no internet, Google API change, etc.).
+3. Always include a Google Flights deep link so the user has an escape
+   hatch to live prices.
 
 Output schema (always present, even on fallback):
     {
@@ -15,10 +21,10 @@ Output schema (always present, even on fallback):
         "to_city": "Tokyo",
         "to_iata": "NRT",
         "date": "2026-05-15",
-        "currency": "USD",
-        "results": [...],          # empty list if fallback
-        "estimate_low": 380,
-        "estimate_high": 650,
+        "currency": "HKD",
+        "options": [{type, label, price_low, price_high, duration_min, stops, recommended, airline?}],
+        "estimate_low": 1850,
+        "estimate_high": 2830,
         "duration_min": 235,
         "stops_typical": 0,
         "source": "fast-flights" | "estimator",
@@ -30,12 +36,26 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+import os
+import re
 from datetime import datetime, timezone
 from urllib.parse import quote_plus
 
 from app.tools.airports import lookup as lookup_airport
 
 logger = logging.getLogger(__name__)
+
+# Env vars that proxy clients (Clash, Shadowsocks, V2Ray, corporate proxies)
+# set to route Python's HTTP traffic through a local SOCKS/HTTP forwarder.
+# Google Flights' protobuf endpoint flags many of those exits as bots.
+_PROXY_ENV_VARS = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "ALL_PROXY",
+    "all_proxy",
+)
 
 
 # ─── Estimator ────────────────────────────────────────────────────────────
@@ -171,10 +191,48 @@ def _google_flights_url(from_iata: str, to_iata: str, date: str | None) -> str:
 # ─── fast-flights call (best-effort) ──────────────────────────────────────
 
 
+_PRICE_RE = re.compile(r"([\d,]+(?:\.\d+)?)")
+_DURATION_HM_RE = re.compile(r"(?:(\d+)\s*hr)?\s*(?:(\d+)\s*min)?")
+
+
+def _parse_price(price_str: str) -> int | None:
+    """Extract a numeric price from a string like 'HK$1,304' or '$480'."""
+    if not price_str:
+        return None
+    m = _PRICE_RE.search(price_str.replace(",", ""))
+    if not m:
+        return None
+    try:
+        return int(round(float(m.group(1))))
+    except ValueError:
+        return None
+
+
+def _parse_duration(duration_str: str) -> int | None:
+    """Convert '4 hr 30 min' / '4 hr' / '45 min' into total minutes."""
+    if not duration_str:
+        return None
+    m = _DURATION_HM_RE.search(duration_str)
+    if not m:
+        return None
+    h = int(m.group(1) or 0)
+    mins = int(m.group(2) or 0)
+    total = h * 60 + mins
+    return total if total > 0 else None
+
+
 def _try_fast_flights(from_iata: str, to_iata: str, date: str) -> list[dict]:
     """Synchronously call fast-flights. Returns [] on any error.
 
     Wrapped in asyncio.to_thread by the caller so we don't block the loop.
+
+    The local HTTP_PROXY/HTTPS_PROXY env vars are temporarily cleared for
+    the duration of the call. Google Flights' protobuf endpoint returns
+    401 "no token provided" when the request comes from a VPN/datacenter
+    IP, which is exactly what a local Clash/Shadowsocks proxy produces.
+    Saving and restoring is fine because we're inside a thread spawned by
+    asyncio.to_thread — the env mutation doesn't leak into other concurrent
+    calls during the brief window the proxy is unset.
     """
     try:
         from fast_flights import FlightData, Passengers, get_flights
@@ -182,6 +240,7 @@ def _try_fast_flights(from_iata: str, to_iata: str, date: str) -> list[dict]:
         logger.info("fast-flights not installed; using estimator")
         return []
 
+    saved = {key: os.environ.pop(key, None) for key in _PROXY_ENV_VARS}
     try:
         result = get_flights(
             flight_data=[FlightData(date=date, from_airport=from_iata, to_airport=to_iata)],
@@ -193,14 +252,20 @@ def _try_fast_flights(from_iata: str, to_iata: str, date: str) -> list[dict]:
     except Exception as e:
         logger.info("fast-flights failed: %s", e)
         return []
+    finally:
+        for key, value in saved.items():
+            if value is not None:
+                os.environ[key] = value
 
     flights = []
-    for f in (result.flights or [])[:5]:
+    for f in (result.flights or [])[:20]:
         flights.append(
             {
                 "airline": f.name,
-                "price": f.price,
-                "duration": f.duration,
+                "price_str": f.price,
+                "price_num": _parse_price(f.price),
+                "duration_str": f.duration,
+                "duration_min": _parse_duration(f.duration),
                 "stops": f.stops,
                 "departure": f.departure,
                 "arrival": f.arrival,
@@ -208,6 +273,65 @@ def _try_fast_flights(from_iata: str, to_iata: str, date: str) -> list[dict]:
             }
         )
     return flights
+
+
+def _options_from_live(live: list[dict]) -> list[dict]:
+    """Build the options array from real fast-flights results.
+
+    Picks the cheapest non-stop and the cheapest 1-stop with a meaningful
+    discount, then a budget 1-stop if it's even cheaper. Falls back to
+    whatever we have when there are fewer flights.
+    """
+    if not live:
+        return []
+
+    valid = [f for f in live if f["price_num"] is not None and f["duration_min"]]
+    if not valid:
+        return []
+
+    nonstops = sorted([f for f in valid if f["stops"] == 0], key=lambda f: f["price_num"])
+    onestops = sorted([f for f in valid if f["stops"] >= 1], key=lambda f: f["price_num"])
+
+    options: list[dict] = []
+
+    def _to_option(flight: dict, type_str: str, label: str, recommended: bool) -> dict:
+        # Use the single price as both low and high — fast-flights returns a
+        # single representative fare per row. The "range" exists in the
+        # sorted list, not within one row.
+        return {
+            "type": type_str,
+            "label": label,
+            "price_low": flight["price_num"],
+            "price_high": flight["price_num"],
+            "duration_min": flight["duration_min"],
+            "stops": flight["stops"],
+            "airline": flight["airline"],
+            "recommended": recommended,
+        }
+
+    if nonstops:
+        options.append(_to_option(nonstops[0], "non-stop", "Non-stop", recommended=True))
+
+    if onestops:
+        cheap_onestop = onestops[0]
+        # Only show a 1-stop option if it's actually cheaper than the
+        # cheapest non-stop, otherwise it's just a worse choice.
+        if not nonstops or cheap_onestop["price_num"] < nonstops[0]["price_num"]:
+            options.append(_to_option(cheap_onestop, "1-stop", "1 stop", recommended=False))
+
+        # And a "budget 1-stop" if there's a substantially cheaper one further
+        # down the list (long layover or off-peak departure).
+        if len(onestops) > 1:
+            budget = onestops[-1]
+            if (
+                budget["price_num"] < cheap_onestop["price_num"]
+                or budget["duration_min"] >= cheap_onestop["duration_min"] + 120
+            ):
+                options.append(
+                    _to_option(budget, "1-stop budget", "1 stop · budget", recommended=False)
+                )
+
+    return options
 
 
 # ─── The tool itself ──────────────────────────────────────────────────────
@@ -243,12 +367,20 @@ async def search_flights(
         date = (datetime.now(timezone.utc) + timedelta(days=30)).date().isoformat()
 
     distance_km = _haversine_km(from_lat, from_lng, to_lat, to_lng)
-    options = _build_options(distance_km, date)
     deep_link = _google_flights_url(from_iata, to_iata, date)
 
     # Best-effort live data via fast-flights (offloaded to a thread).
     live = await asyncio.to_thread(_try_fast_flights, from_iata, to_iata, date)
-    source = "fast-flights" if live else "estimator"
+
+    # Try to build options from live data; fall back to estimator if we
+    # couldn't get any usable flights from fast-flights.
+    live_options = _options_from_live(live)
+    if live_options:
+        options = live_options
+        source = "fast-flights"
+    else:
+        options = _build_options(distance_km, date)
+        source = "estimator"
 
     # Top-level summary fields point at the recommended (non-stop) option so
     # FlightCards that don't iterate options still render meaningful values.

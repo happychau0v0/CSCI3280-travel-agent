@@ -324,20 +324,52 @@ async def test_search_flights_uses_live_data_when_available():
     fake_live = [
         {
             "airline": "Cathay Pacific",
-            "price": "$480",
-            "duration": "4h 5min",
+            "price_str": "HK$3,800",
+            "price_num": 3800,
+            "duration_str": "4 hr 5 min",
+            "duration_min": 245,
             "stops": 0,
             "departure": "10:00",
             "arrival": "15:05",
             "is_best": True,
-        }
+        },
+        {
+            "airline": "Hong Kong Express",
+            "price_str": "HK$1,304",
+            "price_num": 1304,
+            "duration_str": "4 hr 30 min",
+            "duration_min": 270,
+            "stops": 0,
+            "departure": "08:00",
+            "arrival": "12:30",
+            "is_best": True,
+        },
     ]
     with patch("app.tools.flights._try_fast_flights", return_value=fake_live):
         result = await flights.search_flights("Hong Kong", "Tokyo", "2026-05-15")
 
     assert result["source"] == "fast-flights"
-    assert len(result["results"]) == 1
-    assert result["results"][0]["airline"] == "Cathay Pacific"
+    assert len(result["options"]) >= 1
+    # The cheapest non-stop should be the recommended one
+    assert result["options"][0]["recommended"] is True
+    assert result["options"][0]["price_low"] == 1304
+    assert result["options"][0]["airline"] == "Hong Kong Express"
+
+
+def test_parse_price_handles_hkd_format():
+    assert flights._parse_price("HK$1,304") == 1304
+    assert flights._parse_price("$480") == 480
+    assert flights._parse_price("HK$1304") == 1304
+    assert flights._parse_price("") is None
+    assert flights._parse_price("Free") is None
+
+
+def test_parse_duration_handles_hr_min():
+    assert flights._parse_duration("4 hr 30 min") == 270
+    assert flights._parse_duration("4 hr") == 240
+    assert flights._parse_duration("45 min") == 45
+    assert flights._parse_duration("8 hr 30 min") == 510
+    assert flights._parse_duration("") is None
 
 
 @pytest.mark.asyncio
