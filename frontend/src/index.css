@@ -53,9 +53,10 @@ html, body {
 }
 
 body {
-  /* Subtle radial vignette so the globe sits in a softer void */
+  /* Soft radial vignette — lighter than the previous near-black so the
+     globe doesn't sit in a void. Inner blue-grey, outer deep navy. */
   background:
-    radial-gradient(ellipse at center, #0d1424 0%, var(--bg) 60%, #050811 100%);
+    radial-gradient(ellipse at center, #1a2540 0%, #0c1525 55%, #0a0f1c 100%);
   min-height: 100svh;
 }
 

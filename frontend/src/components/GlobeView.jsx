@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Globe from "react-globe.gl";
+import * as THREE from "three";
 
 /**
  * Full-bleed dark globe rendered with react-globe.gl.
@@ -46,7 +47,9 @@ export default function GlobeView({
       });
   }, []);
 
-  // Configure controls and material once the globe is ready
+  // Configure controls and material once the globe is ready, and add a
+  // starfield to the underlying Three.js scene so the void around the
+  // globe has some depth instead of feeling pitch-black.
   useEffect(() => {
     if (!globeRef.current) return;
     const controls = globeRef.current.controls();
@@ -56,6 +59,41 @@ export default function GlobeView({
       controls.enableZoom = true;
       controls.minDistance = 200;
       controls.maxDistance = 800;
+    }
+
+    // Inject a starfield once. Skip if we already added one (StrictMode
+    // double-mounts effects in dev).
+    const scene = globeRef.current.scene?.();
+    if (scene && !scene.userData.starfield) {
+      const starCount = 800;
+      const positions = new Float32Array(starCount * 3);
+      // Place stars on the surface of a sphere of radius ~700 (well outside
+      // the globe's ~100 unit radius and beyond max camera distance) so they
+      // sit at infinity and never clip the camera.
+      for (let i = 0; i < starCount; i++) {
+        const r = 700;
+        const u = Math.random();
+        const v = Math.random();
+        const theta = 2 * Math.PI * u;
+        const phi = Math.acos(2 * v - 1);
+        positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+        positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+        positions[i * 3 + 2] = r * Math.cos(phi);
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      const material = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 1.5,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: 0.65,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const stars = new THREE.Points(geometry, material);
+      scene.add(stars);
+      scene.userData.starfield = stars;
     }
   }, [countries]);
 
@@ -107,14 +145,14 @@ export default function GlobeView({
         backgroundColor="rgba(0,0,0,0)"
         globeImageUrl={null}
         showAtmosphere={true}
-        atmosphereColor="#00d9ff"
-        atmosphereAltitude={0.18}
+        atmosphereColor="#4cc9f0"
+        atmosphereAltitude={0.25}
         // Hexagonal country polygons — the dot-matrix look
         hexPolygonsData={countries.features}
         hexPolygonResolution={3}
         hexPolygonMargin={0.35}
         hexPolygonUseDots={true}
-        hexPolygonColor={() => "rgba(0, 217, 255, 0.55)"}
+        hexPolygonColor={() => "rgba(0, 217, 255, 0.75)"}
         // Arcs (flight paths)
         arcsData={arcs}
         arcStartLat={(d) => d.startLat}
