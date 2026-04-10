@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import AudioPlayer from "./AudioPlayer";
 
 /**
@@ -7,7 +7,11 @@ import AudioPlayer from "./AudioPlayer";
  * lives in InputDock now.
  *
  * Strips JSON code blocks from displayed messages — the structured itinerary
- * is shown in the slide-in drawer instead.
+ * is shown in the persistent right sidebar instead.
+ *
+ * The most-recent user message can be edited inline: hover to reveal a
+ * pencil icon, click to swap the bubble for a textarea, save to truncate
+ * the conversation history and resend with the edited text.
  */
 function stripJsonBlocks(text) {
   return (text || "").replace(/```json[\s\S]*?```/g, "").trim();
@@ -27,12 +31,50 @@ function renderMarkdown(text) {
   });
 }
 
-export default function ChatWindow({ messages, isLoading }) {
+export default function ChatWindow({ messages, isLoading, onEditAndResend }) {
   const messagesEndRef = useRef(null);
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [editText, setEditText] = useState("");
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
+
+  // Index of the LAST user message (the only one that's editable)
+  const lastUserIndex = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") return i;
+    }
+    return -1;
+  })();
+
+  const startEdit = (i, text) => {
+    setEditingIndex(i);
+    setEditText(text);
+  };
+
+  const cancelEdit = () => {
+    setEditingIndex(null);
+    setEditText("");
+  };
+
+  const saveEdit = () => {
+    const trimmed = editText.trim();
+    if (!trimmed) return;
+    setEditingIndex(null);
+    setEditText("");
+    onEditAndResend?.(trimmed);
+  };
+
+  const handleEditKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      saveEdit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelEdit();
+    }
+  };
 
   return (
     <div className="chat-overlay">
@@ -50,14 +92,56 @@ export default function ChatWindow({ messages, isLoading }) {
         {messages.map((msg, i) => {
           const display =
             msg.role === "assistant" ? stripJsonBlocks(msg.content) : msg.content;
+          const isEditing = editingIndex === i;
+          const isEditableUser =
+            msg.role === "user" && i === lastUserIndex && !isLoading;
+
           return (
             <div key={i} className={`message message-${msg.role}`}>
               <div className="message-bubble">
-                <div className="message-content">
-                  {msg.role === "assistant" ? renderMarkdown(display) : display}
-                </div>
-                {msg.role === "assistant" && display && (
-                  <AudioPlayer text={display} />
+                {isEditing ? (
+                  <div className="message-edit">
+                    <textarea
+                      autoFocus
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      onKeyDown={handleEditKeyDown}
+                      rows={2}
+                    />
+                    <div className="message-edit-actions">
+                      <button type="button" onClick={cancelEdit} title="Cancel">
+                        ×
+                      </button>
+                      <button
+                        type="button"
+                        className="message-edit-save"
+                        onClick={saveEdit}
+                        title="Save and resend"
+                      >
+                        ✓
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="message-content">
+                      {msg.role === "assistant" ? renderMarkdown(display) : display}
+                    </div>
+                    {msg.role === "assistant" && display && (
+                      <AudioPlayer text={display} />
+                    )}
+                    {isEditableUser && (
+                      <button
+                        type="button"
+                        className="message-edit-btn"
+                        onClick={() => startEdit(i, msg.content)}
+                        title="Edit and resend"
+                        aria-label="Edit message"
+                      >
+                        ✎
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>

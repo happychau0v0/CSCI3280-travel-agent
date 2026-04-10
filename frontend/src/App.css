@@ -350,6 +350,90 @@
 
 .message-content { flex: 1; }
 
+/* Edit pencil — only visible on hover of the last user message */
+.message-edit-btn {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-h);
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.message-user .message-bubble:hover .message-edit-btn {
+  opacity: 0.85;
+}
+
+.message-edit-btn:hover {
+  opacity: 1 !important;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Inline edit textarea inside the user bubble */
+.message-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.message-edit textarea {
+  width: 100%;
+  min-width: 240px;
+  padding: 6px 8px;
+  border: 1px solid var(--accent-border);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-h);
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+  outline: none;
+}
+
+.message-edit textarea:focus {
+  border-color: var(--accent);
+}
+
+.message-edit-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.message-edit-actions button {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-h);
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.message-edit-actions .message-edit-save {
+  background: var(--accent);
+  color: #002;
+  border-color: var(--accent);
+}
+
+.message-edit-actions button:hover {
+  filter: brightness(1.15);
+}
+
 /* ─── Input dock (bottom-left fixed) ─────────────────────── */
 
 .input-dock {

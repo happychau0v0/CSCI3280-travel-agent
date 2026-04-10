@@ -253,6 +253,28 @@ function App() {
     return () => document.removeEventListener("keydown", handleKey);
   }, []);
 
+  // Edit-and-resend the most recent user message: truncate history to
+  // before that user message, then re-send with the new text.
+  const handleEditAndResend = useCallback(
+    (newText) => {
+      // Find the index of the last user message
+      let lastUserIdx = -1;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === "user") {
+          lastUserIdx = i;
+          break;
+        }
+      }
+      if (lastUserIdx === -1) return;
+      const truncated = messages.slice(0, lastUserIdx);
+      setMessages(truncated);
+      // Re-fire the gate so trip-intent + dates still work, but pass via
+      // a microtask so the state update from setMessages is committed first.
+      queueMicrotask(() => handleSend(newText));
+    },
+    [messages, handleSend],
+  );
+
   const handleClear = useCallback(() => {
     setMessages([]);
     setCurrentItinerary(null);
@@ -371,7 +393,11 @@ function App() {
       </div>
 
       {/* Chat overlay */}
-      <ChatWindow messages={messages} isLoading={isLoading} />
+      <ChatWindow
+        messages={messages}
+        isLoading={isLoading}
+        onEditAndResend={handleEditAndResend}
+      />
 
       {/* Bottom-left input dock + fullscreen toggle */}
       <InputDock
