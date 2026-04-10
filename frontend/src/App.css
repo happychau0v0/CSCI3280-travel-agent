@@ -251,11 +251,14 @@
 
 .chat-overlay {
   position: fixed;
-  top: 80px;
+  /* Sit below the LIVE ticker — the ticker has two rows of content
+     plus 10px vertical padding so its bottom edge is around 86px from
+     the top. Add a 14px gap. */
+  top: 110px;
   left: 24px;
   z-index: 5;
   width: min(440px, calc(100vw - 48px));
-  max-height: calc(100svh - 220px);
+  max-height: calc(100svh - 250px);
   display: flex;
   flex-direction: column;
   pointer-events: none;
@@ -1332,11 +1335,11 @@
     right: 12px;
   }
   .chat-overlay {
-    top: 64px;
+    top: 96px;
     left: 12px;
     right: 12px;
     width: auto;
-    max-height: calc(100svh - 200px);
+    max-height: calc(100svh - 230px);
   }
   .input-dock {
     bottom: 12px;
