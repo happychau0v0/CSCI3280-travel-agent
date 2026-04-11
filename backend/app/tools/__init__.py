@@ -7,6 +7,7 @@ from app.tools import (
     flights,
     geocode,
     navigate,
+    phrasebook,
     places,
     request_input as request_input_tool,
     search,
@@ -317,6 +318,30 @@ TOOL_DEFINITIONS: list[dict] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_phrasebook",
+            "description": (
+                "Return a small phrasebook (10 essential phrases) for the destination's "
+                "local language. Useful for international trips. Call this once after "
+                "picking a destination and embed the result in the itinerary's "
+                "`phrasebook` field so the DAYS panel can display it. Supports: "
+                "ja/ko/zh/fr/es/de/it/th. Returns {error} for unsupported destinations; "
+                "skip the field in that case."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "destination": {
+                        "type": "string",
+                        "description": "City, country, or language name (e.g. 'Tokyo', 'Japan', 'ja').",
+                    },
+                },
+                "required": ["destination"],
+            },
+        },
+    },
 ]
 
 
@@ -330,5 +355,6 @@ TOOL_DISPATCH: dict = {
     "navigate_menu": navigate.navigate_menu,
     "request_input": request_input_tool.request_input,
     "get_day_windows": day_windows.get_day_windows,
+    "get_phrasebook": phrasebook.get_phrasebook,
     "web_search": search.web_search,
 }

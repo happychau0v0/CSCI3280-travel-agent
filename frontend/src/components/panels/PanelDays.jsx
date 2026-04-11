@@ -367,8 +367,26 @@ export default function PanelDays({
         <DayMiniMap activities={activities} airport={airportPin} />
       </div>
 
-      {/* RIGHT — activity timeline */}
+      {/* RIGHT — activity timeline + R17 phrasebook */}
       <aside className="panel-grid-right panel-grid-scroll day-detail-card">
+        {itinerary?.phrasebook && (
+          <div className="day-phrasebook" data-testid="day-phrasebook">
+            <div className="day-phrasebook-header">
+              ◢ {itinerary.phrasebook.language?.toUpperCase() || "PHRASEBOOK"}
+            </div>
+            <ul className="day-phrasebook-list">
+              {(itinerary.phrasebook.phrases || []).slice(0, 10).map((p, i) => (
+                <li key={p.key || i} className="day-phrasebook-row">
+                  <span className="day-phrasebook-en">{p.english}</span>
+                  <span className="day-phrasebook-rom">{p.romanized}</span>
+                  {p.native && p.native !== p.romanized && (
+                    <span className="day-phrasebook-native">{p.native}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <ol className="activities">
           {activities.map((act, i) => (
             <ActivityRow

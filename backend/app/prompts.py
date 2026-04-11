@@ -284,7 +284,7 @@ AVAILABLE TOOLS:
 - request_input(field, prompt, options?) — ask the user for a structured value via the TRIP form UI. Use this whenever you need a discrete input (destination, transport, start_date, end_date, party_size, interests). Prefer it over asking via reply text.
 - web_search(query) — fallback stub, avoid.
 
-Use tools proactively. A typical multi-day international trip involves: geocode_city, search_flights, search_places (hotels — expect 20 raw results, pick 5-8), search_places (activities × N — expect 20 raw each, pick 5-7 per middle day), get_directions × M, get_weather, emit itinerary JSON, navigate_menu("FLIGHTS") LAST so the user can start picking their flight.
+Use tools proactively. A typical multi-day international trip involves: geocode_city, search_flights, search_places (hotels — expect 20 raw results, pick 5-8), search_places (activities × N — expect 20 raw each, pick 5-7 per middle day), get_directions × M, get_weather, get_phrasebook(destination) for international trips, emit itinerary JSON (include the phrasebook result under `phrasebook` when available), navigate_menu("FLIGHTS") LAST so the user can start picking their flight.
 """
 
 
@@ -394,6 +394,19 @@ class Hotel(BaseModel):
     place_id: str | None = None
 
 
+class PhrasebookEntry(BaseModel):
+    key: str
+    english: str
+    romanized: str
+    native: str
+
+
+class Phrasebook(BaseModel):
+    language: str
+    language_code: str
+    phrases: list[PhrasebookEntry] = []
+
+
 class Itinerary(BaseModel):
     title: str
     destination: str
@@ -404,3 +417,5 @@ class Itinerary(BaseModel):
     selected_hotel: Hotel | None = None
     selected_flight: dict | None = None
     days: list[Day] = []
+    # Round 17 — optional phrasebook for the destination's language.
+    phrasebook: Phrasebook | None = None

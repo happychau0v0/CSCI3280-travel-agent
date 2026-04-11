@@ -11,6 +11,7 @@ from app.tools import (
     flights,
     geocode,
     navigate,
+    phrasebook,
     places,
     request_input as request_input_tool,
     search,
@@ -863,6 +864,34 @@ async def test_search_flights_includes_alternate_airports():
     assert hnd["km_from_primary"] > 0
     # Hong Kong has no bundled alternates — from_alternates should be empty
     assert result["from_alternates"] == []
+
+
+@pytest.mark.asyncio
+async def test_phrasebook_tokyo_returns_japanese():
+    """Round 17 — get_phrasebook('Tokyo') resolves to Japanese."""
+    result = await phrasebook.get_phrasebook("Tokyo")
+    assert result.get("language") == "Japanese"
+    assert result.get("language_code") == "ja"
+    assert len(result.get("phrases", [])) >= 8
+    # Every phrase has the expected shape
+    for p in result["phrases"]:
+        assert "key" in p
+        assert "romanized" in p
+        assert "native" in p
+
+
+@pytest.mark.asyncio
+async def test_phrasebook_unknown_returns_error():
+    """Unknown destination returns an error dict the LLM can ignore."""
+    result = await phrasebook.get_phrasebook("Atlantis")
+    assert "error" in result
+
+
+@pytest.mark.asyncio
+async def test_phrasebook_country_name_works():
+    """Country names also resolve (not just cities)."""
+    result = await phrasebook.get_phrasebook("France")
+    assert result.get("language") == "French"
 
 
 @pytest.mark.asyncio
