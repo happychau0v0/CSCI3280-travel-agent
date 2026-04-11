@@ -5,7 +5,14 @@ import Subtitle from "./components/Subtitle";
 import ChatPopover from "./components/ChatPopover";
 import AgentStatusBar from "./components/AgentStatusBar";
 import HistoryOverlay from "./components/HistoryOverlay";
-import SettingsOverlay, { loadTts, loadTheme, applyTheme, loadCurrency } from "./components/SettingsOverlay";
+import SettingsOverlay, {
+  loadTts,
+  loadTheme,
+  applyTheme,
+  loadCurrency,
+  loadSubtitleSize,
+  applySubtitleSize,
+} from "./components/SettingsOverlay";
 import HelpOverlay from "./components/HelpOverlay";
 import PanelHome from "./components/panels/PanelHome";
 import PanelFlights from "./components/panels/PanelFlights";
@@ -359,8 +366,10 @@ function App() {
 
   // Round 12 — apply the persisted theme on mount so the page
   // opens in the user's last-chosen palette without a flash.
+  // Round 17 — same for subtitle size.
   useEffect(() => {
     applyTheme(loadTheme());
+    applySubtitleSize(loadSubtitleSize());
   }, []);
 
   // Round 16 — check for a #plan=… hash on first mount; if one is

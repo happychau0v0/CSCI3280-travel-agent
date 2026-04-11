@@ -138,6 +138,35 @@ function saveCurrency(code) {
   }
 }
 
+// Round 17 — subtitle text size (small / medium / large).
+const SUBTITLE_SIZE_KEY = "travel-subtitle-size";
+const SUBTITLE_SIZES = ["small", "medium", "large"];
+
+export function loadSubtitleSize() {
+  try {
+    const raw = localStorage.getItem(SUBTITLE_SIZE_KEY);
+    return SUBTITLE_SIZES.includes(raw) ? raw : "medium";
+  } catch {
+    return "medium";
+  }
+}
+
+function saveSubtitleSize(size) {
+  try {
+    localStorage.setItem(SUBTITLE_SIZE_KEY, size);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function applySubtitleSize(size) {
+  if (typeof document === "undefined") return;
+  const body = document.body;
+  if (!body) return;
+  body.classList.remove("subtitle-small", "subtitle-medium", "subtitle-large");
+  body.classList.add(`subtitle-${SUBTITLE_SIZES.includes(size) ? size : "medium"}`);
+}
+
 /** Convert an HKD price into the display currency. Backend returns
  * HKD, the frontend re-labels with a fixed rate. */
 export function priceInDisplayCurrency(hkd, currency) {
@@ -187,6 +216,7 @@ export default function SettingsOverlay({
   const [tts, setTts] = useState(() => loadTts());
   const [theme, setTheme] = useState(() => loadTheme());
   const [currency, setCurrency] = useState(() => loadCurrency());
+  const [subtitleSize, setSubtitleSize] = useState(() => loadSubtitleSize());
   const [voices, setVoices] = useState([]);
   const [confirmClear, setConfirmClear] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -303,6 +333,21 @@ export default function SettingsOverlay({
         const next = codes[(idx + 1) % codes.length];
         setCurrency(next);
         saveCurrency(next);
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 600);
+      },
+    },
+    {
+      kind: "action",
+      key: "subtitle_size",
+      label: "SUBTITLE SIZE",
+      value: subtitleSize.toUpperCase(),
+      onActivate: () => {
+        const idx = SUBTITLE_SIZES.indexOf(subtitleSize);
+        const next = SUBTITLE_SIZES[(idx + 1) % SUBTITLE_SIZES.length];
+        setSubtitleSize(next);
+        saveSubtitleSize(next);
+        applySubtitleSize(next);
         setSavedFlash(true);
         setTimeout(() => setSavedFlash(false), 600);
       },

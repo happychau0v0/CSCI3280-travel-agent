@@ -2411,6 +2411,20 @@ select.panel-input {
   transform: translate(-50%, 0);
 }
 
+/* Round 17 — subtitle size scaling (small / medium / large)
+ * applied via body class from SettingsOverlay. */
+body.subtitle-small .subtitle {
+  font-size: 12px;
+  padding: 10px 18px;
+  max-width: min(560px, calc(100vw - 80px));
+}
+
+body.subtitle-large .subtitle {
+  font-size: 19px;
+  padding: 18px 32px;
+  max-width: min(820px, calc(100vw - 64px));
+}
+
 /* Round 16 — subtitle history popover. The ↑ toggle lives on the
  * bar itself so it shows up only when there's text, but the button
  * needs pointer-events even when the wrapper is hidden so users can
