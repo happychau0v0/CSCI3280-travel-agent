@@ -15,6 +15,7 @@ import SettingsOverlay, {
 } from "./components/SettingsOverlay";
 import HelpOverlay from "./components/HelpOverlay";
 import PrintView from "./components/PrintView";
+import TripChecklist from "./components/TripChecklist";
 import PanelHome from "./components/panels/PanelHome";
 import PanelFlights from "./components/panels/PanelFlights";
 import PanelHotels from "./components/panels/PanelHotels";
@@ -135,6 +136,7 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
+  const [checklistOpen, setChecklistOpen] = useState(false);
   // Agent status state used by the AgentStatusBar — addresses the
   // round-7 "feels unresponsive" complaint with overlapping indicators.
   const [agentState, setAgentState] = useState("idle"); // idle|working|done|error
@@ -359,7 +361,8 @@ function App() {
     onRedo: handleRedoPick,
     onOpenHelp: () => setHelpOpen(true),
     onOpenPrint: () => setPrintOpen(true),
-    enabled: !historyOpen && !settingsOpen && !helpOpen && !printOpen,
+    onOpenChecklist: () => setChecklistOpen(true),
+    enabled: !historyOpen && !settingsOpen && !helpOpen && !printOpen && !checklistOpen,
   });
 
   // Persist messages + itinerary
@@ -427,6 +430,7 @@ function App() {
       settingsOpen,
       helpOpen,
       printOpen,
+      checklistOpen,
       chatPopoverOpen,
       muted,
       messages,
@@ -1026,6 +1030,11 @@ function App() {
         itinerary={currentItinerary}
         currency={currency}
         onClose={() => setPrintOpen(false)}
+      />
+      <TripChecklist
+        open={checklistOpen}
+        destinationKey={currentItinerary?.destination || "default"}
+        onClose={() => setChecklistOpen(false)}
       />
 
       {/* Bottom-center subtitle bar with auto-TTS + R16 history */}

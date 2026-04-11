@@ -39,6 +39,8 @@ const GROUPS = [
     rows: [
       ["H", "Open HISTORY overlay (conversation)"],
       ["S", "Open SETTINGS overlay (preferences, theme, currency)"],
+      ["P", "Open print-friendly trip view"],
+      ["L", "Open trip checkList (packing + reminders)"],
       ["?", "Open this keyboard help"],
     ],
   },

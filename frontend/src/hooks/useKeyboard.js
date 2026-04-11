@@ -46,6 +46,7 @@ export function useKeyboard({
   onRedo,
   onOpenHelp,
   onOpenPrint,
+  onOpenChecklist,
   enabled = true,
 }) {
   useEffect(() => {
@@ -168,6 +169,15 @@ export function useKeyboard({
           }
           break;
 
+        case "l":
+        case "L":
+          // Round 18 — open the trip checklist
+          if (!e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            onOpenChecklist?.();
+          }
+          break;
+
         case "h":
         case "H":
           if (!e.metaKey && !e.ctrlKey) {
@@ -230,5 +240,6 @@ export function useKeyboard({
     onRedo,
     onOpenHelp,
     onOpenPrint,
+    onOpenChecklist,
   ]);
 }
