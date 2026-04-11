@@ -221,6 +221,36 @@ def _parse_duration(duration_str: str) -> int | None:
     return total if total > 0 else None
 
 
+def _normalize_time(time_str: str | None) -> str | None:
+    """Convert fast-flights '6:30 PM' / '18:30' / '18:30+1' → 'HH:MM'.
+
+    fast-flights returns times in a variety of formats depending on
+    the locale and whether the arrival crosses midnight. We collapse
+    to 24-hour HH:MM so get_day_windows and the frontend can parse
+    it without worrying about localization. The +1/+2 day-suffix is
+    dropped — the itinerary carries date separately.
+    """
+    if not time_str:
+        return None
+    s = str(time_str).strip()
+    # Strip "+1" / "+2" day suffix
+    for suffix in ("+1", "+2", "+3"):
+        if s.endswith(suffix):
+            s = s[: -len(suffix)].strip()
+    # 12-hour "6:30 PM" → 18:30
+    am_pm_match = re.match(r"(\d{1,2}):(\d{2})\s*(AM|PM)", s, re.IGNORECASE)
+    if am_pm_match:
+        h = int(am_pm_match.group(1)) % 12
+        if am_pm_match.group(3).upper() == "PM":
+            h += 12
+        return f"{h:02d}:{int(am_pm_match.group(2)):02d}"
+    # 24-hour "18:30"
+    hm_match = re.match(r"(\d{1,2}):(\d{2})", s)
+    if hm_match:
+        return f"{int(hm_match.group(1)):02d}:{int(hm_match.group(2)):02d}"
+    return None
+
+
 def _try_fast_flights(from_iata: str, to_iata: str, date: str) -> list[dict]:
     """Synchronously call fast-flights. Returns [] on any error.
 
@@ -276,11 +306,19 @@ def _try_fast_flights(from_iata: str, to_iata: str, date: str) -> list[dict]:
 
 
 def _options_from_live(live: list[dict]) -> list[dict]:
-    """Build the options array from real fast-flights results.
+    """Build a 4-6 option list from real fast-flights results.
 
-    Picks the cheapest non-stop and the cheapest 1-stop with a meaningful
-    discount, then a budget 1-stop if it's even cheaper. Falls back to
-    whatever we have when there are fewer flights.
+    Strategy — pick diverse options so the user has meaningful picks:
+      1. Cheapest non-stop (recommended)
+      2. Fastest non-stop (different flight, same stops class)
+      3. Second-cheapest non-stop from a DIFFERENT airline than #1
+      4. Cheapest 1-stop (only if cheaper than the cheapest non-stop)
+      5. Budget 1-stop (longer layover or much cheaper)
+      6. Premium non-stop (short duration, higher price, only if there's
+         a meaningful gap)
+
+    Deduped by (airline, price_num) so near-identical rows collapse.
+    Falls back to whatever is available when the list is short.
     """
     if not live:
         return []
@@ -291,13 +329,11 @@ def _options_from_live(live: list[dict]) -> list[dict]:
 
     nonstops = sorted([f for f in valid if f["stops"] == 0], key=lambda f: f["price_num"])
     onestops = sorted([f for f in valid if f["stops"] >= 1], key=lambda f: f["price_num"])
-
-    options: list[dict] = []
+    nonstops_by_duration = sorted(nonstops, key=lambda f: f["duration_min"])
 
     def _to_option(flight: dict, type_str: str, label: str, recommended: bool) -> dict:
-        # Use the single price as both low and high — fast-flights returns a
-        # single representative fare per row. The "range" exists in the
-        # sorted list, not within one row.
+        dep = flight.get("departure")
+        arr = flight.get("arrival")
         return {
             "type": type_str,
             "label": label,
@@ -306,32 +342,75 @@ def _options_from_live(live: list[dict]) -> list[dict]:
             "duration_min": flight["duration_min"],
             "stops": flight["stops"],
             "airline": flight["airline"],
+            # HH:MM local times. Round 9 uses these in get_day_windows
+            # to compute flight-aware activity windows per day.
+            "departure_time": _normalize_time(dep),
+            "arrival_time": _normalize_time(arr),
+            "departure": dep,
+            "arrival": arr,
             "recommended": recommended,
         }
 
-    if nonstops:
-        options.append(_to_option(nonstops[0], "non-stop", "Non-stop", recommended=True))
+    seen: set[tuple] = set()
+    options: list[dict] = []
 
+    def _add(flight: dict, type_str: str, label: str, recommended: bool) -> bool:
+        key = (flight.get("airline", ""), flight.get("price_num"))
+        if key in seen:
+            return False
+        seen.add(key)
+        options.append(_to_option(flight, type_str, label, recommended))
+        return True
+
+    # 1. Cheapest non-stop
+    if nonstops:
+        _add(nonstops[0], "non-stop", "Cheapest non-stop", recommended=True)
+
+    # 2. Fastest non-stop (if different from cheapest)
+    if nonstops_by_duration and nonstops_by_duration[0] is not (nonstops[0] if nonstops else None):
+        _add(nonstops_by_duration[0], "non-stop", "Fastest non-stop", recommended=False)
+
+    # 3. Second-cheapest non-stop from a DIFFERENT airline
+    if len(nonstops) > 1:
+        first_airline = nonstops[0].get("airline", "")
+        for candidate in nonstops[1:]:
+            if candidate.get("airline", "") != first_airline:
+                _add(candidate, "non-stop", "Alternative airline", recommended=False)
+                break
+
+    # 4. Cheapest 1-stop (only if genuinely cheaper than cheapest non-stop)
     if onestops:
         cheap_onestop = onestops[0]
-        # Only show a 1-stop option if it's actually cheaper than the
-        # cheapest non-stop, otherwise it's just a worse choice.
         if not nonstops or cheap_onestop["price_num"] < nonstops[0]["price_num"]:
-            options.append(_to_option(cheap_onestop, "1-stop", "1 stop", recommended=False))
+            _add(cheap_onestop, "1-stop", "1 stop · cheap", recommended=False)
 
-        # And a "budget 1-stop" if there's a substantially cheaper one further
-        # down the list (long layover or off-peak departure).
+        # 5. Budget 1-stop with long layover OR much cheaper
         if len(onestops) > 1:
             budget = onestops[-1]
             if (
-                budget["price_num"] < cheap_onestop["price_num"]
+                budget["price_num"] < cheap_onestop["price_num"] * 0.95
                 or budget["duration_min"] >= cheap_onestop["duration_min"] + 120
             ):
-                options.append(
-                    _to_option(budget, "1-stop budget", "1 stop · budget", recommended=False)
-                )
+                _add(budget, "1-stop budget", "1 stop · budget", recommended=False)
 
-    return options
+    # 6. Premium non-stop (short duration, higher price — only if there's
+    #    a meaningful gap vs the cheapest one)
+    if len(nonstops) >= 3:
+        # The second-fastest non-stop that's pricier than the cheapest
+        for candidate in nonstops_by_duration:
+            if candidate["price_num"] > nonstops[0]["price_num"] * 1.15:
+                _add(candidate, "non-stop", "Premium non-stop", recommended=False)
+                break
+
+    # If we still don't have ≥3 options, pad with any remaining nonstops
+    # up to 6 total so the user always has something to compare.
+    for candidate in nonstops:
+        if len(options) >= 6:
+            break
+        _add(candidate, "non-stop", candidate.get("airline") or "Non-stop", recommended=False)
+
+    # Hard cap at 8 options
+    return options[:8]
 
 
 # ─── The tool itself ──────────────────────────────────────────────────────

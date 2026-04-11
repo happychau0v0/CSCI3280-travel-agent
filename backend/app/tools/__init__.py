@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from app.tools import (
+    day_windows,
     directions,
     flights,
     geocode,
@@ -256,6 +257,47 @@ TOOL_DEFINITIONS: list[dict] = [
     {
         "type": "function",
         "function": {
+            "name": "get_day_windows",
+            "description": (
+                "Compute flight-aware activity windows for each day of a "
+                "multi-day trip. Call this AFTER search_flights and BEFORE "
+                "populating the day-by-day itinerary. It returns a list "
+                "of {day, date, start_time, end_time, notes} per day, "
+                "accounting for airport transit + baggage on the arrival "
+                "day and airport check-in buffer on the departure day. "
+                "Every activity you emit must fall within its day's "
+                "window — otherwise the day plan would have activities "
+                "starting before the flight has landed or after the "
+                "passenger has left for the airport."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "flight": {
+                        "type": "object",
+                        "description": (
+                            "The selected flight option dict. Must include "
+                            "arrival_time and departure_time as HH:MM strings "
+                            "(local destination time). If you have the full "
+                            "flight dict from search_flights, pass it as-is."
+                        ),
+                    },
+                    "trip_days": {
+                        "type": "integer",
+                        "description": "Total number of days in the trip (≥1)",
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "description": "ISO start date YYYY-MM-DD. Used to label each window with its date.",
+                    },
+                },
+                "required": ["trip_days"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "web_search",
             "description": (
                 "Fallback web search for general info not covered by other tools. "
@@ -282,5 +324,6 @@ TOOL_DISPATCH: dict = {
     "search_flights": flights.search_flights,
     "navigate_menu": navigate.navigate_menu,
     "request_input": request_input_tool.request_input,
+    "get_day_windows": day_windows.get_day_windows,
     "web_search": search.web_search,
 }

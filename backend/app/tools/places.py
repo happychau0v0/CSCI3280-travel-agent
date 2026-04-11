@@ -74,8 +74,11 @@ async def search_places(
         raise ToolUnavailableError("GOOGLE_MAPS_API_KEY not configured")
 
     body: dict = {"textQuery": query if not location else f"{query} near {location}"}
+    # pageSize is the max results we want back. 20 gives the LLM room
+    # to pick 5-8 diverse hotels / activities while still keeping the
+    # response small enough to not blow the model context.
     if location:
-        body["pageSize"] = 10
+        body["pageSize"] = 20
 
     headers = {
         "Content-Type": "application/json",
@@ -92,6 +95,7 @@ async def search_places(
     for place in data.get("places", []):
         photos = place.get("photos") or []
         location = place.get("location") or {}
+        photo_urls = [_photo_url(p["name"]) for p in photos[:5] if p.get("name")]
         results.append(
             {
                 "place_id": place.get("id", ""),
@@ -99,7 +103,11 @@ async def search_places(
                 "address": place.get("formattedAddress", ""),
                 "rating": place.get("rating"),
                 "price_level": place.get("priceLevel"),
-                "photo_url": _photo_url(photos[0]["name"]) if photos else None,
+                # Backcompat: the existing itinerary schema references
+                # photo_url as the primary image.
+                "photo_url": photo_urls[0] if photo_urls else None,
+                # New in round 9: multi-photo gallery (up to 5 images)
+                "photos": photo_urls,
                 "lat": location.get("latitude"),
                 "lng": location.get("longitude"),
             }

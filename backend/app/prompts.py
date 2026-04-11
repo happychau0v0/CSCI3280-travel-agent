@@ -54,21 +54,24 @@ Step 3 — Local transportation preference
 
 Step 4 — Hotels
 - Call `search_places(query="hotels in {destination}", location="{destination}")`.
-- Pick 3 well-rated options across price levels and add them to the `hotels` array.
+- Pick **5 to 8 well-rated hotels** spanning different price levels AND different neighborhoods (near the airport, near the city center, near the main attraction the user wants to see). Variety matters — the user will pick one of them and expects options.
+- Copy the `photos` array from each search_places result VERBATIM into each hotel object — the frontend shows a gallery per hotel.
 - Pre-select the top option as `selected_hotel` so the day-by-day routing has an anchor. The user can pick a different hotel from the HOTELS panel and you'll be asked to replan.
 
-Step 5 — Day-by-day itinerary (HOTEL-ANCHORED)
+Step 5 — Day-by-day itinerary (FLIGHT-AWARE + HOTEL-ANCHORED)
 - Call `get_weather` for the destination.
-- For each day, search for activities matching the user's interests and the day's weather.
-- **Each day's activities array MUST begin and end at the selected hotel.** The first entry has `name = selected_hotel.name`, time = morning departure (e.g. "09:00"), and `transport_to_next` is the route from the hotel to activity 2 via `get_directions`. The LAST entry is also the hotel with name = selected_hotel.name and time = evening return (e.g. "20:00"); its `transport_to_next` is null.
-- **Each day MUST have at least 4 activities total** (hotel-out + 2-4 real stops + hotel-back). NEVER emit a day with only the hotel bookends and a single stop in between — that's not a real day plan. If the user wants a slow day, fill it with 2 substantial activities (e.g. a morning museum + an afternoon café + an evening walk).
-- **Every non-hotel activity MUST include place_id, lat, lng, AND address** copied VERBATIM from the `search_places` result that identified it. Do NOT emit an activity you didn't get from search_places. If you think of a place the user would like, call search_places("{place name} {destination}") to fetch its official details FIRST, then copy the fields. The frontend needs lat/lng to pin the activity on the day mini-map and the address for the day timeline — missing coordinates mean the activity is invisible on the map. This rule applies to EVERY activity: temples, restaurants, museums, shrines, parks, shops, everything.
+- **Call `get_day_windows(flight=selected_option, trip_days=N, start_date=...)` IMMEDIATELY after picking the flight.** It returns `[{day, date, start_time, end_time, notes}, ...]` — one valid activity window per day. EVERY activity you emit must fall within its day's window. For example, if day 1's window is `{start: "19:30", end: "23:00"}` (late arrival), do NOT plan morning activities on day 1 — start at 19:30 or later with the hotel check-in, then one nearby dinner spot.
+- For each day, search for activities matching the user's interests AND the day's weather AND the day's time window. Do NOT emit 8 activities when the window only permits 2.
+- **Each day's activities array MUST begin and end at the selected hotel.** The first entry has `name = selected_hotel.name`, time >= the day window's start_time, and `transport_to_next` is the route from the hotel to activity 2 via `get_directions`. The LAST entry is also the hotel with name = selected_hotel.name and time before the day window's end_time; its `transport_to_next` is null.
+- **Each day MUST include at least ONE meal activity** (breakfast / lunch / dinner depending on the time slot). Full days (windows ≥8 hours) need at least TWO meals. Meal activities are restaurants / cafés / food markets — NOT the hotel. Use `search_places` with queries like "best ramen in {destination}" or "{cuisine} near {neighborhood}". Meals make the day feel livable and keep the user fed; skipping them produces unrealistic plans.
+- **Each day MUST have at least 4 activities total** on full-day windows (hotel-out + meal + 2-3 real stops + meal + hotel-back). Short windows (arrival/departure days) can have fewer — honor the window's notes field.
+- **Every non-hotel activity MUST include place_id, lat, lng, AND address** copied VERBATIM from the `search_places` result that identified it. Do NOT emit an activity you didn't get from search_places. If you think of a place the user would like, call search_places("{place name} {destination}") to fetch its official details FIRST, then copy the fields. Also copy the `photos` array so the day timeline can show a gallery. Missing coordinates mean the activity is invisible on the day map.
 - A single-location day is ONLY acceptable if the location is clearly an all-day destination (theme park, multi-temple complex, ski resort, multi-hour tour). Otherwise the day needs at least 2 distinct activities.
-- Activities MUST be diverse — don't fill a day with three coffee shops or three museums. Mix sights / food / experiences according to the user's interests.
-- Each activity should have a realistic `duration_min` between 30 and 240 minutes. If you set duration_min, the next activity's `time` should be roughly current time + duration + transport time.
+- Activities MUST be diverse — don't fill a day with three coffee shops or three museums. Mix sights / food / experiences / walks.
+- Each activity should have a realistic `duration_min` between 30 and 240 minutes. The next activity's `time` should be approximately previous.time + previous.duration_min + transport_to_next.duration_min. Keep times strictly monotonic.
 - Call `get_directions` between consecutive activities using the chosen local transport mode.
 - Prefer outdoor activities on sunny days, indoor on rainy days, and explain swaps in your summary.
-- Save place_id, photo_url, lat, lng, and polylines into the itinerary JSON.
+- Save place_id, photo_url, photos array, lat, lng, and polylines into the itinerary JSON.
 
 REPLAN AFTER HOTEL CHANGE (READ THIS CAREFULLY):
 - When the user (or the UI) sends a follow-up of the shape 'Set "{hotel}" as the base hotel. Replan every day so each route starts and ends at this hotel.', you MUST:
@@ -229,6 +232,12 @@ class FlightOption(BaseModel):
     price_low: float | None = None
     price_high: float | None = None
     duration_min: int | None = None
+    # HH:MM local times. Populated by fast-flights when available.
+    # Used by get_day_windows to compute flight-aware activity windows.
+    departure_time: str | None = None
+    arrival_time: str | None = None
+    type: str | None = None
+    recommended: bool | None = None
 
 
 class Flight(BaseModel):
@@ -249,6 +258,9 @@ class Flight(BaseModel):
     source: str = "estimator"
     google_flights_url: str | None = None
     options: list[FlightOption] = []
+    # Top-level convenience fields populated from the chosen option.
+    departure_time: str | None = None
+    arrival_time: str | None = None
 
 
 class Hotel(BaseModel):
