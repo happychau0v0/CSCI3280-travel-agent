@@ -431,6 +431,8 @@
 
 .home-form .trip-plan-btn {
   margin: 0;
+  padding: 11px 18px;
+  font-size: 13px;
   border-top: 1px solid var(--border);
   border-left: none;
   border-right: none;
@@ -438,14 +440,17 @@
   flex: 0 0 auto;
 }
 
-/* Inline row shape — label on the left, input fills the rest */
+/* Inline row shape — label on the left, input fills the rest.
+ * Round 10: compact padding + nowrap so 7 rows + PLAN button fit in
+ * the PLAN panel's middle grid row at 1280×720 without scrolling. */
 .home-form-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
+  gap: 8px;
+  padding: 5px 12px;
   border-bottom: 1px solid var(--border);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-height: 34px;
 }
 
 .home-form-row:last-child {
@@ -453,22 +458,26 @@
 }
 
 .home-form-row .panel-list-label {
-  flex: 0 0 92px;
+  flex: 0 0 84px;
   font-size: 9px;
   letter-spacing: 0.12em;
   color: var(--text-dim);
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .home-form-input {
   flex: 1 1 auto;
   min-width: 0;
-  padding: 6px 8px;
+  padding: 4px 8px;
+  height: 26px;
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid transparent;
   color: var(--text-h);
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 12px;
   outline: none;
   transition: border-color 0.1s ease, background 0.1s ease;
 }
