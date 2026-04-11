@@ -113,6 +113,14 @@ export function useSubtitleQueue({
     const speak = spoken && !mutedRef.current &&
       typeof window !== "undefined" && window.speechSynthesis;
 
+    // Display duration for the subtitle: ~60ms/char, clamped to a
+    // 2.5-6s window. Short enough not to stall the queue in
+    // headless browsers where TTS isn't wired; long enough that
+    // normal replies aren't chopped. Long tool-call gaps don't
+    // cause re-speaking because this is a SINGLE timer per item,
+    // not a loop-back.
+    const displayMs = Math.max(2500, Math.min(text.length * 60, 6000));
+
     if (speak) {
       try {
         window.speechSynthesis.cancel();
@@ -121,27 +129,23 @@ export function useSubtitleQueue({
         utter.pitch = 1.0;
         const voice = findVoice(voiceNameRef.current);
         if (voice) utter.voice = voice;
-        // Advance via onend so long items are spoken fully and the
-        // display holds until the speech actually finishes. If the
-        // queue is empty when onend fires we just go back to idle.
-        utter.onend = () => advance();
-        utter.onerror = () => advance();
+        // Fire-and-forget — we DON'T hook onend/onerror because on
+        // some browsers (headless Chromium, voice-less environments)
+        // the event fires synchronously during speak() which would
+        // cascade advance() calls and burn the whole queue in a few
+        // milliseconds. The setTimeout below is the single source of
+        // advance timing.
         window.speechSynthesis.speak(utter);
-        // Safety net: if the browser never fires onend (known issue
-        // on some Chrome builds), force-advance after 15s.
-        safetyTimerRef.current = setTimeout(() => advance(), 15000);
       } catch {
         // ignore TTS errors — display still works
-        safetyTimerRef.current = setTimeout(() => advance(), 4000);
       }
-    } else {
-      // Silent item (e.g. the user's own "▸" echo). Hold the
-      // subtitle for a short fixed duration then advance. Long
-      // narration labels don't loop because their 4-6s hold covers
-      // the usual tool-call gap.
-      const ms = Math.max(2500, Math.min(text.length * 60, 6000));
-      safetyTimerRef.current = setTimeout(() => advance(), ms);
     }
+
+    // Single setTimeout per item drives advance. No re-speak loop
+    // because each item only schedules ONE timer, and the next
+    // push will clear it via clear() or via advance() popping the
+    // queue.
+    safetyTimerRef.current = setTimeout(() => advance(), displayMs);
   }, [setCurrentBoth, findVoice]);
 
   const push = useCallback(

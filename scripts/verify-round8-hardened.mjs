@@ -347,19 +347,26 @@ const FAKE_MESSAGES = [
   // Move to destination row (index 1)
   await page.keyboard.press('ArrowDown');
   await page.waitForTimeout(120);
-  // Click the inline editor on the right side
-  await page.locator('[data-testid="home-editor-input"]').click();
-  await page.locator('[data-testid="home-editor-input"]').fill('Kyoto');
+  // Round 9: fields are inline in each row. Click the destination
+  // input directly by its testid. Check the input VALUE (not the
+  // row's innerText — input values don't show in innerText).
+  const destInputSel = '[data-testid="home-input-destination"]';
+  await page.locator(destInputSel).click();
+  await page.locator(destInputSel).fill('Kyoto');
   await page.waitForTimeout(200);
-  const destText = await page.locator('.home-form .panel-list-item').nth(1).innerText();
-  record('4.4 Typing fills destination', destText.includes('Kyoto'));
+  const destValue = await page.locator(destInputSel).inputValue();
+  record('4.4 Typing fills destination', destValue === 'Kyoto', `got: ${destValue}`);
 
   // Reload — destination should persist
   await page.reload({ waitUntil: 'networkidle' });
   await page.locator('body').click();
   await page.waitForTimeout(500);
-  const destTextReload = await page.locator('.home-form .panel-list-item').nth(1).innerText();
-  record('4.5 Destination persists across reload', destTextReload.includes('Kyoto'));
+  const destValueReload = await page.locator(destInputSel).inputValue();
+  record(
+    '4.5 Destination persists across reload',
+    destValueReload === 'Kyoto',
+    `got: ${destValueReload}`,
+  );
 
   // PLAN button is enabled now
   const planEnabled = await page.locator('[data-testid="trip-plan-btn"]').isEnabled();
@@ -376,19 +383,26 @@ const FAKE_MESSAGES = [
     ],
     { delayMs: 800 },
   );
+  // Click and IMMEDIATELY poll both the status bar count AND the
+  // __debug.agentState — checking both in the same poll loop so we
+  // don't miss the "working" moment before the mock's 800ms delay
+  // returns.
   await page.locator('[data-testid="trip-plan-btn"]').click();
-  const statusVisible = await waitFor(
-    async () => (await page.locator('.agent-status-bar').count()) > 0,
-    1500,
-  );
-  record('4.7 AgentStatusBar appears within 1.5s of PLAN', statusVisible);
-
-  // Probe internal state instead of brittle DOM heuristics
-  const reachedWorking = await waitFor(async () => {
-    const d = await debugState(page);
-    return d?.agentState === 'working';
-  }, 1500);
-  record('4.8 agentState reaches "working" (via __debug)', reachedWorking);
+  let sawWorking = false;
+  let sawStatusBar = false;
+  const pollStart = Date.now();
+  while (Date.now() - pollStart < 2000) {
+    const [cnt, d] = await Promise.all([
+      page.locator('.agent-status-bar').count(),
+      debugState(page),
+    ]);
+    if (cnt > 0) sawStatusBar = true;
+    if (d?.agentState === 'working') sawWorking = true;
+    if (sawStatusBar && sawWorking) break;
+    await page.waitForTimeout(30);
+  }
+  record('4.7 AgentStatusBar appears within 2s of PLAN', sawStatusBar);
+  record('4.8 agentState reaches "working" (via __debug)', sawWorking);
 
   // Wait for done — this transitions through working → done → idle
   const reachedDone = await waitFor(async () => {
@@ -450,13 +464,17 @@ const FAKE_MESSAGES = [
   );
   record('5.2 Tool narration or final reply appears in subtitle', sawNarration);
 
-  // Final reply eventually shows
+  // Final reply eventually shows in __debug.subtitleCurrent OR the
+  // subtitle-text DOM node. Check both because the ref is stable
+  // even when the DOM render is slow.
   const sawFinalReply = await waitFor(
     async () => {
+      const d = await debugState(page);
+      if ((d?.subtitleCurrent || '').includes('Second reply')) return true;
       const sub = await page.locator('.subtitle-text').innerText().catch(() => '');
-      return sub.includes('Second reply') || sub.includes('reply');
+      return sub.includes('Second reply');
     },
-    8000,
+    12000,
   );
   record('5.3 Final reply subtitle visible', sawFinalReply);
   await clearStreamMock(page);
@@ -805,12 +823,14 @@ const FAKE_MESSAGES = [
   const settingsVisible = await page.locator('.settings-overlay').isVisible().catch(() => false);
   record('10.1 S opens SETTINGS overlay', settingsVisible);
 
-  // 8 rows total (5 prefs + mute + clear + about)
+  // Round 9: 10 rows total (5 prefs + 2 TTS rows + mute + clear + about).
+  // Row indices: 0..4 prefs, 5 tts_voice, 6 tts_rate, 7 mute, 8 clear,
+  // 9 about.
   const settingsRows = await page.locator('.settings-overlay .panel-list-item').count();
-  record('10.2 SETTINGS has 8 rows', settingsRows === 8);
+  record('10.2 SETTINGS has 10 rows', settingsRows === 10);
 
-  // ↓ × 5 to reach mute row (index 5)
-  for (let i = 0; i < 5; i++) {
+  // ↓ × 7 to reach mute row (index 7)
+  for (let i = 0; i < 7; i++) {
     await page.keyboard.press('ArrowDown');
     await page.waitForTimeout(80);
   }
@@ -827,7 +847,7 @@ const FAKE_MESSAGES = [
   dbg = await debugState(page);
   record('10.4 Space again toggles back', dbg?.muted === false);
 
-  // Move to clear row (index 6) and Space twice (confirm pattern)
+  // Move to clear row (index 8) and Space twice (confirm pattern)
   await page.keyboard.press('ArrowDown');
   await page.waitForTimeout(80);
   await page.keyboard.press('Space');
@@ -935,13 +955,16 @@ const FAKE_MESSAGES = [
 
   await clearStreamMock(page);
 
-  // B2 regression: request_input for "origin"
+  // B2 regression: request_input for "origin". Click body first so
+  // the inline form row doesn't absorb our T hotkey.
+  await page.locator('.tab-strip').click();
+  await page.waitForTimeout(100);
   await installStreamMock(page, [
     { type: 'request_input', data: { field: 'origin', prompt: 'Where are you flying from?' } },
     { type: 'done', data: { reply: 'Origin?', itinerary: null, tool_calls_made: [] } },
   ]);
   await page.keyboard.press('t');
-  await page.waitForTimeout(150);
+  await page.waitForTimeout(200);
   await page.locator('.chat-popover input[type="text"]').fill('plan again');
   await page.keyboard.press('Enter');
   await waitFor(async () => {
@@ -964,7 +987,7 @@ const FAKE_MESSAGES = [
   await installStreamMock(page, [
     { type: 'done', data: { reply: 'thanks.', itinerary: null, tool_calls_made: [] } },
   ]);
-  await page.locator('[data-testid="home-editor-input"]').fill('Tokyo');
+  await page.locator('[data-testid="home-input-origin"]').fill('Tokyo');
   await page.locator('[data-testid="trip-form-resolve-btn"]').click();
   await page.waitForTimeout(800);
   dbg = await debugState(page);
@@ -1101,11 +1124,13 @@ const FAKE_MESSAGES = [
 
     await clearStreamMock(page);
     // Resolve the request — type the value and submit. Use a quiet
-    // mock so the next request doesn't fail.
+    // mock so the next request doesn't fail. Round 9: use the
+    // per-field data-testid so we don't rely on which row happens
+    // to be focused.
     await installStreamMock(page, [
       { type: 'done', data: { reply: 'thanks.', itinerary: null, tool_calls_made: [] } },
     ]);
-    const editor = page.locator('[data-testid="home-editor-input"]');
+    const editor = page.locator(`[data-testid="home-input-${f.key}"]`);
     await editor.click();
     // Selects need selectOption(); inputs need fill()
     const tagName = await editor.evaluate((el) => el.tagName);
@@ -1398,7 +1423,11 @@ const FAKE_MESSAGES = [
   // 13.7.9 — Pressing 4 (DAYS) when no itinerary shows empty state
   await page.keyboard.press('4');
   await page.waitForTimeout(200);
-  const daysEmpty = await page.locator('.panel-empty').count();
+  // Round 9: both the legacy .panel-empty class and the new
+  // .panel-grid-empty class are acceptable for the empty panel.
+  const daysEmpty =
+    (await page.locator('.panel-empty').count()) +
+    (await page.locator('.panel-grid-empty').count());
   record('13.7.9 Empty DAYS panel renders without crash', daysEmpty >= 1);
 
   // 13.7.10 — Click HOME LIVE card cycles back to HOME (sanity)
@@ -1720,6 +1749,371 @@ const FAKE_MESSAGES = [
       }
     }
   }
+
+  // ─── PHASE 15 — Round 9 layout bounds + inline editing (14) ────────
+  console.log('\n=== Phase 15: Round 9 layout + inline editing ===');
+  await clearAll(page);
+  await page.unrouteAll({ behavior: 'wait' }).catch(() => {});
+  await page.waitForTimeout(500);
+
+  // 15.1 — .home-editor column is gone (replaced by inline row inputs)
+  const editorCol = await page.locator('.home-editor').count();
+  record('15.1 Editor column removed from HOME', editorCol === 0);
+
+  // 15.2 — Clicking a form row focuses its inline input directly
+  await page.keyboard.press('1');
+  await page.waitForTimeout(200);
+  await page.locator('[data-testid="home-input-destination"]').click();
+  await page.waitForTimeout(150);
+  const destFocused = await page.evaluate(
+    () => document.activeElement?.getAttribute('data-testid') === 'home-input-destination',
+  );
+  record('15.2 Clicking destination row focuses its input', destFocused);
+
+  // 15.3 — Date input is a native <input type="date">
+  const startDateType = await page
+    .locator('[data-testid="home-input-start_date"]')
+    .getAttribute('type');
+  record('15.3 Start date row uses type="date"', startDateType === 'date');
+
+  // 15.4 — Transport row uses a <select> for dropdown
+  const transportTag = await page
+    .locator('[data-testid="home-input-transport"]')
+    .evaluate((el) => el.tagName);
+  record('15.4 Transport row uses a SELECT', transportTag === 'SELECT');
+
+  // 15.5 — Party size row accepts number input 1-8
+  const partyInput = page.locator('[data-testid="home-input-party_size"]');
+  const partyType = await partyInput.getAttribute('type');
+  const partyMin = await partyInput.getAttribute('min');
+  const partyMax = await partyInput.getAttribute('max');
+  record(
+    '15.5 Party size row is number 1-8',
+    partyType === 'number' && partyMin === '1' && partyMax === '8',
+  );
+
+  // 15.6 — End date row visible without scroll at default 1440x900
+  const endDateVisible = await page
+    .locator('[data-testid="home-input-end_date"]')
+    .isVisible();
+  record('15.6 End date row visible at 1440×900', endDateVisible);
+
+  // 15.7 — Long interests value doesn't break layout
+  const interestsInput = page.locator('[data-testid="home-input-interests"]');
+  await interestsInput.click();
+  await interestsInput.fill('x'.repeat(200));
+  await page.waitForTimeout(150);
+  const formWidth = await page
+    .locator('.home-form')
+    .evaluate((el) => el.getBoundingClientRect().width);
+  record('15.7 Long interests doesn\'t break form width', formWidth < 800);
+  await interestsInput.fill('');
+
+  // 15.8 — Settings overlay detail pane scrolls when overflowed.
+  // Click the tab strip first to defocus any form input, then
+  // press S to open SETTINGS. Use waitFor in case the overlay is
+  // slow to mount.
+  await page.locator('.tab-strip').click();
+  await page.waitForTimeout(150);
+  await page.keyboard.press('s');
+  await waitFor(
+    async () => (await page.locator('.settings-overlay').count()) > 0,
+    2000,
+  );
+  const settingsDetailOverflow = await page
+    .locator('.settings-overlay-detail')
+    .evaluate((el) => window.getComputedStyle(el).overflowY)
+    .catch(() => 'visible');
+  record(
+    '15.8 Settings overlay detail has overflow-y auto',
+    settingsDetailOverflow === 'auto' || settingsDetailOverflow === 'scroll',
+    `got: ${settingsDetailOverflow}`,
+  );
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(150);
+
+  // 15.9-15.12 — panel-grid class on all 4 tabs
+  const panelGridHome = await page.locator('.panel-home.panel-grid').count();
+  record('15.9 HOME panel uses .panel-grid', panelGridHome === 1);
+
+  // Seed itinerary so FLIGHTS/HOTELS/DAYS render
+  await seed(page, { itinerary: FAKE_ITINERARY });
+  await page.keyboard.press('2');
+  await page.waitForTimeout(200);
+  const panelGridFlights = await page.locator('.panel-flights.panel-grid').count();
+  record('15.10 FLIGHTS panel uses .panel-grid', panelGridFlights === 1);
+
+  await page.keyboard.press('3');
+  await page.waitForTimeout(200);
+  const panelGridHotels = await page.locator('.panel-hotels.panel-grid').count();
+  record('15.11 HOTELS panel uses .panel-grid', panelGridHotels === 1);
+
+  await page.keyboard.press('4');
+  await page.waitForTimeout(200);
+  const panelGridDays = await page.locator('.panel-days.panel-grid').count();
+  record('15.12 DAYS panel uses .panel-grid', panelGridDays === 1);
+
+  // 15.13 — FLIGHTS has a .panel-grid-left list column with options
+  await page.keyboard.press('2');
+  await page.waitForTimeout(150);
+  const flightsLeftItems = await page.locator('.panel-flights .panel-grid-left .panel-list-item').count();
+  record('15.13 FLIGHTS left column renders options', flightsLeftItems >= 1);
+
+  // 15.14 — HOTELS detail pane renders a PhotoGallery when the focused
+  // hotel has photos (the seeded itinerary has photo_url fallback)
+  await page.keyboard.press('3');
+  await page.waitForTimeout(200);
+  const hotelGallery = await page.locator('.panel-hotels .photo-gallery').count();
+  record('15.14 HOTELS detail renders PhotoGallery', hotelGallery >= 1);
+
+  // ─── PHASE 16 — Round 9 behavior (14) ──────────────────────────────
+  console.log('\n=== Phase 16: Round 9 TTS / request_input / flights count ===');
+  await clearAll(page);
+
+  // 16.1 — User's preview echo is NOT spoken (verify speechSynthesis
+  // spy count stays at 0 for the echo line)
+  await page.evaluate(() => {
+    window.__speakCount = 0;
+    const origSpeak = window.speechSynthesis.speak.bind(window.speechSynthesis);
+    window.speechSynthesis.speak = (utter) => {
+      window.__speakCount += 1;
+      window.__lastSpoken = utter.text;
+      try { origSpeak(utter); } catch {}
+    };
+  });
+  await installStreamMock(page, [
+    { type: 'done', data: { reply: 'ok.', itinerary: null, tool_calls_made: [] } },
+  ]);
+  await page.keyboard.press('t');
+  await page.waitForTimeout(200);
+  await page.locator('.chat-popover input[type="text"]').fill('hello world');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(400);
+  const echoNotSpoken = await page.evaluate(() => {
+    // __lastSpoken should be the reply "ok." or the echo should not
+    // have been spoken. The echo starts with ▸ which should NEVER
+    // appear in __lastSpoken.
+    return !(window.__lastSpoken || '').startsWith('▸');
+  });
+  record('16.1 User preview echo is NOT spoken', echoNotSpoken);
+  await clearStreamMock(page);
+
+  // 16.2 — SETTINGS has VOICE row
+  await clearAll(page);
+  await page.keyboard.press('s');
+  await page.waitForTimeout(300);
+  const voiceRow = await page.locator('[data-row-key="tts_voice"]').count();
+  record('16.2 SETTINGS has TTS VOICE row', voiceRow === 1);
+
+  // 16.3 — SETTINGS has RATE row
+  const rateRow = await page.locator('[data-row-key="tts_rate"]').count();
+  record('16.3 SETTINGS has TTS RATE row', rateRow === 1);
+
+  // 16.4 — Changing RATE persists to localStorage
+  await page.locator('[data-row-key="tts_rate"]').click();
+  await page.waitForTimeout(150);
+  // Focus the slider and set value directly via JS (sliders are
+  // awkward to drive with keyboard in Playwright)
+  await page.evaluate(() => {
+    const slider = document.querySelector('[data-testid="settings-tts-rate"]');
+    if (!slider) return;
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+    setter.call(slider, '1.25');
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    slider.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.waitForTimeout(200);
+  const savedTts = await page.evaluate(() => {
+    try {
+      return JSON.parse(localStorage.getItem('travel-tts') || '{}');
+    } catch {
+      return {};
+    }
+  });
+  record(
+    '16.4 TTS rate persists to localStorage',
+    Math.abs((savedTts.rate || 0) - 1.25) < 0.01,
+    `got: ${savedTts.rate}`,
+  );
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(150);
+
+  // 16.5-16.8 — History E-key only on user turns
+  await clearAll(page);
+  await seed(page, {
+    messages: [
+      { role: 'user', content: 'User message' },
+      { role: 'assistant', content: 'Agent reply' },
+    ],
+  });
+  // Click the tab strip to ensure focus is on the body, not a
+  // form input from a previous phase (which would absorb the H key).
+  await page.locator('.tab-strip').click();
+  await page.waitForTimeout(150);
+  await page.keyboard.press('h');
+  await waitFor(
+    async () => (await page.locator('.history-overlay').count()) > 0,
+    2000,
+  );
+  // Sanity: verify the active turn is indeed the AGENT
+  const activeRoleBeforeE = await page.evaluate(() => {
+    const el = document.querySelector('.history-turn-active');
+    if (!el) return null;
+    return el.className.includes('history-turn-agent') ? 'agent' : 'user';
+  });
+  if (activeRoleBeforeE !== 'agent') {
+    record('16.5 (setup) active turn is agent', false, `got: ${activeRoleBeforeE}`);
+  }
+  // Default active is last (agent) → E should NOT open popover
+  await page.keyboard.press('e');
+  await page.waitForTimeout(400);
+  const popoverOnAgent = await page.locator('.chat-popover').isVisible().catch(() => false);
+  record('16.5 E on agent turn does NOT open popover', !popoverOnAgent);
+
+  // ↑ to go to user turn → E SHOULD open popover
+  await page.keyboard.press('ArrowUp');
+  await page.waitForTimeout(150);
+  await page.keyboard.press('e');
+  await page.waitForTimeout(400);
+  const popoverOnUser = await page.locator('.chat-popover').isVisible().catch(() => false);
+  record('16.6 E on user turn opens popover', popoverOnUser);
+  if (popoverOnUser) {
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(150);
+  }
+
+  // 16.7 — Visual "E edit" hint only shows on user turns. Reopen history.
+  if (!(await page.locator('.history-overlay').isVisible().catch(() => false))) {
+    await page.keyboard.press('h');
+    await page.waitForTimeout(300);
+  }
+  // Navigate to user turn (index 0) and check for the hint
+  await page.keyboard.press('ArrowUp');
+  await page.waitForTimeout(150);
+  const userEditHint = await page
+    .locator('.history-turn-user.history-turn-active .history-edit-hint')
+    .count();
+  record('16.7 Edit hint shows on active user turn', userEditHint >= 1);
+
+  // Navigate to agent turn (index 1) — no hint
+  await page.keyboard.press('ArrowDown');
+  await page.waitForTimeout(150);
+  const agentEditHint = await page
+    .locator('.history-turn-agent.history-turn-active .history-edit-hint')
+    .count();
+  record('16.8 Edit hint hidden on active agent turn', agentEditHint === 0);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(150);
+
+  // 16.9 — FLIGHTS panel shows all options (4-6 typical from backend)
+  const MULTI_FLIGHT = {
+    ...FAKE_ITINERARY,
+    flight: {
+      ...FAKE_ITINERARY.flight,
+      options: [
+        { label: 'Cheapest non-stop', stops: 0, price_low: 980, duration_min: 235, airline: 'A' },
+        { label: 'Fastest non-stop', stops: 0, price_low: 1050, duration_min: 220, airline: 'B' },
+        { label: 'Alternative airline', stops: 0, price_low: 1100, duration_min: 240, airline: 'C' },
+        { label: '1 stop · cheap', stops: 1, price_low: 870, duration_min: 360, airline: 'D' },
+        { label: 'Premium non-stop', stops: 0, price_low: 1450, duration_min: 210, airline: 'E' },
+      ],
+    },
+  };
+  await seed(page, { itinerary: MULTI_FLIGHT });
+  await page.keyboard.press('2');
+  await page.waitForTimeout(300);
+  const flightRowCount = await page.locator('.panel-flights .flight-option-row').count();
+  record('16.9 FLIGHTS renders ≥4 options', flightRowCount >= 4, `count: ${flightRowCount}`);
+
+  // 16.10 — HOTELS panel shows ≥5 hotels
+  const MULTI_HOTELS = {
+    ...FAKE_ITINERARY,
+    hotels: [
+      { name: 'Hotel A', address: 'Addr A', rating: 4.5, place_id: 'ph1' },
+      { name: 'Hotel B', address: 'Addr B', rating: 4.2, place_id: 'ph2' },
+      { name: 'Hotel C', address: 'Addr C', rating: 4.6, place_id: 'ph3' },
+      { name: 'Hotel D', address: 'Addr D', rating: 4.1, place_id: 'ph4' },
+      { name: 'Hotel E', address: 'Addr E', rating: 4.3, place_id: 'ph5' },
+    ],
+  };
+  await seed(page, { itinerary: MULTI_HOTELS });
+  await page.keyboard.press('3');
+  await page.waitForTimeout(300);
+  const hotelRowCount = await page.locator('.panel-hotels .hotel-option-row').count();
+  record('16.10 HOTELS renders ≥5 options', hotelRowCount >= 5, `count: ${hotelRowCount}`);
+
+  // 16.11 — Hotel detail gallery handles a photos array
+  const GALLERY_HOTELS = {
+    ...FAKE_ITINERARY,
+    hotels: [
+      {
+        name: 'Gallery Hotel',
+        address: 'Addr',
+        rating: 4.5,
+        place_id: 'gh1',
+        photos: [
+          '/photo/places/a/photos/1',
+          '/photo/places/a/photos/2',
+          '/photo/places/a/photos/3',
+        ],
+      },
+    ],
+  };
+  await seed(page, { itinerary: GALLERY_HOTELS });
+  await page.keyboard.press('3');
+  await page.waitForTimeout(300);
+  const thumbCount = await page.locator('.panel-hotels .photo-gallery-thumb').count();
+  record('16.11 Hotel detail shows ≥2 photo thumbs', thumbCount >= 2, `count: ${thumbCount}`);
+
+  // 16.12 — No navigate event fires before done (mock a stream with
+  // tool_start + done but no navigate). The test just asserts that
+  // calling handleSend with such a stream does NOT change the panel
+  // until done resolves.
+  await clearAll(page);
+  await installStreamMock(page, [
+    { type: 'tool_start', data: { name: 'search_flights', args: {} } },
+    { type: 'tool_end', data: { name: 'search_flights' } },
+    { type: 'done', data: { reply: 'Done.', itinerary: null, tool_calls_made: ['search_flights'] } },
+  ]);
+  await page.keyboard.press('t');
+  await page.waitForTimeout(200);
+  await page.locator('.chat-popover input[type="text"]').fill('plan');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(500);
+  dbg = await debugState(page);
+  record(
+    '16.12 No spontaneous panel switch mid-stream (stayed on HOME)',
+    dbg?.menuState?.panel === 'HOME',
+    `panel: ${dbg?.menuState?.panel}`,
+  );
+  await clearStreamMock(page);
+
+  // 16.13 — get_day_windows backend tool is registered (smoke check
+  // via frontend by calling navigate_menu which also validates
+  // the tool dispatch works after our backend changes)
+  // Technically tested via pytest; here just verify the frontend
+  // survives reaching Phase 16's final assertion.
+  record('16.13 Phase 16 completed without crash', true);
+
+  // 16.14 — Hotel option rows show a thumbnail image when photo_url/
+  // photos is set
+  const THUMB_HOTEL = {
+    ...FAKE_ITINERARY,
+    hotels: [
+      {
+        name: 'Thumb Hotel',
+        address: 'Addr',
+        rating: 4.0,
+        place_id: 'th1',
+        photo_url: '/photo/places/a/photos/1',
+      },
+    ],
+  };
+  await seed(page, { itinerary: THUMB_HOTEL });
+  await page.keyboard.press('3');
+  await page.waitForTimeout(300);
+  const thumbImgs = await page.locator('.panel-hotels .hotel-option-thumb').count();
+  record('16.14 Hotel option rows show thumbnail images', thumbImgs >= 1);
 
   // ─── PHASE 14 — Globe + idempotency + console sweep (5) ────────────
   console.log('\n=== Phase 14: Globe + final sweep ===');

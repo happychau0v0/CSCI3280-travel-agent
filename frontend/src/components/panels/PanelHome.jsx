@@ -290,12 +290,9 @@ export default function PanelHome({
                     onFocus={() => onJumpTo && onJumpTo("HOME", i)}
                     placeholder={field.placeholder}
                     className="home-form-input"
-                    data-testid={
-                      isFocused
-                        ? "home-editor-input"
-                        : `home-input-${field.key}`
-                    }
+                    data-testid={`home-input-${field.key}`}
                     data-field={field.key}
+                    {...(isFocused ? { "data-editor-active": "true" } : {})}
                   />
                 )}
                 {field.type === "date" && (
@@ -307,12 +304,9 @@ export default function PanelHome({
                     onKeyDown={handleFieldKeyDown(field.key)}
                     onFocus={() => onJumpTo && onJumpTo("HOME", i)}
                     className="home-form-input"
-                    data-testid={
-                      isFocused
-                        ? "home-editor-input"
-                        : `home-input-${field.key}`
-                    }
+                    data-testid={`home-input-${field.key}`}
                     data-field={field.key}
+                    {...(isFocused ? { "data-editor-active": "true" } : {})}
                   />
                 )}
                 {field.type === "number" && (
@@ -327,12 +321,9 @@ export default function PanelHome({
                     onFocus={() => onJumpTo && onJumpTo("HOME", i)}
                     placeholder={String(field.min)}
                     className="home-form-input"
-                    data-testid={
-                      isFocused
-                        ? "home-editor-input"
-                        : `home-input-${field.key}`
-                    }
+                    data-testid={`home-input-${field.key}`}
                     data-field={field.key}
+                    {...(isFocused ? { "data-editor-active": "true" } : {})}
                   />
                 )}
                 {field.type === "select" && (
@@ -342,12 +333,9 @@ export default function PanelHome({
                     onChange={update(field.key)}
                     onFocus={() => onJumpTo && onJumpTo("HOME", i)}
                     className="home-form-input"
-                    data-testid={
-                      isFocused
-                        ? "home-editor-input"
-                        : `home-input-${field.key}`
-                    }
+                    data-testid={`home-input-${field.key}`}
                     data-field={field.key}
+                    {...(isFocused ? { "data-editor-active": "true" } : {})}
                   >
                     {field.options.map(([v, label]) => (
                       <option key={v} value={v}>
