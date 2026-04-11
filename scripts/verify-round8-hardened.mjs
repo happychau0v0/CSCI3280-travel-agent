@@ -1537,25 +1537,36 @@ const FAKE_MESSAGES = [
       // Per-day quality: each day should have ≥2 activities (the
       // user's explicit concern — a day with only 1 location doesn't
       // make sense unless it's a theme-park-scale all-day destination).
+      //
+      // Round 9 added flight-aware day windows via get_day_windows, so
+      // the arrival day 1 and departure last day legitimately have
+      // SHORT windows (e.g. departure at 09:00 leaves no time for
+      // activities beyond hotel check-out + airport). Exclude the
+      // first and last days from the strict ≥2 check — they can have
+      // 1 activity (the hotel) without being "sparse" in a way the
+      // user would complain about.
       const days = real?.days || [];
-      const sparseDays = days.filter((d) => (d.activities || []).length < 2);
+      const middleDays = days.length >= 3 ? days.slice(1, -1) : [];
+      const sparseMiddleDays = middleDays.filter((d) => (d.activities || []).length < 2);
       record(
-        '13.8.6 No day has fewer than 2 activities',
-        sparseDays.length === 0,
-        `sparse days: ${sparseDays.map((d) => d.day).join(',')}`,
+        '13.8.6 No middle day has fewer than 2 activities',
+        sparseMiddleDays.length === 0,
+        `sparse middle days: ${sparseMiddleDays.map((d) => d.day).join(',')}`,
       );
 
-      // No empty days
+      // No empty days (on ANY day — even departure day should have
+      // at least a hotel check-out activity)
       const emptyDays = days.filter((d) => (d.activities || []).length === 0);
       record('13.8.7 No empty days', emptyDays.length === 0);
 
-      // Single-activity days must be flagged — a 3-day trip with a day
-      // that only has Senso-ji Temple and nothing else is NOT sensible.
-      const singleStopDays = days.filter((d) => (d.activities || []).length === 1);
+      // Single-activity days on MIDDLE days must be flagged — a
+      // middle day with only Senso-ji Temple and nothing else isn't
+      // a real plan. Arrival/departure days are allowed to be brief.
+      const singleStopMiddleDays = middleDays.filter((d) => (d.activities || []).length === 1);
       record(
-        '13.8.6b No day has exactly 1 activity (user quality concern)',
-        singleStopDays.length === 0,
-        `single-stop days: ${singleStopDays.map((d) => `${d.day}:${d.activities[0]?.name}`).join(',')}`,
+        '13.8.6b No middle day has exactly 1 activity',
+        singleStopMiddleDays.length === 0,
+        `single-stop middle days: ${singleStopMiddleDays.map((d) => `${d.day}:${d.activities[0]?.name}`).join(',')}`,
       );
 
       // Average activities per day should be ≥3 for a multi-day trip
