@@ -126,7 +126,15 @@ export default function GlobeView({
   // destination; this effect animates the camera there and pauses auto-
   // rotate so the Leaflet map that fades in on top isn't visually
   // fighting a spinning globe underneath.
+  //
+  // __debug.globeFocus is exposed even before the globe ref is ready so
+  // the Playwright harness can assert that a focus target was at least
+  // computed for the current panel.
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.__debug = window.__debug || {};
+      window.__debug.globeFocus = focus ? { ...focus } : null;
+    }
     if (!globeRef.current || !focus) return;
     const controls = globeRef.current.controls?.();
     if (controls) controls.autoRotate = false;
@@ -134,11 +142,6 @@ export default function GlobeView({
       { lat: focus.lat, lng: focus.lng, altitude: focus.altitude ?? 0.35 },
       1500,
     );
-    // Expose for the Playwright harness
-    if (typeof window !== "undefined") {
-      window.__debug = window.__debug || {};
-      window.__debug.globeFocus = { ...focus };
-    }
     const reArm = setTimeout(() => {
       if (globeRef.current) {
         const c = globeRef.current.controls?.();

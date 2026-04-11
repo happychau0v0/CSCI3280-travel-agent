@@ -472,22 +472,27 @@
 
 /* Inline row shape — label on the left, input fills the rest.
  * Round 10: compact padding + nowrap so 7 rows + PLAN button fit in
- * the PLAN panel's middle grid row at 1280×720 without scrolling. */
-.home-form-row {
+ * the PLAN panel's middle grid row at 1280×720 without scrolling.
+ * The compound `.panel-list-item.home-form-row` selector wins the
+ * cascade against the generic `.panel-list-item` rule (later in the
+ * file) which sets padding 12px 16px + flex-direction column. */
+.panel-list-item.home-form-row {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 8px;
-  padding: 5px 12px;
+  padding: 4px 12px;
   border-bottom: 1px solid var(--border);
   flex-wrap: nowrap;
-  min-height: 34px;
+  box-sizing: border-box;
+  height: 32px;
 }
 
-.home-form-row:last-child {
+.panel-list-item.home-form-row:last-child {
   border-bottom: none;
 }
 
-.home-form-row .panel-list-label {
+.panel-list-item.home-form-row .panel-list-label {
   flex: 0 0 84px;
   font-size: 9px;
   letter-spacing: 0.12em;
@@ -521,7 +526,7 @@
   background: rgba(0, 217, 255, 0.08);
 }
 
-.home-form-row.field-pending .home-form-input {
+.panel-list-item.home-form-row.field-pending .home-form-input {
   border-color: #5eead4;
   box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.35) inset;
   animation: field-pulse 1.4s ease-in-out infinite;

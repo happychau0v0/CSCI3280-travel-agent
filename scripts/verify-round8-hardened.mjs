@@ -183,25 +183,26 @@ const FAKE_MESSAGES = [
   record('1.2 Tab strip has exactly 4 tabs', tabCount === 4, `count: ${tabCount}`);
 
   const tabLabels = await page.locator('.tab-strip .tab .tab-label').allInnerTexts();
-  const expected = ['HOME', 'FLIGHTS', 'HOTELS', 'DAYS'];
+  // Round 10 renamed HOME → PLAN at the display layer.
+  const expected = ['PLAN', 'FLIGHTS', 'HOTELS', 'DAYS'];
   const labelsMatch = JSON.stringify(tabLabels) === JSON.stringify(expected);
-  record('1.3 Tab labels HOME/FLIGHTS/HOTELS/DAYS', labelsMatch, `got: ${tabLabels.join(',')}`);
+  record('1.3 Tab labels PLAN/FLIGHTS/HOTELS/DAYS', labelsMatch, `got: ${tabLabels.join(',')}`);
 
   const firstTab = await page.locator('.tab.active').first().innerText();
-  record('1.4 First tab is HOME', firstTab.includes('HOME'));
+  record('1.4 First tab is PLAN', firstTab.includes('PLAN'));
 
-  // Three corner cards (LIVE / FLIGHT / HOTEL); NEXT TRIP is now a
-  // top summary band (`.home-summary-top`), not a card.
+  // Round 10 dropped the bottom flight/hotel preview cards. Only the
+  // top-left LIVE card remains; NEXT TRIP is still a top summary band.
   const cardCount = await page.locator('.home-card').count();
-  record('1.5 HOME has 3 corner cards + 1 summary band', cardCount === 3, `count: ${cardCount}`);
+  record('1.5 PLAN has 1 LIVE card (bottom cards removed)', cardCount === 1, `count: ${cardCount}`);
   const summaryBand = await page.locator('.home-summary-top').count();
-  record('1.5b HOME has NEXT TRIP summary band', summaryBand === 1);
+  record('1.5b PLAN has NEXT TRIP summary band', summaryBand === 1);
 
   const formFieldCount = await page.locator('.home-form .panel-list-item').count();
-  record('1.6 HOME form has 7 fields (incl. origin)', formFieldCount === 7, `count: ${formFieldCount}`);
+  record('1.6 PLAN form has 7 fields (incl. origin)', formFieldCount === 7, `count: ${formFieldCount}`);
 
   const planBtn = await page.locator('[data-testid="trip-plan-btn"]').count();
-  record('1.7 PLAN TRIP button rendered', planBtn === 1);
+  record('1.7 START PLANNING button rendered', planBtn === 1);
 
   const footerHints = await page.locator('.footer-hints .hint').allInnerTexts();
   const allHints = footerHints.join(' ');
@@ -576,6 +577,14 @@ const FAKE_MESSAGES = [
   console.log('\n=== Phase 7: FLIGHTS picker ===');
   await seed(page, { itinerary: FAKE_ITINERARY });
 
+  // Round 10 — flight pick now fires a "transport ask" follow-up
+  // chat. Install a noop mock that doesn't trip the auto-reopen-on-?
+  // logic (no trailing question mark) so the chat popover stays
+  // closed and the subsequent tab click isn't intercepted.
+  await installStreamMock(page, [
+    { type: 'done', data: { reply: 'Noted transport mode.', itinerary: FAKE_ITINERARY, tool_calls_made: [] } },
+  ]);
+
   await page.keyboard.press('2');
   await page.waitForTimeout(200);
   active = await page.locator('.tab.active').first().innerText();
@@ -590,7 +599,16 @@ const FAKE_MESSAGES = [
   record('7.2 PICK THIS FLIGHT button rendered', pickBtn === 1);
 
   await page.locator('[data-testid="flight-pick-btn"]').click();
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(600);
+  // Wait for the follow-up chat to complete so it doesn't interfere
+  // with the subsequent hotkey presses.
+  await waitFor(
+    async () => {
+      const d = await debugState(page);
+      return d?.agentState === 'idle';
+    },
+    4000,
+  );
 
   dbg = await debugState(page);
   record(
@@ -603,21 +621,25 @@ const FAKE_MESSAGES = [
   const pickedClass = await page.locator('.panel-list-item.picked').count();
   record('7.4 .picked class on the selected item', pickedClass === 1);
 
-  // Press 1 → HOME, FLIGHT card shows "1 stop"
+  // Round 10 — PLAN no longer shows flight/hotel preview cards.
+  // 7.5/7.6 are replaced by asserting the pick persists on PLAN via
+  // __debug.selectedFlight (visible on the FLIGHTS panel instead).
   await page.keyboard.press('1');
   await page.waitForTimeout(200);
-  const flightCardText = await page.locator('[data-testid="home-card-flight"]').innerText();
+  dbg = await debugState(page);
   record(
-    '7.5 HOME flight card reflects pick',
-    flightCardText.includes('JAL') || flightCardText.includes('980'),
-    `card: ${flightCardText}`,
+    '7.5 selected_flight persists after PLAN switch',
+    dbg?.selectedFlight != null,
+    `selectedFlight: ${dbg?.selectedFlight?.label || 'null'}`,
   );
 
-  // Click the flight card → jumps to FLIGHTS
-  await page.locator('[data-testid="home-card-flight"]').click();
+  // Click a tab directly (not via keyboard) to avoid interaction with
+  // any focused input from the follow-up chat flow.
+  await page.locator('.tab-strip .tab').nth(1).click();
   await page.waitForTimeout(200);
   active = await page.locator('.tab.active').first().innerText();
-  record('7.6 Click flight card jumps to FLIGHTS', active.includes('FLIGHTS'));
+  record('7.6 Click FLIGHTS tab returns to FLIGHTS', active.includes('FLIGHTS'));
+  await clearStreamMock(page);
 
   // ─── PHASE 8 — HOTELS picker auto-replan R3 (8) ────────────────────
   console.log('\n=== Phase 8: HOTELS picker auto-replan ===');
@@ -683,14 +705,15 @@ const FAKE_MESSAGES = [
     `got: ${dbg?.selectedHotel?.name}`,
   );
 
-  // HOME card reflects pick
+  // Round 10 — PLAN no longer shows hotel preview card. Assert the
+  // pick persists via __debug.selectedHotel instead.
   await page.keyboard.press('1');
   await page.waitForTimeout(200);
-  const hotelCardText = await page.locator('[data-testid="home-card-hotel"]').innerText();
+  dbg = await debugState(page);
   record(
-    '8.5 HOME hotel card shows Andaz',
-    hotelCardText.includes('Andaz'),
-    `card: ${hotelCardText}`,
+    '8.5 selected_hotel persists after PLAN switch',
+    dbg?.selectedHotel?.name === 'Andaz Tokyo',
+    `got: ${dbg?.selectedHotel?.name}`,
   );
 
   // DAYS shows hotel as first/last activity
@@ -1405,20 +1428,30 @@ const FAKE_MESSAGES = [
   await page.keyboard.press('Escape');
   await page.waitForTimeout(150);
 
-  // 13.7.7 — HOME flight card empty state when no itinerary
+  // 13.7.7 — Round 10: flight preview card was dropped. Assert
+  // FLIGHTS empty state instead.
   await clearAll(page);
-  const emptyFlightCard = await page.locator('[data-testid="home-card-flight"]').innerText();
+  await page.keyboard.press('2');
+  await page.waitForTimeout(200);
+  const emptyFlights = await page.locator('.panel-grid-empty').innerText().catch(() => '');
   record(
-    '13.7.7 Empty flight card shows "No flight yet"',
-    emptyFlightCard.toLowerCase().includes('no flight'),
+    '13.7.7 FLIGHTS empty state shows NO FLIGHTS YET',
+    emptyFlights.toUpperCase().includes('NO FLIGHTS'),
+    `got: ${emptyFlights.slice(0, 40)}`,
   );
 
-  // 13.7.8 — HOME hotel card empty state
-  const emptyHotelCard = await page.locator('[data-testid="home-card-hotel"]').innerText();
+  // 13.7.8 — Round 10: hotel preview card dropped. Assert HOTELS
+  // empty state instead.
+  await page.keyboard.press('3');
+  await page.waitForTimeout(200);
+  const emptyHotels = await page.locator('.panel-grid-empty').innerText().catch(() => '');
   record(
-    '13.7.8 Empty hotel card shows "No hotel yet"',
-    emptyHotelCard.toLowerCase().includes('no hotel'),
+    '13.7.8 HOTELS empty state shows NO HOTELS YET',
+    emptyHotels.toUpperCase().includes('NO HOTELS'),
+    `got: ${emptyHotels.slice(0, 40)}`,
   );
+  await page.keyboard.press('1');
+  await page.waitForTimeout(150);
 
   // 13.7.9 — Pressing 4 (DAYS) when no itinerary shows empty state
   await page.keyboard.press('4');
@@ -2133,12 +2166,245 @@ const FAKE_MESSAGES = [
   const thumbImgs = await page.locator('.panel-hotels .hotel-option-thumb').count();
   record('16.14 Hotel option rows show thumbnail images', thumbImgs >= 1);
 
+  // ─── PHASE 18 — Round 10 layout + rename + flight time display ────
+  console.log('\n=== Phase 18: Round 10 layout + rename + flight times ===');
+
+  await clearAll(page);
+  await page.waitForTimeout(200);
+
+  // 18.1 — Tab shows PLAN
+  const r10Tab1 = await page.locator('.tab-strip .tab .tab-label').first().innerText();
+  record('18.1 First tab displays PLAN (was HOME)', r10Tab1.trim() === 'PLAN', `got: ${r10Tab1}`);
+
+  // 18.2 — Bottom preview cards dropped
+  const bottomLeft = await page.locator('[data-testid="home-card-flight"]').count();
+  const bottomRight = await page.locator('[data-testid="home-card-hotel"]').count();
+  record(
+    '18.2 Bottom flight/hotel preview cards removed',
+    bottomLeft === 0 && bottomRight === 0,
+    `flight=${bottomLeft} hotel=${bottomRight}`,
+  );
+
+  // 18.3 — PLAN form fits at 1280×720 (no vertical scroll on .home-form-list)
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.waitForTimeout(250);
+  const formBounds = await page.locator('.home-form-list').evaluate((el) => ({
+    scrollHeight: el.scrollHeight,
+    clientHeight: el.clientHeight,
+  })).catch(() => null);
+  const formFits = formBounds && formBounds.scrollHeight <= formBounds.clientHeight + 2;
+  record(
+    '18.3 PLAN form fits at 1280×720 (no scroll)',
+    !!formFits,
+    `scroll=${formBounds?.scrollHeight} client=${formBounds?.clientHeight}`,
+  );
+
+  // 18.4 — Each .home-form-row is ≤40px tall
+  const rowHeights = await page.locator('.home-form-row').evaluateAll((els) =>
+    els.map((el) => el.getBoundingClientRect().height),
+  );
+  const tallestRow = rowHeights.length ? Math.max(...rowHeights) : 0;
+  record(
+    '18.4 Each home-form-row is ≤40px tall',
+    tallestRow <= 40,
+    `tallest=${tallestRow.toFixed(1)}`,
+  );
+
+  // 18.5 — START PLANNING button label
+  const startBtnLabel = await page.locator('[data-testid="trip-plan-btn"]').innerText();
+  record(
+    '18.5 Button label reads START PLANNING',
+    startBtnLabel.toUpperCase().includes('START PLANNING'),
+    `got: ${startBtnLabel}`,
+  );
+
+  // 18.6 — panel-home grid is 2 rows, not 3 (check computed style)
+  const gridRows = await page.locator('.panel-home').evaluate((el) =>
+    getComputedStyle(el).gridTemplateRows,
+  ).catch(() => '');
+  const rowCount = (gridRows || '').split(' ').filter((x) => x && x !== '0px').length;
+  record(
+    '18.6 panel-home grid-template-rows has 2 tracks',
+    rowCount === 2,
+    `got: ${gridRows}`,
+  );
+
+  // Reset viewport for remaining tests
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await page.waitForTimeout(250);
+
+  // 18.7 — FLIGHTS option row always shows depart→arrive, even when
+  // both times are null on a mock option.
+  const FLIGHTS_NO_TIMES = {
+    ...FAKE_ITINERARY,
+    flight: {
+      ...FAKE_ITINERARY.flight,
+      options: [
+        {
+          label: 'non-stop', stops: 0, airline: 'Test Air',
+          price_low: 999, price_high: 999, duration_min: 180,
+          departure_time: null, arrival_time: null,
+        },
+      ],
+    },
+  };
+  await seed(page, { itinerary: FLIGHTS_NO_TIMES });
+  await page.keyboard.press('2');
+  await page.waitForTimeout(250);
+  const optionMeta = await page.locator('.flight-option-meta').first().innerText();
+  record(
+    '18.7 Flight option row shows → arrow even when times are null',
+    optionMeta.includes('→'),
+    `meta: ${optionMeta}`,
+  );
+
+  // 18.8 — Flight detail card shows depart/arrive stat cards always
+  const depStat = await page.locator('.flight-stat-label')
+    .filter({ hasText: 'depart' }).count();
+  const arrStat = await page.locator('.flight-stat-label')
+    .filter({ hasText: 'arrive' }).count();
+  record(
+    '18.8 Flight detail card always renders depart+arrive stats',
+    depStat >= 1 && arrStat >= 1,
+    `dep=${depStat} arr=${arrStat}`,
+  );
+
+  // 18.9 — HOTELS center cell contains a Leaflet map
+  await page.keyboard.press('3');
+  await page.waitForTimeout(400);
+  const hotelsMapCount = await page.locator('.panel-hotels [data-testid="hotels-map"]').count();
+  record('18.9 HOTELS panel renders HotelsMap', hotelsMapCount >= 1);
+  const leafletCount = await page.locator('.panel-hotels .leaflet-container').count();
+  record('18.9b HOTELS map mounts a Leaflet container', leafletCount >= 1);
+
+  // 18.10 — HotelsMap renders an airport pin (div class day-mini-pin.airport)
+  const airportPinHotels = await page.locator('.panel-hotels .day-mini-pin.airport').count();
+  record('18.10 HotelsMap has ✈ airport pin', airportPinHotels >= 1, `count: ${airportPinHotels}`);
+
+  // 18.11 — PLAN panel CSS .panel-grid-center slot exists on HOTELS
+  const centerSlotCount = await page.locator('.panel-hotels .panel-grid-center').count();
+  record('18.11 HOTELS uses .panel-grid-center slot', centerSlotCount === 1);
+
+  // 18.12 — Global .home-card-bl / .home-card-br class definitions
+  // gone — look for their old selectors on any element in DOM
+  const bottomClassCount = await page.locator('.home-card-bl, .home-card-br').count();
+  record('18.12 .home-card-bl/.home-card-br not used anywhere', bottomClassCount === 0);
+
+  // ─── PHASE 19 — Round 10 airport pins on days, globe focus ─────────
+  console.log('\n=== Phase 19: Round 10 day airport pins + globe focus ===');
+
+  // 19.1 — DAYS Day 1 map shows an airport pin. Needs an itinerary
+  // with flight.to_lat/to_lng; FAKE_ITINERARY already has those.
+  const R10_DAYS_ITIN = {
+    ...FAKE_ITINERARY,
+    days: [
+      {
+        day: 1, date: '2026-05-15', theme: 'Arrival',
+        activities: [
+          { time: '19:30', name: 'NRT Airport · Arrival', address: 'Narita', lat: 35.772, lng: 140.393 },
+          { time: '21:00', name: 'Park Hyatt Tokyo', address: '3-7-1-2 Nishi Shinjuku', lat: 35.689, lng: 139.692 },
+        ],
+      },
+      {
+        day: 2, date: '2026-05-16', theme: 'Middle',
+        activities: [
+          { time: '09:00', name: 'Park Hyatt Tokyo', address: 'hotel', lat: 35.689, lng: 139.692 },
+          { time: '10:00', name: 'Senso-ji Temple', address: 'Asakusa', lat: 35.715, lng: 139.796 },
+          { time: '21:00', name: 'Park Hyatt Tokyo', address: 'hotel', lat: 35.689, lng: 139.692 },
+        ],
+      },
+      {
+        day: 3, date: '2026-05-17', theme: 'Departure',
+        activities: [
+          { time: '09:00', name: 'Park Hyatt Tokyo', address: 'hotel', lat: 35.689, lng: 139.692 },
+          { time: '12:00', name: 'NRT Airport · Departure', address: 'Narita', lat: 35.772, lng: 140.393 },
+        ],
+      },
+    ],
+  };
+  await seed(page, { itinerary: R10_DAYS_ITIN });
+  await page.keyboard.press('4');
+  await page.waitForTimeout(500);
+
+  // Day 1 is the default — airport pin should be present
+  const day1Pin = await page.locator('.panel-days .day-mini-pin.airport').count();
+  record('19.1 DAYS Day 1 renders airport pin', day1Pin >= 1, `count: ${day1Pin}`);
+
+  // Switch to Day 2 (middle day) — no airport pin
+  await page.locator('[data-testid="day-option-1"]').click();
+  await page.waitForTimeout(400);
+  const day2Pin = await page.locator('.panel-days .day-mini-pin.airport').count();
+  record('19.2 DAYS middle day has no airport pin', day2Pin === 0, `count: ${day2Pin}`);
+
+  // Switch to Day 3 (last day) — airport pin returns
+  await page.locator('[data-testid="day-option-2"]').click();
+  await page.waitForTimeout(400);
+  const day3Pin = await page.locator('.panel-days .day-mini-pin.airport').count();
+  record('19.3 DAYS last day renders airport pin', day3Pin >= 1, `count: ${day3Pin}`);
+
+  // 19.4 — Globe focus fires on HOTELS panel switch
+  await page.keyboard.press('3');
+  await page.waitForTimeout(900);
+  const hotelsFocus = await page.evaluate(() => window.__debug?.globeFocus || null);
+  record(
+    '19.4 Globe focus set on HOTELS switch',
+    hotelsFocus != null && typeof hotelsFocus.lat === 'number',
+    `focus: ${JSON.stringify(hotelsFocus)}`,
+  );
+  record(
+    '19.5 Globe HOTELS altitude ≤0.4',
+    hotelsFocus && hotelsFocus.altitude <= 0.4,
+    `alt: ${hotelsFocus?.altitude}`,
+  );
+
+  // 19.6/19.7 — Globe focus on DAYS switch
+  await page.keyboard.press('4');
+  await page.waitForTimeout(900);
+  const daysFocus = await page.evaluate(() => window.__debug?.globeFocus || null);
+  record(
+    '19.6 Globe focus set on DAYS switch',
+    daysFocus != null && typeof daysFocus.lat === 'number',
+    `focus: ${JSON.stringify(daysFocus)}`,
+  );
+  record(
+    '19.7 Globe DAYS altitude ≤0.3',
+    daysFocus && daysFocus.altitude <= 0.3,
+    `alt: ${daysFocus?.altitude}`,
+  );
+
+  // 19.8 — Day 1's first activity name contains Airport (copy of
+  // itinerary — sanity check that the frontend rendered it)
+  await page.keyboard.press('4');
+  await page.waitForTimeout(200);
+  await page.locator('[data-testid="day-option-0"]').click();
+  await page.waitForTimeout(300);
+  const firstActivityText = await page.locator('.panel-days .activity').first().innerText();
+  record(
+    '19.8 Day 1 first activity name contains Airport',
+    firstActivityText.toLowerCase().includes('airport'),
+    `got: ${firstActivityText.slice(0, 60)}`,
+  );
+
+  // 19.9 — Last day's last activity name contains Airport
+  await page.locator('[data-testid="day-option-2"]').click();
+  await page.waitForTimeout(300);
+  const lastActivities = await page.locator('.panel-days .activity').allInnerTexts();
+  const lastActivityText = lastActivities[lastActivities.length - 1] || '';
+  record(
+    '19.9 Last day last activity contains Airport',
+    lastActivityText.toLowerCase().includes('airport'),
+    `got: ${lastActivityText.slice(0, 60)}`,
+  );
+
+  // 19.10 — Phase 19 survived
+  record('19.10 Phase 19 completed without crash', true);
+
   // ─── PHASE 14 — Globe + idempotency + console sweep (5) ────────────
   console.log('\n=== Phase 14: Globe + final sweep ===');
   await page.keyboard.press('1');
   await page.waitForTimeout(200);
   active = await page.locator('.tab.active').first().innerText();
-  record('14.1 Press 1 → HOME', active.includes('HOME'));
+  record('14.1 Press 1 → PLAN', active.includes('PLAN'));
 
   // Final screenshot
   await page.screenshot({ path: '/tmp/round8-hardened-final.png', fullPage: false });

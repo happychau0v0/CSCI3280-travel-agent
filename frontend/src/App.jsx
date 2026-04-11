@@ -279,6 +279,11 @@ function App() {
       // should clear the previous timer (idleTimerActive flips false
       // at the start of the next handleSend).
       idleTimerActive: idleTimerRef.current != null,
+      // Round 10 — Playwright probes this after HOTELS/DAYS panel
+      // switches to confirm the globe was told to fly in toward
+      // the destination. null on HOME/FLIGHTS, {lat, lng, altitude}
+      // otherwise.
+      globeFocus,
     };
   });
 

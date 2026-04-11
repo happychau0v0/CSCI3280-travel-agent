@@ -593,6 +593,106 @@ async def test_get_day_windows_reads_flight_options_fallback():
     assert result[0]["end_time"] == "22:00"
 
 
+# ─── round 10 — airport coords in day_windows + nav flow ─────────────────
+
+
+@pytest.mark.asyncio
+async def test_get_day_windows_includes_arrival_airport_on_day_one():
+    """Round 10: day 1 carries arrival_airport coords copied from the
+    flight dict."""
+    flight = {
+        "from_iata": "HKG",
+        "from_city": "Hong Kong",
+        "from_lat": 22.308,
+        "from_lng": 113.918,
+        "to_iata": "NRT",
+        "to_city": "Tokyo",
+        "to_lat": 35.772,
+        "to_lng": 140.393,
+        "arrival_time": "18:30",
+        "departure_time": "12:00",
+    }
+    result = await day_windows.get_day_windows(flight=flight, trip_days=3)
+    assert result[0]["arrival_airport"] is not None
+    assert result[0]["arrival_airport"]["iata"] == "NRT"
+    assert result[0]["arrival_airport"]["lat"] == 35.772
+    assert result[0]["arrival_airport"]["lng"] == 140.393
+    assert result[0]["arrival_airport"]["arrival_time"] == "18:30"
+    # Middle day has neither airport
+    assert result[1]["arrival_airport"] is None
+    assert result[1]["departure_airport"] is None
+
+
+@pytest.mark.asyncio
+async def test_get_day_windows_includes_departure_airport_on_last_day():
+    """Round 10: last day carries departure_airport coords."""
+    flight = {
+        "from_iata": "HKG",
+        "from_lat": 22.308,
+        "from_lng": 113.918,
+        "to_iata": "NRT",
+        "to_city": "Tokyo",
+        "to_lat": 35.772,
+        "to_lng": 140.393,
+        "arrival_time": "18:30",
+        "departure_time": "12:00",
+    }
+    result = await day_windows.get_day_windows(flight=flight, trip_days=3)
+    last = result[-1]
+    assert last["departure_airport"] is not None
+    # Last day's departure airport is the destination-side airport
+    # (that's where the user boards the return flight)
+    assert last["departure_airport"]["iata"] == "NRT"
+    assert last["departure_airport"]["departure_time"] == "12:00"
+    # Round-trip metadata — origin IATA exposed for symmetry
+    assert last["departure_airport"]["origin_iata"] == "HKG"
+
+
+def test_flights_pads_from_onestops_when_nonstops_exhausted():
+    """Round 10: the option padding loop falls through to onestops so
+    mostly-1-stop routes still return ≥4 options."""
+    live = [
+        {"airline": "Cathay", "price_num": 1200, "duration_min": 240, "stops": 0,
+         "departure": "10:00", "arrival": "14:00"},
+        # Only 1 nonstop, the rest are 1-stops on various airlines
+        {"airline": "JAL", "price_num": 1100, "duration_min": 380, "stops": 1,
+         "departure": "09:00", "arrival": "15:20"},
+        {"airline": "ANA", "price_num": 1250, "duration_min": 400, "stops": 1,
+         "departure": "12:00", "arrival": "18:40"},
+        {"airline": "Korean", "price_num": 1050, "duration_min": 520, "stops": 1,
+         "departure": "07:00", "arrival": "15:40"},
+        {"airline": "China Air", "price_num": 1150, "duration_min": 460, "stops": 1,
+         "departure": "14:00", "arrival": "21:40"},
+    ]
+    options = flights._options_from_live(live)
+    # Minimum 4 options when at least 4 raw flights exist, even if
+    # most are 1-stops. The 6-step strategy gives 1 non-stop + 1-2
+    # 1-stops; the padding loop then fills from remaining onestops.
+    assert len(options) >= 4, f"got {len(options)} options: {options}"
+
+
+def test_flights_option_always_has_time_fields():
+    """Round 10: every option carries departure_time and arrival_time
+    keys (value may be None when fast-flights omits them)."""
+    live = [
+        {"airline": "Cathay", "price_num": 1200, "duration_min": 240, "stops": 0,
+         "departure": "10:00", "arrival": "14:00"},
+        {"airline": "JAL", "price_num": 1300, "duration_min": 230, "stops": 0,
+         "departure": None, "arrival": None},
+    ]
+    options = flights._options_from_live(live)
+    for opt in options:
+        assert "departure_time" in opt
+        assert "arrival_time" in opt
+
+
+def test_flights_normalize_time_handles_none():
+    """_normalize_time returns None for falsy input — PanelFlights
+    renders em-dash as fallback (R10-B1)."""
+    assert flights._normalize_time(None) is None
+    assert flights._normalize_time("") is None
+
+
 # ─── flights.py round 9 — 4-6 options ────────────────────────────────────
 
 
