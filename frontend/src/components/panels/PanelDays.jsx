@@ -41,6 +41,8 @@ function ActivityRow({
   onDragLeave,
   onDrop,
   onDragEnd,
+  onRemove,
+  onReplace,
 }) {
   const [expanded, setExpanded] = useState(false);
   const gallery =
@@ -109,11 +111,47 @@ function ActivityRow({
       {gallery.length > 0 && (
         <PhotoGallery photos={gallery} altPrefix={activity.name} maxCount={4} />
       )}
+      {isDraggable && (onRemove || onReplace) && (
+        <div
+          className="activity-actions"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {onReplace && (
+            <button
+              type="button"
+              className="activity-action-btn"
+              onClick={() => onReplace(index)}
+              data-testid={`activity-replace-${index}`}
+              title="Ask the agent for a similar alternative"
+            >
+              ↻ REPLACE
+            </button>
+          )}
+          {onRemove && (
+            <button
+              type="button"
+              className="activity-action-btn delete"
+              onClick={() => onRemove(index)}
+              data-testid={`activity-remove-${index}`}
+              aria-label="Remove activity"
+            >
+              × REMOVE
+            </button>
+          )}
+        </div>
+      )}
     </li>
   );
 }
 
-export default function PanelDays({ itinerary, listIndex, onSelect, onReorderActivities }) {
+export default function PanelDays({
+  itinerary,
+  listIndex,
+  onSelect,
+  onReorderActivities,
+  onRemoveActivity,
+  onReplaceActivity,
+}) {
   const days = itinerary?.days || [];
   const hotelName =
     itinerary?.selected_hotel?.name || itinerary?.hotels?.[0]?.name || null;
@@ -271,6 +309,8 @@ export default function PanelDays({ itinerary, listIndex, onSelect, onReorderAct
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               onDragEnd={handleDragEnd}
+              onRemove={onRemoveActivity ? (idx) => onRemoveActivity(selectedIdx, idx) : null}
+              onReplace={onReplaceActivity ? (idx) => onReplaceActivity(selectedIdx, idx) : null}
             />
           ))}
         </ol>

@@ -898,6 +898,32 @@ function App() {
               });
               cues.tick?.();
             }}
+            onRemoveActivity={(dayIdx, actIdx) => {
+              // Round 13 — remove a single activity without firing a
+              // replan. Purely local.
+              setCurrentItinerary((prev) => {
+                if (!prev?.days?.[dayIdx]?.activities) return prev;
+                const day = prev.days[dayIdx];
+                const acts = day.activities.filter((_, i) => i !== actIdx);
+                const days = [...prev.days];
+                days[dayIdx] = { ...day, activities: acts };
+                return { ...prev, days };
+              });
+              cues.tick?.();
+            }}
+            onReplaceActivity={(dayIdx, actIdx) => {
+              // Round 13 — ask the agent for a similar alternative.
+              // Fires a chat that the LLM can respond to with a
+              // replacement via replan.
+              const day = currentItinerary?.days?.[dayIdx];
+              const act = day?.activities?.[actIdx];
+              if (!act) return;
+              const dest = currentItinerary?.destination || "the destination";
+              handleSend(
+                `Replace "${act.name}" on Day ${day.day} with a similar but different place in ${dest}. ` +
+                `Keep every other activity, keep the hotel anchor, update times if needed.`,
+              );
+            }}
           />
         )}
       </MenuShell>
