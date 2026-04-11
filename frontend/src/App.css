@@ -448,6 +448,52 @@
   cursor: pointer;
 }
 
+/* Round 20 — prev/next nav + counter in lightbox */
+.photo-gallery-lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--text-h);
+  border: 1px solid var(--border);
+  width: 56px;
+  height: 80px;
+  font-size: 44px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: serif;
+  padding: 0;
+  transition: all 0.12s;
+}
+
+.photo-gallery-lightbox-nav:hover {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.photo-gallery-lightbox-nav.prev {
+  left: 24px;
+}
+
+.photo-gallery-lightbox-nav.next {
+  right: 24px;
+}
+
+.photo-gallery-lightbox-count {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--text-h);
+  border: 1px solid var(--border);
+  padding: 6px 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+
 /* PanelHome dashboard — Round 10 dropped the bottom preview cards, so
  * the grid is 2 rows (status strip + main content). Overrides the
  * shared .panel-grid 3-row template specifically for the PLAN tab. */

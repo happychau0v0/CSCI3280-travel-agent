@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { photoSrc } from "../api/client";
 
 /**
@@ -28,6 +28,28 @@ export default function PhotoGallery({
   const validPhotos = (photos || []).filter(Boolean).slice(0, maxCount);
   const [activeIdx, setActiveIdx] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  // Round 20 — arrow key navigation while the lightbox is open.
+  useEffect(() => {
+    if (!lightboxOpen) return undefined;
+    const handler = (e) => {
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        e.stopPropagation();
+        setActiveIdx((i) => (i - 1 + validPhotos.length) % validPhotos.length);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        e.stopPropagation();
+        setActiveIdx((i) => (i + 1) % validPhotos.length);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        setLightboxOpen(false);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [lightboxOpen, validPhotos.length]);
 
   if (validPhotos.length === 0) {
     return (
@@ -86,8 +108,40 @@ export default function PhotoGallery({
           onClick={() => setLightboxOpen(false)}
           role="dialog"
           aria-label="Photo lightbox"
+          data-testid="photo-lightbox"
         >
           <img src={heroSrc} alt={`${altPrefix} ${heroIdx + 1}`} />
+          {validPhotos.length > 1 && (
+            <>
+              <button
+                type="button"
+                className="photo-gallery-lightbox-nav prev"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveIdx((i) => (i - 1 + validPhotos.length) % validPhotos.length);
+                }}
+                aria-label="Previous photo"
+                data-testid="photo-lightbox-prev"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                className="photo-gallery-lightbox-nav next"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveIdx((i) => (i + 1) % validPhotos.length);
+                }}
+                aria-label="Next photo"
+                data-testid="photo-lightbox-next"
+              >
+                ›
+              </button>
+              <div className="photo-gallery-lightbox-count">
+                {heroIdx + 1} / {validPhotos.length}
+              </div>
+            </>
+          )}
           <button
             type="button"
             className="photo-gallery-lightbox-close"
