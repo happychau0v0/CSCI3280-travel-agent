@@ -5,7 +5,7 @@ import Subtitle from "./components/Subtitle";
 import ChatPopover from "./components/ChatPopover";
 import AgentStatusBar from "./components/AgentStatusBar";
 import HistoryOverlay from "./components/HistoryOverlay";
-import SettingsOverlay, { loadTts } from "./components/SettingsOverlay";
+import SettingsOverlay, { loadTts, loadTheme, applyTheme } from "./components/SettingsOverlay";
 import PanelHome from "./components/panels/PanelHome";
 import PanelFlights from "./components/panels/PanelFlights";
 import PanelHotels from "./components/panels/PanelHotels";
@@ -308,6 +308,12 @@ function App() {
   useEffect(() => {
     saveState(messages, currentItinerary);
   }, [messages, currentItinerary]);
+
+  // Round 12 — apply the persisted theme on mount so the page
+  // opens in the user's last-chosen palette without a flash.
+  useEffect(() => {
+    applyTheme(loadTheme());
+  }, []);
 
   // Expose internal state to a window-level debug object so the
   // Playwright test can probe state without relying on CSS class

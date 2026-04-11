@@ -1,4 +1,6 @@
-/* Force dark theme — matches the Shopify Liveview reference layout. */
+/* Dark theme (default) — matches the Shopify Liveview reference.
+ * Round 12 added a light theme toggle in SETTINGS; see the
+ * `body.theme-light` overrides below. */
 
 :root {
   /* Background layers */
@@ -44,6 +46,43 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Light theme — Round 12. Cream base with teal accents so the
+ * NieR UI still reads as a designed palette rather than a flipped
+ * dark theme. Applied via body.theme-light (set from SETTINGS). */
+body.theme-light {
+  --bg: #f3efe0;
+  --bg-elevated: #faf7ec;
+  --bg-glass: rgba(250, 247, 236, 0.7);
+
+  --text: #544a2f;
+  --text-h: #261d0a;
+  --text-dim: #857857;
+
+  --accent: #1a9b8f;
+  --accent-2: #0f6b7a;
+  --accent-bg: rgba(26, 155, 143, 0.12);
+  --accent-glow: rgba(26, 155, 143, 0.4);
+  --accent-border: rgba(26, 155, 143, 0.5);
+
+  --border: rgba(38, 29, 10, 0.12);
+  --border-strong: rgba(38, 29, 10, 0.28);
+  --code-bg: #eae3c7;
+
+  --danger: #c2185b;
+  --success: #1a9b8f;
+
+  --shadow:
+    rgba(38, 29, 10, 0.2) 0 16px 40px -12px,
+    rgba(26, 155, 143, 0.1) 0 0 0 1px;
+
+  color-scheme: light;
+}
+
+body.theme-light {
+  background:
+    radial-gradient(ellipse at center, #fdf9e8 0%, #f3efe0 55%, #e7dfbf 100%) !important;
 }
 
 html, body {

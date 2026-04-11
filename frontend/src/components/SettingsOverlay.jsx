@@ -66,6 +66,7 @@ export function preferencesForApi(prefs) {
 }
 
 const TTS_STORAGE_KEY = "travel-tts";
+const THEME_STORAGE_KEY = "travel-theme";
 
 export function loadTts() {
   try {
@@ -89,6 +90,35 @@ function saveTts(tts) {
   }
 }
 
+export function loadTheme() {
+  try {
+    const raw = localStorage.getItem(THEME_STORAGE_KEY);
+    return raw === "light" ? "light" : "dark";
+  } catch {
+    return "dark";
+  }
+}
+
+function saveTheme(theme) {
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Apply a theme to document.body — called on page load and on toggle. */
+export function applyTheme(theme) {
+  if (typeof document === "undefined") return;
+  const body = document.body;
+  if (!body) return;
+  if (theme === "light") {
+    body.classList.add("theme-light");
+  } else {
+    body.classList.remove("theme-light");
+  }
+}
+
 export default function SettingsOverlay({
   open,
   onClose,
@@ -100,6 +130,7 @@ export default function SettingsOverlay({
 }) {
   const [prefs, setPrefs] = useState(() => loadPrefs());
   const [tts, setTts] = useState(() => loadTts());
+  const [theme, setTheme] = useState(() => loadTheme());
   const [voices, setVoices] = useState([]);
   const [confirmClear, setConfirmClear] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -186,6 +217,20 @@ export default function SettingsOverlay({
       key: "tts_rate",
       label: "TTS SPEED",
       value: `${tts.rate.toFixed(2)}×`,
+    },
+    {
+      kind: "action",
+      key: "theme",
+      label: "THEME",
+      value: theme === "light" ? "LIGHT" : "DARK",
+      onActivate: () => {
+        const next = theme === "light" ? "dark" : "light";
+        setTheme(next);
+        saveTheme(next);
+        applyTheme(next);
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 600);
+      },
     },
     {
       kind: "action",
