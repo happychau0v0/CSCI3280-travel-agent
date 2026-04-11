@@ -24,6 +24,7 @@ export default function GlobeView({
   arcs = [],
   points = [],
   drawerOpen = false,
+  focus = null,
 }) {
   const globeRef = useRef(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
@@ -109,15 +110,43 @@ export default function GlobeView({
 
   // Fly to the midpoint of the first arc when arcs change (i.e. when a flight
   // is added). Offset eastward when the drawer is open so the destination
-  // isn't covered.
+  // isn't covered. Skipped when `focus` is set — panel-driven focus wins.
   useEffect(() => {
     if (!globeRef.current || arcs.length === 0) return;
+    if (focus) return;
     const arc = arcs[0];
     const midLat = (arc.startLat + arc.endLat) / 2;
     let midLng = (arc.startLng + arc.endLng) / 2;
     if (drawerOpen) midLng -= 25; // shift the focus left of the drawer
     globeRef.current.pointOfView({ lat: midLat, lng: midLng, altitude: 2.4 }, 2000);
-  }, [arcs, drawerOpen]);
+  }, [arcs, drawerOpen, focus]);
+
+  // Panel-driven focus (Round 10). When the user switches to HOTELS or
+  // DAYS the parent computes a low-altitude target centered on the trip
+  // destination; this effect animates the camera there and pauses auto-
+  // rotate so the Leaflet map that fades in on top isn't visually
+  // fighting a spinning globe underneath.
+  useEffect(() => {
+    if (!globeRef.current || !focus) return;
+    const controls = globeRef.current.controls?.();
+    if (controls) controls.autoRotate = false;
+    globeRef.current.pointOfView(
+      { lat: focus.lat, lng: focus.lng, altitude: focus.altitude ?? 0.35 },
+      1500,
+    );
+    // Expose for the Playwright harness
+    if (typeof window !== "undefined") {
+      window.__debug = window.__debug || {};
+      window.__debug.globeFocus = { ...focus };
+    }
+    const reArm = setTimeout(() => {
+      if (globeRef.current) {
+        const c = globeRef.current.controls?.();
+        if (c) c.autoRotate = true;
+      }
+    }, 3500);
+    return () => clearTimeout(reArm);
+  }, [focus]);
 
   // Build the rings dataset from points that have ring=true
   const ringsData = useMemo(

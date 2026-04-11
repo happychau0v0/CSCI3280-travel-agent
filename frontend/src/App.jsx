@@ -511,6 +511,22 @@ function App() {
     return { arcs, points };
   }, [currentItinerary, userLocation]);
 
+  // Round 10 — when the user switches to HOTELS or DAYS, zoom the globe
+  // in toward the destination so the subsequent Leaflet map overlay
+  // feels like a camera zoom-in rather than a cut. Returns null for
+  // HOME/FLIGHTS so the existing arc-midpoint flight stays in charge.
+  const globeFocus = useMemo(() => {
+    const dest = currentItinerary?.flight;
+    if (dest?.to_lat == null || dest?.to_lng == null) return null;
+    if (menu.state.panel === "HOTELS") {
+      return { lat: dest.to_lat, lng: dest.to_lng, altitude: 0.35 };
+    }
+    if (menu.state.panel === "DAYS") {
+      return { lat: dest.to_lat, lng: dest.to_lng, altitude: 0.25 };
+    }
+    return null;
+  }, [menu.state.panel, currentItinerary]);
+
   return (
     <div className="app">
       <ErrorBanner error={error} onDismiss={() => setError(null)} />
@@ -522,6 +538,7 @@ function App() {
           arcs={arcs}
           points={points}
           drawerOpen={false}
+          focus={globeFocus}
         />
       </Suspense>
 
