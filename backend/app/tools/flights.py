@@ -402,12 +402,19 @@ def _options_from_live(live: list[dict]) -> list[dict]:
                 _add(candidate, "non-stop", "Premium non-stop", recommended=False)
                 break
 
-    # If we still don't have ≥3 options, pad with any remaining nonstops
-    # up to 6 total so the user always has something to compare.
+    # If we still don't have ≥4 options, pad first from remaining nonstops,
+    # then from remaining onestops. This guarantees a meaningful list when
+    # fast-flights returns few results or when most routes are 1-stops
+    # (e.g. smaller airports with limited direct service).
     for candidate in nonstops:
         if len(options) >= 6:
             break
         _add(candidate, "non-stop", candidate.get("airline") or "Non-stop", recommended=False)
+    for candidate in onestops:
+        if len(options) >= 6:
+            break
+        label = candidate.get("airline") or "1 stop"
+        _add(candidate, "1-stop", f"{label} · 1 stop", recommended=False)
 
     # Hard cap at 8 options
     return options[:8]
