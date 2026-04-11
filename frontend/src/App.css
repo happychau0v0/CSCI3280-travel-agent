@@ -899,6 +899,43 @@
   border-color: var(--danger);
 }
 
+/* Round 14 — PLAN panel quick-start template strip */
+.home-template-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-family: var(--mono);
+}
+
+.home-template-label {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+
+.home-template-chip {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  color: var(--accent-2);
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.12s;
+}
+
+.home-template-chip:hover {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .home-next-todo li {
   margin-top: 3px;
   color: var(--text);

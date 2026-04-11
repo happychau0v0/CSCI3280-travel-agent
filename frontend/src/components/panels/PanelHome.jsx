@@ -53,6 +53,69 @@ const FIELDS = [
 
 export const HOME_FIELD_COUNT = FIELDS.length;
 
+// Round 14 — quick-start templates that pre-fill the form with
+// common trip shapes. Users still edit individual fields after
+// applying a template.
+function _daysFromToday(start, length) {
+  const d = new Date();
+  d.setDate(d.getDate() + start);
+  const startIso = d.toISOString().slice(0, 10);
+  d.setDate(d.getDate() + length - 1);
+  const endIso = d.toISOString().slice(0, 10);
+  return { start_date: startIso, end_date: endIso };
+}
+
+const TEMPLATES = [
+  {
+    key: "weekend",
+    label: "WEEKEND",
+    fields: () => ({
+      destination: "",
+      transport: "transit",
+      seat_class: "economy",
+      party_size: "2",
+      interests: "food, local culture, coffee",
+      ..._daysFromToday(14, 3),
+    }),
+  },
+  {
+    key: "foodie",
+    label: "FOODIE",
+    fields: () => ({
+      destination: "",
+      transport: "transit",
+      seat_class: "premium_economy",
+      party_size: "2",
+      interests: "restaurants, street food, markets, michelin",
+      ..._daysFromToday(30, 5),
+    }),
+  },
+  {
+    key: "museum",
+    label: "MUSEUM",
+    fields: () => ({
+      destination: "",
+      transport: "walking",
+      seat_class: "economy",
+      party_size: "1",
+      interests: "museums, galleries, history, architecture",
+      ..._daysFromToday(30, 4),
+    }),
+  },
+  {
+    key: "honeymoon",
+    label: "HONEYMOON",
+    fields: () => ({
+      destination: "",
+      transport: "driving",
+      seat_class: "business",
+      party_size: "2",
+      interests: "romantic dinners, scenic views, spas, beaches",
+      ..._daysFromToday(60, 7),
+    }),
+  },
+];
+
 function loadForm() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -238,7 +301,7 @@ export default function PanelHome({
         </div>
       </button>
 
-      {/* TOP-CENTER — next trip summary */}
+      {/* TOP-CENTER — next trip summary + R14 template chips */}
       <div className="home-summary-top">
         <div className="home-card-label">🌏 NEXT TRIP</div>
         {itinerary?.destination ? (
@@ -257,6 +320,33 @@ export default function PanelHome({
             Fill the form on the left and press START PLANNING
           </div>
         )}
+        <div className="home-template-strip" data-testid="home-template-strip">
+          <span className="home-template-label">QUICK START</span>
+          {TEMPLATES.map((tpl) => (
+            <button
+              key={tpl.key}
+              type="button"
+              className="home-template-chip"
+              data-testid={`home-template-${tpl.key}`}
+              onClick={() => {
+                const patch = tpl.fields();
+                // Keep any user-set destination / origin — templates
+                // only fill the missing slots so clicking doesn't
+                // stomp a typed destination.
+                const merged = {
+                  ...form,
+                  ...patch,
+                  origin: form.origin?.trim() || userLocation?.city || "",
+                  destination: form.destination?.trim() || patch.destination || "",
+                };
+                setForm(merged);
+                saveForm(merged);
+              }}
+            >
+              {tpl.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* LEFT — editable trip form (inline inputs per row) */}
