@@ -826,14 +826,14 @@ const FAKE_MESSAGES = [
   const settingsVisible = await page.locator('.settings-overlay').isVisible().catch(() => false);
   record('10.1 S opens SETTINGS overlay', settingsVisible);
 
-  // Round 9: 10 rows total (5 prefs + 2 TTS rows + mute + clear + about).
-  // Row indices: 0..4 prefs, 5 tts_voice, 6 tts_rate, 7 mute, 8 clear,
-  // 9 about.
+  // Round 12 — 11 rows (5 prefs + 2 TTS + theme + mute + clear + about).
+  // Row indices: 0..4 prefs, 5 tts_voice, 6 tts_rate, 7 theme, 8 mute,
+  // 9 clear, 10 about.
   const settingsRows = await page.locator('.settings-overlay .panel-list-item').count();
-  record('10.2 SETTINGS has 10 rows', settingsRows === 10);
+  record('10.2 SETTINGS has 11 rows (incl. THEME)', settingsRows === 11);
 
-  // ↓ × 7 to reach mute row (index 7)
-  for (let i = 0; i < 7; i++) {
+  // ↓ × 8 to reach mute row (index 8)
+  for (let i = 0; i < 8; i++) {
     await page.keyboard.press('ArrowDown');
     await page.waitForTimeout(80);
   }
@@ -850,15 +850,18 @@ const FAKE_MESSAGES = [
   dbg = await debugState(page);
   record('10.4 Space again toggles back', dbg?.muted === false);
 
-  // Move to clear row (index 8) and Space twice (confirm pattern)
+  // Move to clear row (Round 12: now index 9 with THEME added at 7).
+  // Nav one more step down after MUTE and press Space.
   await page.keyboard.press('ArrowDown');
   await page.waitForTimeout(80);
   await page.keyboard.press('Space');
   await page.waitForTimeout(200);
-  // First press shows "TAP AGAIN"
+  // First press shows "TAP AGAIN". Find the CLEAR row by its label
+  // text so row reordering doesn't break the assertion.
   const clearText1 = await page
-    .locator('.settings-overlay .panel-list-action')
-    .nth(1)
+    .locator('.settings-overlay .panel-list-item')
+    .filter({ hasText: 'CLEAR ALL DATA' })
+    .first()
     .innerText();
   record(
     '10.5 First Space on CLEAR shows TAP AGAIN',
@@ -1341,10 +1344,14 @@ const FAKE_MESSAGES = [
   // ─── PHASE 13.7 — Additional UX sanity checks (12) ─────────────────
   console.log('\n=== Phase 13.7: Additional UX sanity checks ===');
 
-  // 13.7.1 — chat popover cannot submit empty
+  // 13.7.1 — chat popover cannot submit empty. Click the tab strip
+  // first to blur any focused input from the preceding test state
+  // (request_input flows can leave an inline row input focused).
   await clearAll(page);
+  await page.locator('.tab-strip').click().catch(() => {});
+  await page.waitForTimeout(150);
   await page.keyboard.press('t');
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(300);
   const sendBtnDisabled = await page.locator('.chat-popover-send').isDisabled();
   record('13.7.1 Chat popover send button disabled when input empty', sendBtnDisabled);
   await page.keyboard.press('Escape');
@@ -2550,6 +2557,124 @@ const FAKE_MESSAGES = [
     dbg?.globeFocus && dbg.globeFocus.altitude <= 0.1,
     `alt: ${dbg?.globeFocus?.altitude}`,
   );
+
+  // ─── PHASE 21 — Round 12 seat class + alternates + undo + theme ────
+  console.log('\n=== Phase 21: Round 12 cabin + alternates + undo + theme ===');
+
+  // 21.1 — PLAN form has a CABIN row (round 12 added seat_class)
+  await clearAll(page);
+  await page.waitForTimeout(300);
+  const cabinRowCount = await page.locator('.home-form-row[data-field="seat_class"]').count();
+  record('21.1 PLAN form has a CABIN/seat_class row', cabinRowCount === 1);
+
+  // 21.2 — Total form field count is 8 (CABIN added)
+  const r12FieldCount = await page.locator('.home-form .panel-list-item').count();
+  record('21.2 PLAN form has 8 fields (R12 +CABIN)', r12FieldCount === 8, `count: ${r12FieldCount}`);
+
+  // 21.3 — FLIGHTS seat class badge renders when non-economy
+  const BIZ_ITINERARY = {
+    ...FAKE_ITINERARY,
+    flight: {
+      ...FAKE_ITINERARY.flight,
+      seat_class: 'business',
+      seat_class_label: 'Business',
+      options: [
+        {
+          label: 'Non-stop', stops: 0, airline: 'Cathay',
+          price_low: 4800, price_high: 5200, duration_min: 235,
+          departure_time: '10:00', arrival_time: '14:30',
+          seat_class: 'business', seat_class_label: 'Business',
+        },
+      ],
+      from_alternates: [],
+      to_alternates: [
+        { iata: 'HND', name: 'Tokyo Haneda', lat: 35.55, lng: 139.78, km_from_primary: 62.4 },
+      ],
+    },
+  };
+  await seed(page, { itinerary: BIZ_ITINERARY });
+  await page.keyboard.press('2');
+  await page.waitForTimeout(300);
+  const topBand = await page.locator('.panel-flights .panel-grid-top-band').innerText().catch(() => '');
+  record(
+    '21.3 FLIGHTS top band shows BUSINESS badge',
+    topBand.toUpperCase().includes('BUSINESS'),
+    `band: ${topBand.slice(0, 80)}`,
+  );
+
+  // 21.4 — FLIGHTS bottom band shows ALSO NEARBY alternates
+  const bottomBand = await page.locator('.panel-flights .panel-grid-bottom-band').innerText().catch(() => '');
+  record(
+    '21.4 FLIGHTS bottom band shows ALSO NEARBY alternates',
+    bottomBand.toUpperCase().includes('ALSO NEARBY') && bottomBand.includes('HND'),
+    `band: ${bottomBand.slice(0, 80)}`,
+  );
+
+  // 21.5 — Undo/redo stacks start empty
+  await page.keyboard.press('1');
+  await page.waitForTimeout(200);
+  dbg = await debugState(page);
+  record('21.5 undoCount starts at 0', dbg?.undoCount === 0, `got: ${dbg?.undoCount}`);
+
+  // 21.6 — Click flight PICK → undoCount increments, auto-advance HOTELS
+  await page.keyboard.press('2');
+  await page.waitForTimeout(200);
+  await page.locator('[data-testid="flight-pick-btn"]').click();
+  await page.waitForTimeout(300);
+  dbg = await debugState(page);
+  record(
+    '21.6 Flight pick pushed an undo entry',
+    (dbg?.undoCount || 0) >= 1,
+    `undoCount: ${dbg?.undoCount}`,
+  );
+
+  // 21.7 — Press Ctrl+Z → undoCount decreases, selected_flight cleared
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(300);
+  dbg = await debugState(page);
+  record(
+    '21.7 Ctrl+Z clears selected_flight and increments redoCount',
+    (dbg?.redoCount || 0) >= 1 && dbg?.selectedFlight == null,
+    `undo: ${dbg?.undoCount} redo: ${dbg?.redoCount} flight: ${dbg?.selectedFlight?.label || 'null'}`,
+  );
+
+  // 21.8 — Press Ctrl+Shift+Z → redo, selected_flight restored
+  await page.keyboard.press('Control+Shift+z');
+  await page.waitForTimeout(300);
+  dbg = await debugState(page);
+  record(
+    '21.8 Ctrl+Shift+Z redoes the pick',
+    dbg?.selectedFlight != null,
+    `flight: ${dbg?.selectedFlight?.label || 'null'}`,
+  );
+
+  // 21.9 — SETTINGS has a THEME row
+  await clearAll(page);
+  await page.locator('.tab-strip').click().catch(() => {});
+  await page.waitForTimeout(150);
+  await page.keyboard.press('s');
+  await page.waitForTimeout(300);
+  const themeRowCount = await page.locator('.settings-overlay .panel-list-item')
+    .filter({ hasText: 'THEME' }).count();
+  record('21.9 SETTINGS overlay has a THEME row', themeRowCount >= 1);
+
+  // 21.10 — Activating THEME toggles body.theme-light class
+  // Nav down to THEME row (index 7)
+  for (let i = 0; i < 7; i++) {
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(60);
+  }
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(300);
+  const hasLight = await page.evaluate(() => document.body.classList.contains('theme-light'));
+  record('21.10 Theme toggle switches body.theme-light on', hasLight === true);
+  // Toggle back
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(200);
+  const hasLight2 = await page.evaluate(() => document.body.classList.contains('theme-light'));
+  record('21.11 Theme toggle switches body.theme-light off', hasLight2 === false);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
 
   // ─── PHASE 14 — Globe + idempotency + console sweep (5) ────────────
   console.log('\n=== Phase 14: Globe + final sweep ===');

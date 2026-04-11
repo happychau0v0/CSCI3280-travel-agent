@@ -501,11 +501,11 @@
   flex-direction: row;
   align-items: center;
   gap: 8px;
-  padding: 4px 12px;
+  padding: 2px 12px;
   border-bottom: 1px solid var(--border);
   flex-wrap: nowrap;
   box-sizing: border-box;
-  height: 32px;
+  height: 28px;
 }
 
 .panel-list-item.home-form-row:last-child {

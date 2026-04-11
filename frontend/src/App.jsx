@@ -235,6 +235,50 @@ function App() {
     menu.reset();
   }, [menu]);
 
+  // Round 12 — undo/redo helpers for flight + hotel picks. Declared
+  // BEFORE useKeyboard so the hook's deps array doesn't TDZ on them.
+  // Only user-driven selections are tracked; LLM replans don't push a
+  // new undo entry.
+  const pushPickSnapshot = useCallback(() => {
+    const snap = {
+      selected_flight: currentItinerary?.selected_flight || null,
+      selected_hotel: currentItinerary?.selected_hotel || null,
+    };
+    undoStackRef.current.push(snap);
+    if (undoStackRef.current.length > 20) undoStackRef.current.shift();
+    redoStackRef.current = [];
+    setUndoCount(undoStackRef.current.length);
+    setRedoCount(0);
+  }, [currentItinerary]);
+
+  const handleUndoPick = useCallback(() => {
+    if (undoStackRef.current.length === 0) return;
+    const current = {
+      selected_flight: currentItinerary?.selected_flight || null,
+      selected_hotel: currentItinerary?.selected_hotel || null,
+    };
+    const prev = undoStackRef.current.pop();
+    redoStackRef.current.push(current);
+    setUndoCount(undoStackRef.current.length);
+    setRedoCount(redoStackRef.current.length);
+    setCurrentItinerary((ci) => (ci ? { ...ci, ...prev } : ci));
+    cues.tick?.();
+  }, [currentItinerary, cues]);
+
+  const handleRedoPick = useCallback(() => {
+    if (redoStackRef.current.length === 0) return;
+    const current = {
+      selected_flight: currentItinerary?.selected_flight || null,
+      selected_hotel: currentItinerary?.selected_hotel || null,
+    };
+    const next = redoStackRef.current.pop();
+    undoStackRef.current.push(current);
+    setUndoCount(undoStackRef.current.length);
+    setRedoCount(redoStackRef.current.length);
+    setCurrentItinerary((ci) => (ci ? { ...ci, ...next } : ci));
+    cues.tick?.();
+  }, [currentItinerary, cues]);
+
   // Cue audio on cursor moves and tab switches
   const setPanelWithCue = useCallback(
     (panel) => {
@@ -403,49 +447,6 @@ function App() {
       return next;
     });
   }, []);
-
-  // Round 12 — undo/redo helpers for flight + hotel picks. Only
-  // user-driven selections are tracked; LLM replans don't push a
-  // new undo entry.
-  const pushPickSnapshot = useCallback(() => {
-    const snap = {
-      selected_flight: currentItinerary?.selected_flight || null,
-      selected_hotel: currentItinerary?.selected_hotel || null,
-    };
-    undoStackRef.current.push(snap);
-    if (undoStackRef.current.length > 20) undoStackRef.current.shift();
-    redoStackRef.current = [];
-    setUndoCount(undoStackRef.current.length);
-    setRedoCount(0);
-  }, [currentItinerary]);
-
-  const handleUndoPick = useCallback(() => {
-    if (undoStackRef.current.length === 0) return;
-    const current = {
-      selected_flight: currentItinerary?.selected_flight || null,
-      selected_hotel: currentItinerary?.selected_hotel || null,
-    };
-    const prev = undoStackRef.current.pop();
-    redoStackRef.current.push(current);
-    setUndoCount(undoStackRef.current.length);
-    setRedoCount(redoStackRef.current.length);
-    setCurrentItinerary((ci) => (ci ? { ...ci, ...prev } : ci));
-    cues.tick?.();
-  }, [currentItinerary, cues]);
-
-  const handleRedoPick = useCallback(() => {
-    if (redoStackRef.current.length === 0) return;
-    const current = {
-      selected_flight: currentItinerary?.selected_flight || null,
-      selected_hotel: currentItinerary?.selected_hotel || null,
-    };
-    const next = redoStackRef.current.pop();
-    undoStackRef.current.push(current);
-    setUndoCount(undoStackRef.current.length);
-    setRedoCount(redoStackRef.current.length);
-    setCurrentItinerary((ci) => (ci ? { ...ci, ...next } : ci));
-    cues.tick?.();
-  }, [currentItinerary, cues]);
 
   const handleSend = useCallback(
     async (text, { editLast = false, truncateBefore = null } = {}) => {
