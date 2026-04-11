@@ -559,14 +559,20 @@ function App() {
   // in toward the destination so the subsequent Leaflet map overlay
   // feels like a camera zoom-in rather than a cut. Returns null for
   // HOME/FLIGHTS so the existing arc-midpoint flight stays in charge.
+  //
+  // Round 11 — altitudes dropped from 0.35/0.25 to 0.08/0.05 so the
+  // globe actually lands close to street level before the Leaflet
+  // map takes over. Combined with GlobeView's 2200ms flight and the
+  // .panel-grid-center scale-in keyframe, this reads as a continuous
+  // zoom rather than two disjoint animations.
   const globeFocus = useMemo(() => {
     const dest = currentItinerary?.flight;
     if (dest?.to_lat == null || dest?.to_lng == null) return null;
     if (menu.state.panel === "HOTELS") {
-      return { lat: dest.to_lat, lng: dest.to_lng, altitude: 0.35 };
+      return { lat: dest.to_lat, lng: dest.to_lng, altitude: 0.08 };
     }
     if (menu.state.panel === "DAYS") {
-      return { lat: dest.to_lat, lng: dest.to_lng, altitude: 0.25 };
+      return { lat: dest.to_lat, lng: dest.to_lng, altitude: 0.05 };
     }
     return null;
   }, [menu.state.panel, currentItinerary]);

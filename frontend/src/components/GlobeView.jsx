@@ -138,16 +138,21 @@ export default function GlobeView({
     if (!globeRef.current || !focus) return;
     const controls = globeRef.current.controls?.();
     if (controls) controls.autoRotate = false;
+    // Round 11 — longer flight (2200ms) gives the camera time to
+    // truly "zoom in" before the map overlay fades in on top. The
+    // CSS .panel-grid-center scale-in starts at 1400ms, so the
+    // globe is still moving when the map emerges, creating a
+    // continuous-zoom illusion.
     globeRef.current.pointOfView(
-      { lat: focus.lat, lng: focus.lng, altitude: focus.altitude ?? 0.35 },
-      1500,
+      { lat: focus.lat, lng: focus.lng, altitude: focus.altitude ?? 0.08 },
+      2200,
     );
     const reArm = setTimeout(() => {
       if (globeRef.current) {
         const c = globeRef.current.controls?.();
         if (c) c.autoRotate = true;
       }
-    }, 3500);
+    }, 4200);
     return () => clearTimeout(reArm);
   }, [focus]);
 

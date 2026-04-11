@@ -20,7 +20,15 @@ function FitBounds({ points }) {
   useEffect(() => {
     if (!points.length) return;
     const bounds = L.latLngBounds(points);
-    map.fitBounds(bounds, { padding: [32, 32], maxZoom: 14 });
+    // Round 11 — flyToBounds gives a smooth zoom-in after mount,
+    // which dovetails with the .panel-grid-center scale-in CSS
+    // animation to read as a continuous camera push.
+    map.flyToBounds(bounds, {
+      padding: [32, 32],
+      maxZoom: 14,
+      duration: 0.9,
+      easeLinearity: 0.25,
+    });
   }, [points, map]);
   return null;
 }
@@ -79,7 +87,7 @@ export default function HotelsMap({ hotels, airport = null, selectedIdx = 0 }) {
     <div className="day-mini-map" data-testid="hotels-map">
       <MapContainer
         center={center}
-        zoom={12}
+        zoom={9}
         scrollWheelZoom={false}
         zoomControl={false}
         attributionControl={false}

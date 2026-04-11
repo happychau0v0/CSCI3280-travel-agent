@@ -45,13 +45,19 @@ function decodePolyline(encoded) {
   return points;
 }
 
-/** Auto-fit the map to all markers + polylines whenever they change. */
+/** Auto-fit the map to all markers + polylines whenever they change.
+ * Round 11 — flyToBounds gives a smooth zoom-in after mount. */
 function FitBounds({ points }) {
   const map = useMap();
   useEffect(() => {
     if (!points.length) return;
     const bounds = L.latLngBounds(points);
-    map.fitBounds(bounds, { padding: [20, 20] });
+    map.flyToBounds(bounds, {
+      padding: [24, 24],
+      maxZoom: 15,
+      duration: 0.9,
+      easeLinearity: 0.25,
+    });
   }, [points, map]);
   return null;
 }
@@ -120,7 +126,7 @@ export default function DayMiniMap({ activities, airport = null }) {
     <div className="day-mini-map" data-testid="day-mini-map">
       <MapContainer
         center={centerPoint}
-        zoom={13}
+        zoom={10}
         scrollWheelZoom={false}
         zoomControl={false}
         attributionControl={false}
