@@ -604,29 +604,13 @@ function App() {
             onPick={(i) => {
               const opt = currentItinerary?.flight?.options?.[i];
               if (!opt) return;
+              // Round 10 — plan is already complete; a flight pick
+              // just stamps the selection locally and advances the
+              // panel to HOTELS so the user can pick accommodation
+              // next. No backend round-trip needed.
               setCurrentItinerary({ ...currentItinerary, selected_flight: opt });
               cues.chime();
-              // Round 10 — fire the turn-2 follow-up so the LLM
-              // switches into the transport question step. The
-              // prompt's 4-turn flow expects this exact shape.
-              const airline = opt.airline || opt.label || "the selected flight";
-              const stopsLbl =
-                opt.stops === 0 ? "non-stop" :
-                opt.stops === 1 ? "1 stop" :
-                `${opt.stops || 0} stops`;
-              const priceLbl =
-                typeof opt.price_low === "number"
-                  ? `HK$${opt.price_low.toLocaleString("en-HK")}`
-                  : "price unknown";
-              const durLbl =
-                opt.duration_min
-                  ? `${Math.floor(opt.duration_min / 60)}h ${opt.duration_min % 60}m`
-                  : "unknown duration";
-              const depLbl = opt.departure_time || "?";
-              const followUp =
-                `I picked ${airline} (${stopsLbl}, ${priceLbl}, ${durLbl}, ` +
-                `departs ${depLbl}). Ask me about local transport.`;
-              handleSend(followUp);
+              setPanelWithCue("HOTELS");
             }}
           />
         )}
@@ -646,13 +630,19 @@ function App() {
                 selected_hotel: hotel,
               });
               cues.chime();
-              // Round 10 — fire the turn-4 follow-up so the LLM
-              // starts the day-by-day planning step. Matches the
-              // 4-turn flow in prompts.py.
-              const addr = hotel.address ? ` at ${hotel.address}` : "";
-              const followUp =
-                `I picked ${hotel.name}${addr}. Start the day-by-day plan now.`;
-              handleSend(followUp);
+              // If the user picked the hotel the LLM already pre-
+              // selected, no replan is needed — just advance to
+              // DAYS. Otherwise fire the replan chat so the LLM
+              // re-emits the days array anchored on the new hotel.
+              const prev = currentItinerary?.selected_hotel?.name;
+              if (prev === hotel.name) {
+                setPanelWithCue("DAYS");
+                return;
+              }
+              const prompt =
+                `Set "${hotel.name}" as the base hotel. ` +
+                `Replan every day so each route starts and ends at this hotel.`;
+              handleSend(prompt);
             }}
           />
         )}
