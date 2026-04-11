@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import PlanHistoryPanel from "../PlanHistoryPanel";
 
 /**
  * PLAN (was HOME) — the trip-setup panel. Left = editable form,
@@ -89,6 +90,9 @@ export default function PanelHome({
   listIndex = 0,
   isLoading = false,
   pendingInputRequest = null,
+  planHistory = [],
+  onLoadPlan,
+  onDeletePlan,
   onJumpTo,
   onPlan,
   onResolveInput,
@@ -353,59 +357,15 @@ export default function PanelHome({
         </button>
       </div>
 
-      {/* RIGHT — next steps / agent status */}
-      <aside className="home-next-steps" data-testid="home-next-steps">
-        <div className="home-card-label">◢ NEXT STEPS</div>
-        {(() => {
-          const missing = [];
-          if (!form.destination?.trim()) missing.push("Destination");
-          if (!form.start_date) missing.push("Start date");
-          if (!form.end_date) missing.push("End date");
-          if (!form.transport) missing.push("Transport");
-          if (agentState === "working") {
-            return (
-              <div className="home-next-body">
-                <div className="home-next-line home-next-working">
-                  Agent working{currentTool ? ` · ${currentTool}` : "…"}
-                </div>
-                <p className="home-next-hint">Hold tight — your plan is cooking.</p>
-              </div>
-            );
-          }
-          if (agentState === "error") {
-            return (
-              <div className="home-next-body">
-                <div className="home-next-line home-next-error">Agent error</div>
-                <p className="home-next-hint">Try again or check settings.</p>
-              </div>
-            );
-          }
-          if (hasItinerary) {
-            return (
-              <div className="home-next-body">
-                <div className="home-next-line">Trip ready · {days.length} day{days.length !== 1 ? "s" : ""}</div>
-                <ul className="home-next-todo">
-                  {!itinerary.selected_hotel && <li>Pick a hotel in the HOTELS tab</li>}
-                  {!itinerary.selected_flight && <li>Pick a flight in the FLIGHTS tab</li>}
-                  <li>Review day activities in DAYS</li>
-                </ul>
-              </div>
-            );
-          }
-          return (
-            <div className="home-next-body">
-              <p className="home-next-hint">Fill in the form on the left and press START PLANNING.</p>
-              {missing.length > 0 && (
-                <ul className="home-next-todo">
-                  {missing.map((m) => (
-                    <li key={m}>{m} missing</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          );
-        })()}
-      </aside>
+      {/* RIGHT — plan history (Round 11 — replaced the NEXT STEPS
+       *  hint card with a scrollable list of past plans). */}
+      <div className="home-history-slot">
+        <PlanHistoryPanel
+          plans={planHistory}
+          onLoad={onLoadPlan}
+          onDelete={onDeletePlan}
+        />
+      </div>
     </section>
   );
 }

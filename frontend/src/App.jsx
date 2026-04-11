@@ -23,6 +23,8 @@ const GlobeView = lazy(() => import("./components/GlobeView"));
 
 const STATE_KEY = "travel-chat-state";
 const TRIP_DATES_KEY = "travel-trip-dates";
+const PLAN_HISTORY_KEY = "travel-plan-history";
+const PLAN_HISTORY_MAX = 20;
 
 // Subtitle-line narration for each tool the LLM can call. Pushed onto
 // the subtitle queue when a tool_start event arrives so the user sees
@@ -70,10 +72,48 @@ function loadTripDates() {
   }
 }
 
+function loadPlanHistory() {
+  try {
+    const raw = localStorage.getItem(PLAN_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePlanHistory(history) {
+  try {
+    localStorage.setItem(PLAN_HISTORY_KEY, JSON.stringify(history));
+  } catch {
+    /* ignore — quota exceeded, stale state still in memory */
+  }
+}
+
+// Build a lightweight plan history entry from a finished itinerary.
+// Returns null if the itinerary is missing essential fields (destination).
+function buildHistoryEntry(itinerary, messages) {
+  if (!itinerary?.destination) return null;
+  const days = itinerary.days || [];
+  return {
+    id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    created_at: Date.now(),
+    destination: itinerary.destination,
+    origin: itinerary.origin || null,
+    start_date: itinerary.flight?.date || days[0]?.date || null,
+    end_date: days[days.length - 1]?.date || null,
+    day_count: days.length,
+    itinerary,
+    messages: Array.isArray(messages) ? messages : [],
+  };
+}
+
 function App() {
   const initial = loadState();
   const [messages, setMessages] = useState(initial.messages);
   const [currentItinerary, setCurrentItinerary] = useState(initial.itinerary);
+  const [planHistory, setPlanHistory] = useState(() => loadPlanHistory());
   const [isLoading, setIsLoading] = useState(false);
   const [preferences, setPreferences] = useState(null);
   const [error, setError] = useState(null);
@@ -290,8 +330,61 @@ function App() {
       // the destination. null on HOME/FLIGHTS, {lat, lng, altitude}
       // otherwise.
       globeFocus,
+      planHistory,
     };
   });
+
+  // Round 11 — plan history handlers.
+  // Save whenever the LLM emits an itinerary that meaningfully
+  // differs from the last snapshot (destination changed OR the
+  // last save was more than 10 minutes ago).
+  const saveCurrentPlanToHistory = useCallback(
+    (itinerary, msgSnapshot) => {
+      const entry = buildHistoryEntry(itinerary, msgSnapshot);
+      if (!entry) return;
+      setPlanHistory((prev) => {
+        const last = prev[0];
+        const DEDUPE_WINDOW_MS = 10 * 60 * 1000;
+        if (
+          last &&
+          last.destination === entry.destination &&
+          Date.now() - last.created_at < DEDUPE_WINDOW_MS
+        ) {
+          // Replace the most recent entry instead of adding a new
+          // one — this happens during replan round-trips on the
+          // same trip.
+          const next = [entry, ...prev.slice(1)].slice(0, PLAN_HISTORY_MAX);
+          savePlanHistory(next);
+          return next;
+        }
+        const next = [entry, ...prev].slice(0, PLAN_HISTORY_MAX);
+        savePlanHistory(next);
+        return next;
+      });
+    },
+    [],
+  );
+
+  const loadPlanFromHistory = useCallback(
+    (id) => {
+      setPlanHistory((prev) => {
+        const entry = prev.find((p) => p.id === id);
+        if (!entry) return prev;
+        setCurrentItinerary(entry.itinerary);
+        setMessages(entry.messages || []);
+        return prev;
+      });
+    },
+    [],
+  );
+
+  const deletePlanFromHistory = useCallback((id) => {
+    setPlanHistory((prev) => {
+      const next = prev.filter((p) => p.id !== id);
+      savePlanHistory(next);
+      return next;
+    });
+  }, []);
 
   const handleSend = useCallback(
     async (text, { editLast = false, truncateBefore = null } = {}) => {
@@ -397,17 +490,24 @@ function App() {
           // across replan round-trips even if the LLM forgets to echo
           // them in its response. The new itinerary still wins on
           // every OTHER field.
+          let mergedItinerary;
           setCurrentItinerary((prev) => {
-            const merged = { ...data.itinerary };
-            if (!merged.selected_flight && prev?.selected_flight) {
-              merged.selected_flight = prev.selected_flight;
+            mergedItinerary = { ...data.itinerary };
+            if (!mergedItinerary.selected_flight && prev?.selected_flight) {
+              mergedItinerary.selected_flight = prev.selected_flight;
             }
-            if (!merged.selected_hotel && prev?.selected_hotel) {
-              merged.selected_hotel = prev.selected_hotel;
+            if (!mergedItinerary.selected_hotel && prev?.selected_hotel) {
+              mergedItinerary.selected_hotel = prev.selected_hotel;
             }
-            return merged;
+            return mergedItinerary;
           });
           cues.chime();
+          // Round 11 — persist the finished plan to history so the
+          // user can find it again in the PLAN HISTORY card.
+          saveCurrentPlanToHistory(
+            mergedItinerary,
+            [...baseMessages, userMsg, assistantMsg],
+          );
         }
 
         // Round 11 — flush any buffered navigate_menu target now
@@ -622,6 +722,12 @@ function App() {
             listIndex={menu.state.listIndex}
             isLoading={isLoading}
             pendingInputRequest={pendingInputRequest}
+            planHistory={planHistory}
+            onLoadPlan={(id) => {
+              loadPlanFromHistory(id);
+              setPanelWithCue("FLIGHTS");
+            }}
+            onDeletePlan={deletePlanFromHistory}
             onJumpTo={(panel, fieldIdx) => {
               if (panel === "HOME" && typeof fieldIdx === "number") {
                 // Click on a HOME form field row → enter list scope

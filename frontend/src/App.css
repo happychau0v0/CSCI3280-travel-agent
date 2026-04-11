@@ -587,12 +587,20 @@
   cursor: not-allowed;
 }
 
-/* NEXT STEPS card — right column, middle row */
-.home-next-steps {
+/* PLAN HISTORY slot — right column, middle row. Round 11 replaced
+ * the NEXT STEPS hint card with a scrollable list of past plans. */
+.home-history-slot {
   grid-column: 3;
   grid-row: 2;
   pointer-events: auto;
-  padding: 14px 18px;
+  min-height: 0;
+  display: flex;
+}
+
+.plan-history-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 14px 16px;
   background: var(--bg-glass);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -600,14 +608,13 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  overflow-y: auto;
-  min-height: 0;
+  gap: 10px;
   font-family: var(--mono);
+  overflow: hidden;
 }
 
-.home-next-steps::before,
-.home-next-steps::after {
+.plan-history-panel::before,
+.plan-history-panel::after {
   content: "";
   position: absolute;
   width: 12px;
@@ -615,51 +622,176 @@
   border: 1px solid var(--accent);
 }
 
-.home-next-steps::before {
+.plan-history-panel::before {
   top: -1px;
   left: -1px;
   border-right: none;
   border-bottom: none;
 }
 
-.home-next-steps::after {
+.plan-history-panel::after {
   bottom: -1px;
   right: -1px;
   border-left: none;
   border-top: none;
 }
 
-.home-next-body {
+.plan-history-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  flex: 0 0 auto;
+}
+
+.plan-history-chevron {
+  color: var(--accent);
   font-size: 12px;
-  color: var(--text);
+}
+
+.plan-history-count {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+}
+
+.plan-history-empty {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-dim);
   line-height: 1.5;
 }
 
-.home-next-line {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-h);
-  margin-bottom: 8px;
-}
-
-.home-next-line.home-next-working {
-  color: var(--accent);
-  animation: home-card-pulse 1.6s ease-in-out infinite;
-}
-
-.home-next-line.home-next-error {
-  color: var(--danger);
-}
-
-.home-next-hint {
+.plan-history-empty p {
   margin: 0;
+}
+
+.plan-history-empty .plan-history-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  opacity: 0.85;
+}
+
+.plan-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.plan-history-card {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.plan-history-card:hover {
+  border-color: var(--accent);
+  background: rgba(0, 217, 255, 0.06);
+}
+
+.plan-history-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-h);
+  font-weight: 700;
+}
+
+.plan-history-card-head strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.plan-history-card-age {
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+  flex: 0 0 auto;
+}
+
+.plan-history-card-meta {
+  font-size: 11px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plan-history-arrow {
+  color: var(--accent);
+}
+
+.plan-history-card-dates {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+}
+
+.plan-history-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.plan-history-card-btn {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.12s;
+}
+
+.plan-history-card-btn.load {
+  flex: 1 1 auto;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.plan-history-card-btn.load:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.plan-history-card-btn.delete {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  font-size: 14px;
+  line-height: 1;
   color: var(--text-dim);
 }
 
-.home-next-todo {
-  margin: 6px 0 0 0;
-  padding-left: 18px;
-  list-style: disc;
+.plan-history-card-btn.delete:hover {
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
 .home-next-todo li {
