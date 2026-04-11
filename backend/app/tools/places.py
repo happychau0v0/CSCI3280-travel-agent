@@ -73,12 +73,18 @@ async def search_places(
     if not check_key(GOOGLE_MAPS_API_KEY):
         raise ToolUnavailableError("GOOGLE_MAPS_API_KEY not configured")
 
-    body: dict = {"textQuery": query if not location else f"{query} near {location}"}
     # pageSize is the max results we want back. 20 gives the LLM room
     # to pick 5-8 diverse hotels / activities while still keeping the
     # response small enough to not blow the model context.
-    if location:
-        body["pageSize"] = 20
+    #
+    # Round 11 — ALWAYS set pageSize. Google Places (New) defaults
+    # pageSize to 1 when omitted, which previously collapsed the
+    # entire itinerary to 1 hotel / 1 activity / 1 restaurant whenever
+    # the LLM called this tool without the optional `location` arg.
+    body: dict = {
+        "textQuery": f"{query} near {location}" if location else query,
+        "pageSize": 20,
+    }
 
     headers = {
         "Content-Type": "application/json",
