@@ -813,6 +813,47 @@
   box-shadow: 0 0 24px var(--accent-glow);
 }
 
+/* Round 13 — hotel filter chips in PanelHotels top band */
+.hotel-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  font-family: var(--mono);
+}
+
+.hotel-filter-label {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-right: 2px;
+}
+
+.hotel-filter-chip {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  padding: 3px 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.1s;
+}
+
+.hotel-filter-chip:hover {
+  border-color: var(--accent);
+}
+
+.hotel-filter-chip.active {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .home-next-todo li {
   margin-top: 3px;
   color: var(--text);

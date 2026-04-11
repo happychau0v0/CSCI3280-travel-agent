@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { photoSrc } from "../../api/client";
 import PhotoGallery from "../PhotoGallery";
 import HotelsMap from "../HotelsMap";
@@ -10,6 +11,9 @@ import HotelsMap from "../HotelsMap";
  * Right column: detail card for the focused hotel — photo gallery,
  *         rating, price, address, PICK & REPLAN button, Maps link.
  * Top band: summary "HOTELS · N near {destination}".
+ *
+ * Round 13 — top band adds filter chips (price + rating) that
+ * narrow the displayed list without re-querying the LLM.
  */
 
 const PRICE_LEVEL_LABELS = {
@@ -20,10 +24,41 @@ const PRICE_LEVEL_LABELS = {
   PRICE_LEVEL_VERY_EXPENSIVE: "$$$$",
 };
 
-export default function PanelHotels({ itinerary, listIndex, onSelect, onPick }) {
-  const hotels = itinerary?.hotels || [];
+const PRICE_LEVEL_RANK = {
+  PRICE_LEVEL_FREE: 0,
+  PRICE_LEVEL_INEXPENSIVE: 1,
+  PRICE_LEVEL_MODERATE: 2,
+  PRICE_LEVEL_EXPENSIVE: 3,
+  PRICE_LEVEL_VERY_EXPENSIVE: 4,
+};
 
-  if (hotels.length === 0) {
+const PRICE_FILTERS = [
+  { key: "any", label: "ANY", match: () => true },
+  { key: "budget", label: "$ / $$", match: (h) => (PRICE_LEVEL_RANK[h.price_level] ?? 2) <= 2 },
+  { key: "premium", label: "$$$+", match: (h) => (PRICE_LEVEL_RANK[h.price_level] ?? 2) >= 3 },
+];
+
+const RATING_FILTERS = [
+  { key: "any", label: "ANY", match: () => true },
+  { key: "good", label: "4.0+", match: (h) => typeof h.rating === "number" && h.rating >= 4.0 },
+  { key: "great", label: "4.5+", match: (h) => typeof h.rating === "number" && h.rating >= 4.5 },
+];
+
+export default function PanelHotels({ itinerary, listIndex, onSelect, onPick }) {
+  const hotelsRaw = itinerary?.hotels || [];
+  const [priceFilter, setPriceFilter] = useState("any");
+  const [ratingFilter, setRatingFilter] = useState("any");
+
+  const hotels = useMemo(() => {
+    const priceFn = PRICE_FILTERS.find((f) => f.key === priceFilter)?.match || (() => true);
+    const ratingFn = RATING_FILTERS.find((f) => f.key === ratingFilter)?.match || (() => true);
+    const filtered = hotelsRaw.filter((h) => priceFn(h) && ratingFn(h));
+    // If the filters eliminated everything, fall back to the raw list
+    // so the panel never shows an empty map mid-session.
+    return filtered.length > 0 ? filtered : hotelsRaw;
+  }, [hotelsRaw, priceFilter, ratingFilter]);
+
+  if (hotelsRaw.length === 0) {
     return (
       <section className="panel panel-grid panel-hotels" aria-label="Hotels">
         <div className="panel-grid-empty">
@@ -73,19 +108,49 @@ export default function PanelHotels({ itinerary, listIndex, onSelect, onPick }) 
 
   return (
     <section className="panel panel-grid panel-hotels" aria-label="Hotels">
-      {/* TOP band — summary */}
+      {/* TOP band — summary + Round 13 filter chips */}
       <header className="panel-grid-top-band home-summary-top">
         <div className="home-card-label">
-          🏨 HOTELS · {hotels.length} near {itinerary?.destination || "destination"}
+          🏨 HOTELS · {hotels.length}
+          {hotels.length !== hotelsRaw.length && ` / ${hotelsRaw.length}`} near{" "}
+          {itinerary?.destination || "destination"}
         </div>
         <div className="home-summary-line">
           {pickedIdx >= 0 ? (
             <>
-              picked <strong>{hotels[pickedIdx].name}</strong>
+              picked <strong>{hotels[pickedIdx]?.name}</strong>
             </>
           ) : (
             <span className="home-summary-meta">Click PICK & REPLAN to lock in a hotel</span>
           )}
+        </div>
+        <div className="hotel-filters" data-testid="hotel-filters">
+          <span className="hotel-filter-label">PRICE</span>
+          {PRICE_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              className={`hotel-filter-chip${priceFilter === f.key ? " active" : ""}`}
+              onClick={() => setPriceFilter(f.key)}
+              data-testid={`hotel-filter-price-${f.key}`}
+            >
+              {f.label}
+            </button>
+          ))}
+          <span className="hotel-filter-label" style={{ marginLeft: 10 }}>
+            RATING
+          </span>
+          {RATING_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              className={`hotel-filter-chip${ratingFilter === f.key ? " active" : ""}`}
+              onClick={() => setRatingFilter(f.key)}
+              data-testid={`hotel-filter-rating-${f.key}`}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
       </header>
 
