@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.tools import (
+    day_windows,
     directions,
     flights,
     geocode,
@@ -490,6 +491,190 @@ async def test_request_input_rejects_unknown_field():
     result = await request_input_tool.request_input("garbage", "Hello?")
     assert "error" in result
     assert "Unknown field" in result["error"]
+
+
+# ─── get_day_windows (round 9) ──────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_get_day_windows_full_middle_day():
+    """Middle days of a multi-day trip are full 09:00-21:00 windows."""
+    flight = {"arrival_time": "10:00", "departure_time": "18:00"}
+    result = await day_windows.get_day_windows(flight=flight, trip_days=5)
+    # Middle days (2, 3, 4) should be 09:00-21:00 full days
+    for day in result[1:-1]:
+        assert day["start_time"] == "09:00"
+        assert day["end_time"] == "21:00"
+        assert "Full day" in day["notes"]
+
+
+@pytest.mark.asyncio
+async def test_get_day_windows_arrival_late_night():
+    """Late arrival (>=20:00) → short day 1 with 'one dinner spot' note."""
+    flight = {"arrival_time": "22:15", "departure_time": "10:00"}
+    result = await day_windows.get_day_windows(flight=flight, trip_days=3)
+    day1 = result[0]
+    # 22:15 + 90 min buffer = 23:45
+    assert day1["start_time"] == "23:45"
+    assert day1["end_time"] == "23:00"  # late night cap
+    assert "Late arrival" in day1["notes"]
+
+
+@pytest.mark.asyncio
+async def test_get_day_windows_arrival_early_morning():
+    """Early arrival (<=13:00) → near-full day after check-in buffer."""
+    flight = {"arrival_time": "08:30", "departure_time": "15:00"}
+    result = await day_windows.get_day_windows(flight=flight, trip_days=3)
+    day1 = result[0]
+    # 08:30 + 90 = 10:00
+    assert day1["start_time"] == "10:00"
+    assert day1["end_time"] == "21:00"
+    assert "Early arrival" in day1["notes"]
+
+
+@pytest.mark.asyncio
+async def test_get_day_windows_departure_before_noon():
+    """Early departure (<=12:00) → tight last-day window."""
+    flight = {"arrival_time": "15:00", "departure_time": "09:00"}
+    result = await day_windows.get_day_windows(flight=flight, trip_days=3)
+    last_day = result[-1]
+    # 09:00 - 180 = 06:00
+    assert last_day["start_time"] == "09:00"
+    assert last_day["end_time"] == "06:00"  # end < start is expected
+    assert "Early departure" in last_day["notes"]
+
+
+@pytest.mark.asyncio
+async def test_get_day_windows_departure_late_evening():
+    """Late departure (>=18:00) → near-full last day."""
+    flight = {"arrival_time": "15:00", "departure_time": "20:00"}
+    result = await day_windows.get_day_windows(flight=flight, trip_days=3)
+    last_day = result[-1]
+    # 20:00 - 180 = 17:00
+    assert last_day["start_time"] == "09:00"
+    assert last_day["end_time"] == "17:00"
+    assert "Late departure" in last_day["notes"]
+
+
+@pytest.mark.asyncio
+async def test_get_day_windows_no_flight():
+    """No flight data → default full-day windows for every day."""
+    result = await day_windows.get_day_windows(flight=None, trip_days=3)
+    assert len(result) == 3
+    for day in result:
+        assert day["start_time"] == "09:00"
+        assert day["end_time"] == "21:00"
+
+
+@pytest.mark.asyncio
+async def test_get_day_windows_dates_from_start():
+    """start_date seeds each day's date field."""
+    flight = {"arrival_time": "15:00", "departure_time": "16:00"}
+    result = await day_windows.get_day_windows(
+        flight=flight, trip_days=3, start_date="2026-06-01"
+    )
+    assert result[0]["date"] == "2026-06-01"
+    assert result[1]["date"] == "2026-06-02"
+    assert result[2]["date"] == "2026-06-03"
+
+
+@pytest.mark.asyncio
+async def test_get_day_windows_reads_flight_options_fallback():
+    """When top-level arrival/departure_time are missing, fall back to
+    options[0]."""
+    flight = {
+        "options": [
+            {"arrival_time": "18:00", "departure_time": "12:00"},
+        ],
+    }
+    result = await day_windows.get_day_windows(flight=flight, trip_days=2)
+    # Arrival 18:00 is mid-afternoon → extended evening end
+    assert result[0]["start_time"] == "19:30"
+    assert result[0]["end_time"] == "22:00"
+
+
+# ─── flights.py round 9 — 4-6 options ────────────────────────────────────
+
+
+def test_flights_options_from_live_returns_multiple():
+    """A diverse set of real flights should produce 3-6 options."""
+    live = [
+        {"airline": "Cathay", "price_num": 1200, "duration_min": 240, "stops": 0,
+         "departure": "10:00", "arrival": "14:00"},
+        {"airline": "JAL", "price_num": 1300, "duration_min": 230, "stops": 0,
+         "departure": "11:00", "arrival": "15:00"},
+        {"airline": "ANA", "price_num": 1500, "duration_min": 220, "stops": 0,
+         "departure": "09:00", "arrival": "13:00"},
+        {"airline": "Budget Air", "price_num": 900, "duration_min": 420, "stops": 1,
+         "departure": "07:00", "arrival": "15:00"},
+    ]
+    options = flights._options_from_live(live)
+    assert len(options) >= 3
+    assert len(options) <= 8
+    # All options have price_low > 0
+    assert all(o["price_low"] > 0 for o in options)
+    # Deduped — no duplicate (airline, price_num) pairs
+    seen = set()
+    for o in options:
+        key = (o["airline"], o["price_low"])
+        assert key not in seen, f"duplicate option: {key}"
+        seen.add(key)
+    # Times are normalized to HH:MM
+    for o in options:
+        if o.get("departure_time"):
+            assert len(o["departure_time"]) == 5
+            assert o["departure_time"][2] == ":"
+
+
+def test_flights_normalize_time_12h():
+    """12-hour AM/PM strings convert to 24-hour HH:MM."""
+    assert flights._normalize_time("6:30 PM") == "18:30"
+    assert flights._normalize_time("9:15 AM") == "09:15"
+    assert flights._normalize_time("12:00 AM") == "00:00"
+    assert flights._normalize_time("12:00 PM") == "12:00"
+
+
+def test_flights_normalize_time_24h():
+    """24-hour HH:MM strings pass through."""
+    assert flights._normalize_time("18:30") == "18:30"
+    assert flights._normalize_time("6:30") == "06:30"
+
+
+def test_flights_normalize_time_strips_day_suffix():
+    """The +1 day suffix fast-flights uses for overnight is dropped."""
+    assert flights._normalize_time("18:30+1") == "18:30"
+    assert flights._normalize_time("6:30 AM+2") == "06:30"
+
+
+# ─── places.py round 9 — photos gallery ──────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_places_search_returns_photos_gallery():
+    """search_places returns up to 5 photo URLs per place."""
+    mock_response = {
+        "places": [
+            {
+                "id": "p1",
+                "displayName": {"text": "Place 1"},
+                "formattedAddress": "addr",
+                "location": {"latitude": 1.0, "longitude": 2.0},
+                "photos": [
+                    {"name": f"photo_{i}"} for i in range(7)
+                ],
+            }
+        ]
+    }
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json = lambda: mock_response
+        mock_post.return_value.raise_for_status = lambda: None
+        results = await places.search_places("hotels", location="Tokyo")
+        assert len(results) == 1
+        # Up to 5 photos in the gallery
+        assert len(results[0]["photos"]) == 5
+        # photo_url stays as the first for back-compat
+        assert results[0]["photo_url"] == results[0]["photos"][0]
 
 
 # ─── web_search stub ─────────────────────────────────────────────────────
