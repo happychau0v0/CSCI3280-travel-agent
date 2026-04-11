@@ -35,6 +35,7 @@ const STATE_KEY = "travel-chat-state";
 const TRIP_DATES_KEY = "travel-trip-dates";
 const PLAN_HISTORY_KEY = "travel-plan-history";
 const PLAN_HISTORY_MAX = 20;
+const FAVORITES_KEY = "travel-favorites";
 
 // Subtitle-line narration for each tool the LLM can call. Pushed onto
 // the subtitle queue when a tool_start event arrives so the user sees
@@ -82,6 +83,25 @@ function loadTripDates() {
   }
 }
 
+function loadFavorites() {
+  try {
+    const raw = localStorage.getItem(FAVORITES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveFavorites(favorites) {
+  try {
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+  } catch {
+    /* ignore */
+  }
+}
+
 function loadPlanHistory() {
   try {
     const raw = localStorage.getItem(PLAN_HISTORY_KEY);
@@ -124,6 +144,8 @@ function App() {
   const [messages, setMessages] = useState(initial.messages);
   const [currentItinerary, setCurrentItinerary] = useState(initial.itinerary);
   const [planHistory, setPlanHistory] = useState(() => loadPlanHistory());
+  const [favorites, setFavorites] = useState(() => loadFavorites());
+  const favoriteKeys = useMemo(() => new Set(favorites.map((f) => f.key)), [favorites]);
   const [isLoading, setIsLoading] = useState(false);
   const [preferences, setPreferences] = useState(null);
   const [error, setError] = useState(null);
@@ -999,6 +1021,42 @@ function App() {
                 days[dayIdx] = { ...day, activities: acts };
                 return { ...prev, days };
               });
+            }}
+            favoriteKeys={favoriteKeys}
+            onToggleFavorite={(dayIdx, actIdx) => {
+              // Round 19 — toggle a favorite entry keyed by place_id
+              // or name. Favorites are global (not per-plan) so users
+              // can build a wishlist across trips.
+              const day = currentItinerary?.days?.[dayIdx];
+              const act = day?.activities?.[actIdx];
+              if (!act) return;
+              const key = act.place_id || act.name;
+              if (!key) return;
+              setFavorites((prev) => {
+                const exists = prev.some((f) => f.key === key);
+                let next;
+                if (exists) {
+                  next = prev.filter((f) => f.key !== key);
+                } else {
+                  next = [
+                    {
+                      key,
+                      name: act.name,
+                      address: act.address,
+                      place_id: act.place_id,
+                      lat: act.lat,
+                      lng: act.lng,
+                      photo_url: act.photo_url,
+                      destination: currentItinerary?.destination,
+                      saved_at: Date.now(),
+                    },
+                    ...prev,
+                  ].slice(0, 100);
+                }
+                saveFavorites(next);
+                return next;
+              });
+              cues.tick?.();
             }}
           />
         )}

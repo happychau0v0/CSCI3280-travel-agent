@@ -905,6 +905,25 @@
   background: rgba(0, 217, 255, 0.08);
 }
 
+/* Round 19 — activity favorite star button */
+.activity-fav-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 6px;
+  margin-left: 6px;
+  line-height: 1;
+  vertical-align: middle;
+  transition: color 0.1s;
+}
+
+.activity-fav-btn:hover,
+.activity-fav-btn.on {
+  color: #fbbf24;
+}
+
 .activity-actions {
   display: flex;
   gap: 6px;

@@ -58,6 +58,7 @@ function ActivityRow({
   isAirport,
   isActive,
   isDragTarget,
+  isFavorite,
   expandOverride,
   onClick,
   onDragStart,
@@ -68,6 +69,7 @@ function ActivityRow({
   onRemove,
   onReplace,
   onNoteChange,
+  onToggleFavorite,
 }) {
   const [expandedLocal, setExpandedLocal] = useState(false);
   // Round 15 — when expandOverride is non-null (from expand/collapse
@@ -115,6 +117,21 @@ function ActivityRow({
             {isHotel && <span className="activity-hotel-tag">🏨 HOTEL </span>}
             {isAirport && <span className="activity-hotel-tag">✈ AIRPORT </span>}
             {activity.name}
+            {isDraggable && onToggleFavorite && (
+              <button
+                type="button"
+                className={`activity-fav-btn${isFavorite ? " on" : ""}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFavorite(index);
+                }}
+                data-testid={`activity-fav-${index}`}
+                aria-label={isFavorite ? "Unfavorite" : "Favorite"}
+                title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+              >
+                {isFavorite ? "★" : "☆"}
+              </button>
+            )}
           </strong>
           {activity.address && <p className="activity-addr">{activity.address}</p>}
           {activity.description && (
@@ -205,6 +222,8 @@ export default function PanelDays({
   onRemoveActivity,
   onReplaceActivity,
   onSetActivityNote,
+  favoriteKeys = new Set(),
+  onToggleFavorite,
 }) {
   const days = itinerary?.days || [];
   const hotelName =
@@ -458,6 +477,10 @@ export default function PanelDays({
               onRemove={onRemoveActivity ? (idx) => onRemoveActivity(selectedIdx, idx) : null}
               onReplace={onReplaceActivity ? (idx) => onReplaceActivity(selectedIdx, idx) : null}
               onNoteChange={onSetActivityNote ? (idx, note) => onSetActivityNote(selectedIdx, idx, note) : null}
+              isFavorite={favoriteKeys.has(act.place_id || act.name)}
+              onToggleFavorite={
+                onToggleFavorite ? (idx) => onToggleFavorite(selectedIdx, idx) : null
+              }
             />
           ))}
         </ol>
