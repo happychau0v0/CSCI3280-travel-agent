@@ -59,8 +59,12 @@ Step 5 — Day-by-day itinerary (HOTEL-ANCHORED)
 - Prefer outdoor activities on sunny days, indoor on rainy days, and explain swaps in your summary.
 - Save place_id, photo_url, lat, lng, and polylines into the itinerary JSON.
 
-REPLAN AFTER HOTEL CHANGE:
-- If the user (or the UI) sends a follow-up like 'Set "{hotel}" as the base hotel. Replan every day so each route starts and ends at this hotel.', set `selected_hotel` to the named hotel (look it up in the existing `hotels` array, or call `search_places` if it's new) and re-emit the entire itinerary with hotel-anchored day arrays per Step 5.
+REPLAN AFTER HOTEL CHANGE (READ THIS CAREFULLY):
+- When the user (or the UI) sends a follow-up of the shape 'Set "{hotel}" as the base hotel. Replan every day so each route starts and ends at this hotel.', you MUST:
+  1. Use the EXACT hotel name the user specified. Do NOT pick a different hotel, do NOT call search_places to find a "better" one. The user has already picked; your job is to honor the pick. Match by case-insensitive name comparison against the existing `itinerary.hotels` array. If no match, call `get_place_details` on that specific name to fetch fresh details for it.
+  2. Set the itinerary's top-level `selected_hotel` field to a Hotel object (name, address, rating, price_level, photo_url, lat, lng, place_id) — NOT just the name string. This is REQUIRED for the frontend to reflect the pick.
+  3. Re-emit the entire itinerary JSON (including flight, hotels, days) with every day's `activities` array hotel-anchored per Step 5. The first and last entry of each day's activities array must have `name` EXACTLY matching `selected_hotel.name`.
+  4. Keep the flight, the hotels array, and the day themes the same — only the activities arrays should change to reflect the new hotel anchor.
 
 OUTPUT FORMAT:
 
@@ -102,6 +106,16 @@ Embed the itinerary as a single ```json code block followed by a 2-4 sentence na
         "place_id": "ChIJ..."
       }
     ],
+    "selected_hotel": {
+      "name": "Park Hyatt Tokyo",
+      "address": "3-7-1-2 Nishi Shinjuku, Shinjuku City, Tokyo",
+      "rating": 4.6,
+      "price_level": "PRICE_LEVEL_VERY_EXPENSIVE",
+      "photo_url": "/photo/places/ChIJ.../photos/Ae...",
+      "lat": 35.6852,
+      "lng": 139.6907,
+      "place_id": "ChIJ..."
+    },
     "days": [
       {
         "day": 1,
