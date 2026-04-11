@@ -88,36 +88,13 @@ async function runOnce(runIdx) {
     tools: [], // per-tool timing rows
   };
 
-  // Track SSE events with their arrival timestamps so we can slice
-  // the request into per-tool phases.
-  const sseEvents = [];
+  // Per-event SSE timings come from window.__sseEvents which
+  // client.js populates (in DEV mode) on every chunk read. Each
+  // event has its own {at} timestamp so we can compute per-tool
+  // durations accurately — much better than page.on('response')
+  // which only fires once when the whole body arrives.
   let planClickAt = null;
   let turn2ClickAt = null;
-  page.on('response', async (res) => {
-    if (res.url().includes('/chat/stream') && res.request().method() === 'POST') {
-      try {
-        const body = await res.text();
-        const arrived = Date.now();
-        // Parse SSE events
-        const chunks = body.split('\n\n').filter(Boolean);
-        for (const chunk of chunks) {
-          const typeLine = chunk.split('\n').find((l) => l.startsWith('event:'));
-          const dataLine = chunk.split('\n').find((l) => l.startsWith('data:'));
-          if (!typeLine || !dataLine) continue;
-          const type = typeLine.slice(6).trim();
-          let data = null;
-          try {
-            data = JSON.parse(dataLine.slice(5).trim());
-          } catch {
-            /* skip */
-          }
-          sseEvents.push({ type, data, at: arrived });
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-  });
 
   // ── Time to First Paint + TTI ────────────────────────────────────
   const navStart = Date.now();
@@ -195,7 +172,8 @@ async function runOnce(runIdx) {
   }, 240000, 200);
   metrics.timings.turn1TotalMs = turn1Ok ? Date.now() - planClickAt : null;
 
-  // ── Per-tool breakdown from sseEvents ────────────────────────────
+  // ── Per-tool breakdown from window.__sseEvents ───────────────────
+  const sseEvents = await page.evaluate(() => window.__sseEvents || []);
   if (sseEvents.length > 0 && planClickAt) {
     const toolStarts = new Map();
     for (const ev of sseEvents) {
@@ -225,6 +203,9 @@ async function runOnce(runIdx) {
       metrics.timings.sseDoneMs = doneEv.at - planClickAt;
     }
   }
+  // Clear the SSE buffer for turn 2 — only turn 2's events should
+  // be counted against turn 2's planClickAt.
+  await page.evaluate(() => { window.__sseEvents = []; });
 
   // ── Turn 2 (optional) ────────────────────────────────────────────
   if (TURNS >= 2 && turn1Ok) {
@@ -238,8 +219,6 @@ async function runOnce(runIdx) {
     }
     const t2Start = Date.now();
     turn2ClickAt = t2Start;
-    // Clear SSE event buffer for turn 2
-    sseEvents.length = 0;
     await page.locator('.chat-popover input[type="text"]').fill(
       'Yes, proceed with the full plan. Fill every day with 3-4 distinct activities.',
     );
@@ -252,9 +231,10 @@ async function runOnce(runIdx) {
     metrics.timings.turn2TotalMs = turn2Ok ? Date.now() - t2Start : null;
 
     // Turn 2 per-tool breakdown
-    if (turn2Ok && sseEvents.length > 0) {
+    const sseEvents2 = await page.evaluate(() => window.__sseEvents || []);
+    if (turn2Ok && sseEvents2.length > 0) {
       const toolStarts = new Map();
-      for (const ev of sseEvents) {
+      for (const ev of sseEvents2) {
         if (ev.type === 'tool_start') {
           const name = ev.data?.name;
           if (name) toolStarts.set(name, ev.at);
