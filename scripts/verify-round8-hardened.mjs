@@ -1597,6 +1597,32 @@ const FAKE_MESSAGES = [
         `${replyWords} words`,
       );
 
+      // Each day should have a distinct theme — users expect variety,
+      // not "Day 1: Tokyo / Day 2: Tokyo / Day 3: Tokyo". Require
+      // unique theme strings across all days.
+      const themes = days.map((d) => (d.theme || "").trim().toLowerCase()).filter(Boolean);
+      record(
+        '13.8.6h Day themes are distinct',
+        new Set(themes).size === themes.length && themes.length === days.length,
+        `themes: ${themes.join(' | ')}`,
+      );
+
+      // Each non-hotel activity should have unique place_id across
+      // days (don't visit the same temple twice) — duplicates are
+      // usually a sign the LLM ran out of ideas or forgot a search.
+      const allActIds = [];
+      for (const d of days) {
+        for (const a of d.activities || []) {
+          if (a.name === (real?.selected_hotel?.name || real?.hotels?.[0]?.name)) continue;
+          if (a.place_id) allActIds.push(a.place_id);
+        }
+      }
+      record(
+        '13.8.6i No duplicate place_ids across days',
+        new Set(allActIds).size === allActIds.length,
+        `total: ${allActIds.length}, unique: ${new Set(allActIds).size}`,
+      );
+
       // Activities have realistic structure (name + at least one of
       // address/place_id/lat). Hotel bookends are excluded because
       // the hotel's details live on itinerary.selected_hotel, not on
