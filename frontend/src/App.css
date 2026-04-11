@@ -398,11 +398,11 @@
   cursor: pointer;
 }
 
-/* PanelHome dashboard — 4 corner cards with the globe in the center */
+/* PanelHome dashboard — Round 10 dropped the bottom preview cards, so
+ * the grid is 2 rows (status strip + main content). Overrides the
+ * shared .panel-grid 3-row template specifically for the PLAN tab. */
 .panel-home {
-  /* Inherits .panel-grid via both classes on the section. No extra
-   * rules for now, but keep the hook in case HOME-specific tweaks
-   * are needed later (e.g. bigger globe, different card spans). */
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 /* Trip form panel — left column, spans the middle row. Inline
@@ -689,8 +689,6 @@
 
 .home-card-tl { grid-column: 1; grid-row: 1; }
 .home-card-tr { grid-column: 3; grid-row: 1; }
-.home-card-bl { grid-column: 1; grid-row: 3; }
-.home-card-br { grid-column: 3; grid-row: 3; }
 
 .home-card-label {
   font-size: 10px;

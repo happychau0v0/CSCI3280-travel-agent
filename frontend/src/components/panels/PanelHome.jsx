@@ -1,25 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 /**
- * HOME — combines the editable trip form, the dashboard summary
- * cards, and the globe-as-background into a single landing screen.
+ * PLAN (was HOME) — the trip-setup panel. Left = editable form,
+ * center = globe background, right = NEXT STEPS hint card. Round 10
+ * dropped the bottom flight/hotel preview cards so the form fits at
+ * 1280×720 without scroll.
  *
- * Layout (CSS grid):
+ * Layout (CSS grid, 2 rows):
  *   ┌───────────┬─────────────────┬───────────┐
- *   │ 📍 LIVE   │   ↑ NEXT TRIP ↑ │ EDITOR    │
- *   │ card      │                 │ (focused  │
- *   │           │   (globe in     │  field)   │
- *   ├───────────┤    middle)      │           │
- *   │ TRIP FORM │                 │           │
- *   │ ↑↓ fields │                 │           │
- *   │ PLAN BTN  │                 │           │
- *   ├───────────┼─────────────────┼───────────┤
- *   │ ✈ FLIGHT  │                 │ 🏨 HOTEL  │
- *   │ SELECTED  │                 │ SELECTED  │
+ *   │ 📍 LIVE   │   ↑ NEXT TRIP ↑ │ (empty)   │
+ *   ├───────────┤    (globe in    ├───────────┤
+ *   │ TRIP FORM │    background)  │ ◢ NEXT    │
+ *   │ ↑↓ fields │                 │   STEPS   │
+ *   │ START →   │                 │           │
  *   └───────────┴─────────────────┴───────────┘
- *
- * The form's listIndex doubles as the menu state's listIndex so
- * ↑/↓ moves between fields. Clicking a field also enters scope=list.
  */
 
 const STORAGE_KEY = "travel-trip-form";
@@ -47,13 +41,6 @@ const FIELDS = [
 
 export const HOME_FIELD_COUNT = FIELDS.length;
 
-const PRICE_LEVEL_LABELS = {
-  PRICE_LEVEL_INEXPENSIVE: "$",
-  PRICE_LEVEL_MODERATE: "$$",
-  PRICE_LEVEL_EXPENSIVE: "$$$",
-  PRICE_LEVEL_VERY_EXPENSIVE: "$$$$",
-};
-
 function loadForm() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -69,11 +56,6 @@ function saveForm(form) {
   } catch {
     /* ignore */
   }
-}
-
-function formatHKD(n) {
-  if (n == null) return "—";
-  return `HK$${n.toLocaleString("en-HK")}`;
 }
 
 function buildPrompt(form) {
@@ -204,13 +186,6 @@ export default function PanelHome({
     requestedIdx >= 0 ? requestedIdx : Math.min(Math.max(0, listIndex), FIELDS.length - 1);
   const focusedField = pendingInputRequest?.field || null;
 
-  // Selected flight = the currently picked option, defaults to options[0]
-  const selectedFlight =
-    itinerary?.selected_flight ||
-    itinerary?.flight?.options?.[0] ||
-    null;
-  const selectedHotel =
-    itinerary?.selected_hotel || itinerary?.hotels?.[0] || null;
   const days = itinerary?.days || [];
   const hasItinerary = !!itinerary;
   const planLabel = hasItinerary ? "REPLAN →" : "START PLANNING →";
@@ -431,67 +406,6 @@ export default function PanelHome({
           );
         })()}
       </aside>
-
-      {/* BOTTOM-LEFT — selected flight */}
-      <button
-        type="button"
-        className="home-card home-card-bl"
-        onClick={() => onJumpTo?.("FLIGHTS")}
-        data-testid="home-card-flight"
-      >
-        <div className="home-card-label">✈ FLIGHT SELECTED</div>
-        {itinerary?.flight && selectedFlight ? (
-          <>
-            <div className="home-card-value">
-              {itinerary.flight.from_iata} → {itinerary.flight.to_iata}
-            </div>
-            <div className="home-card-sub">
-              {selectedFlight.airline ? `${selectedFlight.airline} · ` : ""}
-              {formatHKD(selectedFlight.price_low)}
-              {itinerary.flight.source === "fast-flights" && (
-                <span style={{ marginLeft: 8, color: "#5eead4" }}>● LIVE</span>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="home-card-value home-card-empty">—</div>
-            <div className="home-card-sub">No flight yet · click to pick</div>
-          </>
-        )}
-      </button>
-
-      {/* BOTTOM-RIGHT — selected hotel */}
-      <button
-        type="button"
-        className="home-card home-card-br"
-        onClick={() => onJumpTo?.("HOTELS")}
-        data-testid="home-card-hotel"
-      >
-        <div className="home-card-label">🏨 HOTEL SELECTED</div>
-        {selectedHotel ? (
-          <>
-            <div className="home-card-value">{selectedHotel.name}</div>
-            <div className="home-card-sub">
-              {selectedHotel.rating != null && (
-                <span style={{ color: "#fbbf24", marginRight: 8 }}>
-                  ★ {selectedHotel.rating.toFixed(1)}
-                </span>
-              )}
-              {PRICE_LEVEL_LABELS[selectedHotel.price_level] && (
-                <span style={{ color: "var(--accent)" }}>
-                  {PRICE_LEVEL_LABELS[selectedHotel.price_level]}
-                </span>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="home-card-value home-card-empty">—</div>
-            <div className="home-card-sub">No hotel yet · click to pick</div>
-          </>
-        )}
-      </button>
     </section>
   );
 }
