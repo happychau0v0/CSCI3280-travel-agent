@@ -490,17 +490,15 @@ function App() {
           // across replan round-trips even if the LLM forgets to echo
           // them in its response. The new itinerary still wins on
           // every OTHER field.
-          let mergedItinerary;
-          setCurrentItinerary((prev) => {
-            mergedItinerary = { ...data.itinerary };
-            if (!mergedItinerary.selected_flight && prev?.selected_flight) {
-              mergedItinerary.selected_flight = prev.selected_flight;
-            }
-            if (!mergedItinerary.selected_hotel && prev?.selected_hotel) {
-              mergedItinerary.selected_hotel = prev.selected_hotel;
-            }
-            return mergedItinerary;
-          });
+          const prevSnapshot = currentItinerary;
+          const mergedItinerary = { ...data.itinerary };
+          if (!mergedItinerary.selected_flight && prevSnapshot?.selected_flight) {
+            mergedItinerary.selected_flight = prevSnapshot.selected_flight;
+          }
+          if (!mergedItinerary.selected_hotel && prevSnapshot?.selected_hotel) {
+            mergedItinerary.selected_hotel = prevSnapshot.selected_hotel;
+          }
+          setCurrentItinerary(mergedItinerary);
           cues.chime();
           // Round 11 — persist the finished plan to history so the
           // user can find it again in the PLAN HISTORY card.
@@ -511,29 +509,20 @@ function App() {
         }
 
         // Round 11 — flush any buffered navigate_menu target now
-        // that the itinerary has landed. Override to FLIGHTS on the
-        // initial plan so the user sees real flight options instead
-        // of landing on an empty HOTELS page. A hotel-replan turn
-        // (followed by a "selected_hotel" already-set state) still
-        // honors the LLM's DAYS target.
-        if (data.itinerary) {
+        // that the itinerary has landed. Honor the LLM's target
+        // verbatim so explicit navigation (including HOTELS / DAYS
+        // on replans) still works. If the LLM DIDN'T navigate at
+        // all but this turn produced a brand-new itinerary with
+        // flights, fall back to FLIGHTS so the sequential flow
+        // starts at the first pick step.
+        {
           const pending = pendingNavigateRef.current;
           pendingNavigateRef.current = null;
-          const hasHotelReplan = !!data.itinerary.selected_hotel &&
-            messages.some((m) => m.role === "user" &&
-              /base hotel|replan every day/i.test(m.content || ""));
-          let target = null;
           if (pending && pending.panel) {
-            if (hasHotelReplan) {
-              target = pending.panel;
-            } else {
-              target = "FLIGHTS";
-            }
-          } else if (data.itinerary.flight?.options?.length) {
-            target = "FLIGHTS";
-          }
-          if (target) {
-            menu.navigate({ panel: target });
+            menu.navigate(pending);
+            cues.select();
+          } else if (data.itinerary?.flight?.options?.length) {
+            menu.setPanel("FLIGHTS");
             cues.select();
           }
         }

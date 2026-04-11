@@ -700,6 +700,116 @@ def test_flights_normalize_time_handles_none():
     assert flights._normalize_time("") is None
 
 
+# ─── Round 11 — sparseness regression guards ─────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_places_search_always_sends_pagesize_without_location():
+    """Round 11 — the #1 sparseness bug. search_places MUST send
+    pageSize=20 even when the LLM omits the `location` kwarg. Google
+    Places (New) defaults to pageSize=1 which previously collapsed
+    every plan to 1 hotel / 1 activity / 1 restaurant."""
+    captured: dict = {}
+
+    class _Resp:
+        status_code = 200
+        def raise_for_status(self):
+            pass
+        def json(self):
+            return {"places": []}
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            pass
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            return None
+        async def post(self, url, json=None, headers=None):
+            captured["body"] = json
+            return _Resp()
+
+    with patch("httpx.AsyncClient", _Client):
+        await places.search_places("hotels in Tokyo")
+
+    assert captured["body"]["pageSize"] == 20
+    assert captured["body"]["textQuery"] == "hotels in Tokyo"
+
+
+@pytest.mark.asyncio
+async def test_places_search_with_location_still_sends_pagesize():
+    """Regression guard for the location-provided branch."""
+    captured: dict = {}
+
+    class _Resp:
+        status_code = 200
+        def raise_for_status(self):
+            pass
+        def json(self):
+            return {"places": []}
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            pass
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            return None
+        async def post(self, url, json=None, headers=None):
+            captured["body"] = json
+            return _Resp()
+
+    with patch("httpx.AsyncClient", _Client):
+        await places.search_places("ramen", location="Shinjuku")
+
+    assert captured["body"]["pageSize"] == 20
+    assert captured["body"]["textQuery"] == "ramen near Shinjuku"
+
+
+def test_flights_estimator_short_haul_returns_three_options():
+    """Round 11 — _build_options must return 3 non-stop slots for
+    short-haul routes too, not 1. Previously HKG→Taipei returned a
+    single option when fast-flights was blocked."""
+    # 800 km is short-haul (< 2000 km cutoff).
+    options = flights._build_options(distance_km=800, when="2026-06-01")
+    assert len(options) == 3
+    assert all(o["type"] == "non-stop" for o in options)
+    # Each slot has a distinct departure_time so the FLIGHTS panel
+    # shows 3 distinguishable rows.
+    departures = {o["departure_time"] for o in options}
+    assert len(departures) == 3
+
+
+def test_flights_estimator_medium_haul_returns_five_options():
+    """Medium/long-haul gets 3 non-stops + 2 one-stops = 5."""
+    options = flights._build_options(distance_km=2800, when="2026-06-01")
+    assert len(options) == 5
+    assert sum(1 for o in options if o["stops"] == 0) == 3
+    assert sum(1 for o in options if o["stops"] == 1) == 2
+
+
+def test_flights_live_padding_reaches_eight_options():
+    """Round 11 — _options_from_live padding ceiling was 6, now 8."""
+    live = [
+        {"airline": f"Air{i}", "price_num": 1000 + i * 50, "duration_min": 240,
+         "stops": 0, "departure": f"{6 + i:02d}:00", "arrival": f"{10 + i:02d}:00"}
+        for i in range(12)
+    ]
+    options = flights._options_from_live(live)
+    assert len(options) == 8, f"expected 8 options, got {len(options)}"
+
+
+def test_prompts_hotel_count_is_consistent():
+    """Round 11 — the system prompt must NOT have the old "3 well-
+    rated" hotel hint that contradicted Step 3's "5-8 hotels" rule
+    and drove the LLM toward 3 hotels."""
+    from app.prompts import SYSTEM_PROMPT
+    assert "3 well-rated options" not in SYSTEM_PROMPT
+    # The intended phrasing (5 to 8) should be present in at least
+    # one place.
+    assert "5 to 8" in SYSTEM_PROMPT or "5-8" in SYSTEM_PROMPT
+
+
 # ─── flights.py round 9 — 4-6 options ────────────────────────────────────
 
 

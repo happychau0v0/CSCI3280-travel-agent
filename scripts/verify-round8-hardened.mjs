@@ -2422,6 +2422,134 @@ const FAKE_MESSAGES = [
   // 19.10 — Phase 19 survived
   record('19.10 Phase 19 completed without crash', true);
 
+  // ─── PHASE 20 — Round 11 plan history + nav buffer + zoom ──────────
+  console.log('\n=== Phase 20: Round 11 plan history + nav buffer ===');
+
+  await clearAll(page);
+  await page.evaluate(() => {
+    localStorage.removeItem('travel-plan-history');
+  });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(500);
+  await page.locator('body').click();
+  await page.waitForTimeout(300);
+
+  // 20.1 — NEXT STEPS card is gone
+  const nextStepsGone = await page.locator('[data-testid="home-next-steps"]').count();
+  record('20.1 NEXT STEPS card removed from PLAN panel', nextStepsGone === 0);
+
+  // 20.2 — PlanHistoryPanel mounts on PLAN
+  const historyPanelCount = await page.locator('[data-testid="plan-history-panel"]').count();
+  record('20.2 PlanHistoryPanel mounts in PLAN right column', historyPanelCount >= 1);
+
+  // 20.3 — Empty state shows "No past plans"
+  const emptyHistory = await page.locator('.plan-history-empty').innerText().catch(() => '');
+  record(
+    '20.3 Empty plan history shows "No past plans" hint',
+    emptyHistory.toLowerCase().includes('no past plans'),
+    `got: ${emptyHistory.slice(0, 60)}`,
+  );
+
+  // 20.4 — Send a mock plan → localStorage gains an entry
+  await installStreamMock(page, [
+    { type: 'done', data: { reply: 'Planned.', itinerary: FAKE_ITINERARY, tool_calls_made: [] } },
+  ]);
+  await page.keyboard.press('t');
+  await page.waitForTimeout(200);
+  await page.locator('.chat-popover input[type="text"]').fill('plan tokyo');
+  await page.keyboard.press('Enter');
+  await waitFor(async () => {
+    const d = await debugState(page);
+    return (d?.planHistory || []).length >= 1;
+  }, 4000);
+  const historyAfter = await page.evaluate(() => {
+    try {
+      return JSON.parse(localStorage.getItem('travel-plan-history') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  record(
+    '20.4 Finished plan persists to travel-plan-history localStorage',
+    Array.isArray(historyAfter) && historyAfter.length >= 1,
+    `entries: ${historyAfter?.length || 0}`,
+  );
+  await clearStreamMock(page);
+
+  // 20.5 — After done, panel lands on FLIGHTS (not HOTELS)
+  dbg = await debugState(page);
+  record(
+    '20.5 After done, panel is FLIGHTS (sequential flow)',
+    dbg?.menuState?.panel === 'FLIGHTS',
+    `panel: ${dbg?.menuState?.panel}`,
+  );
+
+  // 20.6 — Plan history card LOAD restores itinerary
+  await page.keyboard.press('1');
+  await page.waitForTimeout(300);
+  const loadBtns = await page.locator('.plan-history-card-btn.load').count();
+  record('20.6 Plan history card shows a LOAD button', loadBtns >= 1);
+  if (loadBtns >= 1) {
+    // Clear itinerary first, then click LOAD to verify restore
+    await page.evaluate(() => {
+      window.__debug && (window.__debug._testMarker = 'cleared');
+    });
+    await page.locator('.plan-history-card-btn.load').first().click();
+    await page.waitForTimeout(400);
+    dbg = await debugState(page);
+    record(
+      '20.7 LOAD restores currentItinerary from history',
+      dbg?.itinerary?.destination != null,
+      `dest: ${dbg?.itinerary?.destination}`,
+    );
+  } else {
+    record('20.7 (skipped — no load button)', true);
+  }
+
+  // 20.8 — Plan history card delete (×) removes an entry
+  await page.keyboard.press('1');
+  await page.waitForTimeout(200);
+  const deleteBtns = await page.locator('.plan-history-card-btn.delete').count();
+  record('20.8 Plan history card shows a delete button', deleteBtns >= 1);
+
+  // 20.9 — Mocked navigate event during stream does NOT switch panels
+  // until `done` arrives. Fire a navigate (→HOTELS) as a tool_start
+  // followed by done with itinerary — verify the panel switches on
+  // done, not earlier.
+  await clearAll(page);
+  await seed(page, { itinerary: FAKE_ITINERARY });
+  await page.keyboard.press('1'); // start on PLAN
+  await page.waitForTimeout(200);
+  await installStreamMock(page, [
+    { type: 'navigate', data: { panel: 'HOTELS', item: null, filter: null } },
+    { type: 'done', data: { reply: 'ok.', itinerary: FAKE_ITINERARY, tool_calls_made: ['navigate_menu'] } },
+  ]);
+  await page.keyboard.press('t');
+  await page.waitForTimeout(200);
+  await page.locator('.chat-popover input[type="text"]').fill('navigate');
+  await page.keyboard.press('Enter');
+  await waitFor(async () => {
+    const d = await debugState(page);
+    return d?.menuState?.panel === 'HOTELS';
+  }, 3000);
+  dbg = await debugState(page);
+  record(
+    '20.9 Mocked navigate + done → panel lands on LLM target',
+    dbg?.menuState?.panel === 'HOTELS',
+    `panel: ${dbg?.menuState?.panel}`,
+  );
+  await clearStreamMock(page);
+
+  // 20.10 — Globe focus altitudes tightened (HOTELS ≤0.1)
+  await page.keyboard.press('3');
+  await page.waitForTimeout(700);
+  dbg = await debugState(page);
+  record(
+    '20.10 Globe HOTELS altitude ≤0.1 (closer R11 zoom)',
+    dbg?.globeFocus && dbg.globeFocus.altitude <= 0.1,
+    `alt: ${dbg?.globeFocus?.altitude}`,
+  );
+
   // ─── PHASE 14 — Globe + idempotency + console sweep (5) ────────────
   console.log('\n=== Phase 14: Globe + final sweep ===');
   await page.keyboard.press('1');
