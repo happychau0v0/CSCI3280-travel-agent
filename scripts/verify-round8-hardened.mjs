@@ -2881,6 +2881,123 @@ const FAKE_MESSAGES = [
     record('23.8 (skipped — help overlay not visible)', false);
   }
 
+  // ─── PHASE 24 — Round 15 weather forecast + cost + collapse ───────
+  console.log('\n=== Phase 24: Round 15 forecast + cost + collapse ===');
+
+  const R15_ITIN = {
+    ...FAKE_ITINERARY,
+    party_size: 2,
+    selected_flight: {
+      label: 'non-stop', stops: 0, price_low: 1300, duration_min: 235, airline: 'Cathay',
+    },
+    hotels: [
+      { name: 'Park Hyatt Tokyo', address: '3-7-1-2 Nishi Shinjuku', rating: 4.6,
+        price_level: 'PRICE_LEVEL_VERY_EXPENSIVE', place_id: 'p1', lat: 35.689, lng: 139.692 },
+    ],
+    selected_hotel: {
+      name: 'Park Hyatt Tokyo', address: '3-7-1-2 Nishi Shinjuku', rating: 4.6,
+      price_level: 'PRICE_LEVEL_VERY_EXPENSIVE', place_id: 'p1', lat: 35.689, lng: 139.692,
+    },
+    days: [
+      { day: 1, date: '2026-05-15', theme: 'Arrival',
+        weather: { condition: 'Sunny', temp_c: 22, icon: 'sunny' },
+        activities: [
+          { time: '09:00', name: 'Park Hyatt Tokyo', address: 'hotel', lat: 35.689, lng: 139.692 },
+          { time: '11:00', name: 'Senso-ji', address: '2-3-1 Asakusa', lat: 35.715, lng: 139.796 },
+          { time: '13:00', name: 'Ichiran', address: 'Shibuya', lat: 35.661, lng: 139.698 },
+          { time: '20:00', name: 'Park Hyatt Tokyo', address: 'hotel', lat: 35.689, lng: 139.692 },
+        ],
+      },
+      { day: 2, date: '2026-05-16', theme: 'Middle',
+        weather: { condition: 'Cloudy', temp_c: 19, icon: 'cloudy' },
+        activities: [
+          { time: '09:00', name: 'Park Hyatt Tokyo', address: 'hotel', lat: 35.689, lng: 139.692 },
+          { time: '10:30', name: 'Meiji Shrine', address: 'Yoyogi', lat: 35.676, lng: 139.699 },
+          { time: '12:30', name: 'Tsukiji Market', address: 'Chuo', lat: 35.665, lng: 139.770 },
+          { time: '20:00', name: 'Park Hyatt Tokyo', address: 'hotel', lat: 35.689, lng: 139.692 },
+        ],
+      },
+      { day: 3, date: '2026-05-17', theme: 'Departure',
+        weather: { condition: 'Rainy', temp_c: 17, icon: 'rainy' },
+        activities: [
+          { time: '09:00', name: 'Park Hyatt Tokyo', address: 'hotel', lat: 35.689, lng: 139.692 },
+          { time: '12:00', name: 'NRT Airport · Departure', address: 'Narita', lat: 35.772, lng: 140.393 },
+        ],
+      },
+    ],
+  };
+  await clearAll(page);
+  await seed(page, { itinerary: R15_ITIN });
+  await page.waitForTimeout(300);
+
+  // 24.1 — PLAN summary shows an EST TOTAL cost row
+  const costRow = await page.locator('[data-testid="home-summary-cost"]').count();
+  record('24.1 PLAN summary shows EST TOTAL cost', costRow === 1);
+
+  if (costRow === 1) {
+    const costText = await page.locator('[data-testid="home-summary-cost"]').innerText();
+    record(
+      '24.2 Cost row contains currency + number',
+      /HK\$|US\$|€|¥|£/.test(costText) && /\d/.test(costText),
+      `text: ${costText.slice(0, 80)}`,
+    );
+  } else {
+    record('24.2 (skipped — no cost row)', false);
+  }
+
+  // 24.3 — DAYS forecast strip renders
+  await page.keyboard.press('4');
+  await page.waitForTimeout(400);
+  const forecastStrip = await page.locator('[data-testid="day-forecast-strip"]').count();
+  record('24.3 DAYS forecast strip renders', forecastStrip === 1);
+
+  // 24.4 — Each day has a forecast cell
+  const forecastCells = await page.locator('[data-testid^="day-forecast-"]').count();
+  record(
+    '24.4 Forecast strip has one cell per day (+strip itself)',
+    forecastCells >= R15_ITIN.days.length,
+    `count: ${forecastCells}`,
+  );
+
+  // 24.5 — Clicking a forecast cell selects that day
+  await page.locator('[data-testid="day-forecast-1"]').click();
+  await page.waitForTimeout(200);
+  dbg = await debugState(page);
+  record(
+    '24.5 Clicking forecast cell sets listIndex',
+    dbg?.menuState?.listIndex === 1,
+    `listIndex: ${dbg?.menuState?.listIndex}`,
+  );
+
+  // 24.6 — Expand all + Collapse all chips render
+  const expandAllCount = await page.locator('[data-testid="day-expand-all"]').count();
+  const collapseAllCount = await page.locator('[data-testid="day-collapse-all"]').count();
+  record(
+    '24.6 Expand/collapse chips render',
+    expandAllCount === 1 && collapseAllCount === 1,
+    `expand: ${expandAllCount} collapse: ${collapseAllCount}`,
+  );
+
+  // 24.7 — Clicking EXPAND ALL gives it the .active class
+  await page.locator('[data-testid="day-expand-all"]').click();
+  await page.waitForTimeout(200);
+  const expandAllActive = await page.locator('[data-testid="day-expand-all"]')
+    .evaluate((el) => el.classList.contains('active'));
+  record('24.7 EXPAND ALL chip becomes active on click', expandAllActive);
+
+  // 24.8 — Clicking COLLAPSE toggles override off EXPAND
+  await page.locator('[data-testid="day-collapse-all"]').click();
+  await page.waitForTimeout(200);
+  const collapseActive = await page.locator('[data-testid="day-collapse-all"]')
+    .evaluate((el) => el.classList.contains('active'));
+  const expandStillActive = await page.locator('[data-testid="day-expand-all"]')
+    .evaluate((el) => el.classList.contains('active'));
+  record(
+    '24.8 COLLAPSE chip is active + EXPAND cleared',
+    collapseActive && !expandStillActive,
+    `collapse: ${collapseActive} expand: ${expandStillActive}`,
+  );
+
   // ─── PHASE 14 — Globe + idempotency + console sweep (5) ────────────
   console.log('\n=== Phase 14: Globe + final sweep ===');
   await page.keyboard.press('1');
