@@ -62,8 +62,10 @@ function FitBounds({ points }) {
  *
  * Props:
  *   activities: list of {name, lat, lng, transport_to_next?}
+ *   airport: {lat, lng, iata, label} | null — reference pin for
+ *            Day 1 (arrival) / last day (departure). Round 10.
  */
-export default function DayMiniMap({ activities }) {
+export default function DayMiniMap({ activities, airport = null }) {
   const { points, polylines } = useMemo(() => {
     const pts = [];
     const lines = [];
@@ -80,7 +82,10 @@ export default function DayMiniMap({ activities }) {
     return { points: pts, polylines: lines };
   }, [activities]);
 
-  if (points.length === 0) {
+  const hasAirport =
+    airport && airport.lat != null && airport.lng != null;
+
+  if (points.length === 0 && !hasAirport) {
     return null;
   }
 
@@ -93,16 +98,28 @@ export default function DayMiniMap({ activities }) {
       iconAnchor: [11, 11],
     });
 
-  // All points used for fitBounds: markers + polyline vertices
+  const airportIcon = L.divIcon({
+    className: "day-mini-marker",
+    html: '<div class="day-mini-pin airport">✈</div>',
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  });
+
+  // All points used for fitBounds: markers + polyline vertices + airport
   const allPoints = [
     ...points.map((p) => [p.lat, p.lng]),
     ...polylines.flat(),
   ];
+  if (hasAirport) allPoints.push([airport.lat, airport.lng]);
+
+  const centerPoint = points.length
+    ? [points[0].lat, points[0].lng]
+    : [airport.lat, airport.lng];
 
   return (
-    <div className="day-mini-map">
+    <div className="day-mini-map" data-testid="day-mini-map">
       <MapContainer
-        center={[points[0].lat, points[0].lng]}
+        center={centerPoint}
         zoom={13}
         scrollWheelZoom={false}
         zoomControl={false}
@@ -113,6 +130,13 @@ export default function DayMiniMap({ activities }) {
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           subdomains="abcd"
         />
+        {hasAirport && (
+          <Marker
+            key={`airport-${airport.iata || "x"}`}
+            position={[airport.lat, airport.lng]}
+            icon={airportIcon}
+          />
+        )}
         {points.map((p) => (
           <Marker
             key={`${p.idx}-${p.lat}-${p.lng}`}

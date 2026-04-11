@@ -107,6 +107,24 @@ export default function PanelDays({ itinerary, listIndex, onSelect }) {
   const selected = days[selectedIdx];
   const activities = selected?.activities || [];
 
+  // Airport reference pin — shown on Day 1 (arrival) and the last
+  // day (departure). Both use the destination airport (to_lat/to_lng)
+  // because the user arrives there on Day 1 and flies out of the same
+  // physical airport on the last day. Middle days get no airport pin.
+  const isFirstDay = selectedIdx === 0;
+  const isLastDay = days.length > 1 && selectedIdx === days.length - 1;
+  const airportPin =
+    (isFirstDay || isLastDay) &&
+    itinerary?.flight?.to_lat != null &&
+    itinerary?.flight?.to_lng != null
+      ? {
+          lat: itinerary.flight.to_lat,
+          lng: itinerary.flight.to_lng,
+          iata: itinerary.flight.to_iata,
+          label: `${itinerary.flight.to_iata || ""} Airport`.trim(),
+        }
+      : null;
+
   return (
     <section className="panel panel-grid panel-days" aria-label="Days">
       {/* TOP band — day summary */}
@@ -167,7 +185,7 @@ export default function PanelDays({ itinerary, listIndex, onSelect }) {
        *  the center grid cell with pointer-events auto so the user
        *  can interact with it. */}
       <div className="panel-grid-center panel-day-map-center" data-testid="day-map-center">
-        <DayMiniMap activities={activities} />
+        <DayMiniMap activities={activities} airport={airportPin} />
       </div>
 
       {/* RIGHT — activity timeline */}
