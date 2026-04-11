@@ -1038,7 +1038,12 @@ function App() {
       />
 
       {/* Bottom-center subtitle bar with auto-TTS + R16 history */}
-      <Subtitle text={subtitles.current} history={subtitles.history || []} />
+      <Subtitle
+        text={subtitles.current}
+        history={subtitles.history || []}
+        onPause={subtitles.pause}
+        onResume={subtitles.resume}
+      />
 
       {/* Chat popover (opens on Enter / Cmd+K) */}
       <ChatPopover

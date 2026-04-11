@@ -11,11 +11,17 @@ import HighlightedText from "./HighlightedText";
  * Clicking the ↑ button opens a popover so the user can re-read
  * narration they missed.
  */
-export default function Subtitle({ text, history = [] }) {
+export default function Subtitle({ text, history = [], onPause, onResume }) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const hasHistory = history.length > 0;
   return (
-    <div className={`subtitle${text ? " visible" : ""}`} aria-live="polite">
+    <div
+      className={`subtitle${text ? " visible" : ""}`}
+      aria-live="polite"
+      onMouseEnter={() => onPause?.()}
+      onMouseLeave={() => onResume?.()}
+      data-testid="subtitle-bar"
+    >
       {hasHistory && (
         <button
           type="button"

@@ -57,10 +57,15 @@ export function useSubtitleQueue({
   const currentRef = useRef(null);
   const queueRef = useRef([]);
   const safetyTimerRef = useRef(null);
+  const safetyDelayRef = useRef(0);
   const speakingRef = useRef(false);
   const mutedRef = useRef(muted);
   const rateRef = useRef(rate);
   const voiceNameRef = useRef(voiceName);
+  // Round 18 — pause state. While paused, the advance timer is
+  // cleared and the current line stays visible indefinitely. On
+  // resume, a fresh timer is scheduled for the remaining time.
+  const pausedRef = useRef(false);
 
   const setCurrentBoth = useCallback((v) => {
     currentRef.current = v;
@@ -155,9 +160,46 @@ export function useSubtitleQueue({
     // Single setTimeout per item drives advance. No re-speak loop
     // because each item only schedules ONE timer, and the next
     // push will clear it via clear() or via advance() popping the
-    // queue.
-    safetyTimerRef.current = setTimeout(() => advance(), displayMs);
+    // queue. Round 18 — if paused (mouse hover), delay scheduling
+    // the timer until resume.
+    safetyDelayRef.current = displayMs;
+    if (!pausedRef.current) {
+      safetyTimerRef.current = setTimeout(() => advance(), displayMs);
+    }
   }, [setCurrentBoth, findVoice]);
+
+  const pause = useCallback(() => {
+    pausedRef.current = true;
+    if (safetyTimerRef.current) {
+      clearTimeout(safetyTimerRef.current);
+      safetyTimerRef.current = null;
+    }
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.pause?.();
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
+
+  const resume = useCallback(() => {
+    if (!pausedRef.current) return;
+    pausedRef.current = false;
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.resume?.();
+      } catch {
+        /* ignore */
+      }
+    }
+    // Schedule the advance timer with a small residual window so
+    // the subtitle doesn't immediately pop.
+    if (currentRef.current && !safetyTimerRef.current) {
+      const remaining = Math.max(1000, safetyDelayRef.current || 2500);
+      safetyTimerRef.current = setTimeout(() => advance(), remaining);
+    }
+  }, [advance]);
 
   const push = useCallback(
     (text, opts = {}) => {
@@ -203,7 +245,7 @@ export function useSubtitleQueue({
   const clearHistory = useCallback(() => setHistory([]), []);
 
   return useMemo(
-    () => ({ current, history, push, pushParagraph, clear, clearHistory }),
-    [current, history, push, pushParagraph, clear, clearHistory],
+    () => ({ current, history, push, pushParagraph, clear, clearHistory, pause, resume }),
+    [current, history, push, pushParagraph, clear, clearHistory, pause, resume],
   );
 }
