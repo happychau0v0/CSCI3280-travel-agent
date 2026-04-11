@@ -23,13 +23,14 @@ function weatherIcon(weather) {
 
 export default function PanelDays({ itinerary, listIndex, onSelect }) {
   const days = itinerary?.days || [];
+  const hotelName = itinerary?.selected_hotel?.name || itinerary?.hotels?.[0]?.name || null;
 
   if (days.length === 0) {
     return (
       <section className="panel panel-list" aria-label="Days">
         <div className="panel-empty">
           <h2>NO ITINERARY YET</h2>
-          <p>Press Enter and ask the agent to plan a multi-day trip.</p>
+          <p>Press T and ask the agent to plan a multi-day trip.</p>
         </div>
       </section>
     );
@@ -78,8 +79,9 @@ export default function PanelDays({ itinerary, listIndex, onSelect }) {
             <ol className="activities">
               {(selected.activities || []).map((act, i) => {
                 const photo = photoSrc(act.photo_url);
+                const isHotel = hotelName && act.name === hotelName;
                 return (
-                  <li key={i} className="activity">
+                  <li key={i} className={`activity${isHotel ? " activity-hotel" : ""}`}>
                     {photo && (
                       <img
                         src={photo}
@@ -93,7 +95,10 @@ export default function PanelDays({ itinerary, listIndex, onSelect }) {
                     <div className="activity-row">
                       <span className="activity-time">{act.time}</span>
                       <div className="activity-info">
-                        <strong>{act.name}</strong>
+                        <strong>
+                          {isHotel && <span className="activity-hotel-tag">🏨 HOTEL </span>}
+                          {act.name}
+                        </strong>
                         {act.address && <p className="activity-addr">{act.address}</p>}
                         {act.description && <p className="activity-desc">{act.description}</p>}
                         {act.duration_min && (

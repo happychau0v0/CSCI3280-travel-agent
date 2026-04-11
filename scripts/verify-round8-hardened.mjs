@@ -1380,26 +1380,62 @@ const FAKE_MESSAGES = [
   if (process.env.REAL_LLM === '1') {
     console.log('\n=== Phase 13.8: Real-LLM trip quality smoke ===');
     await clearAll(page);
-    // Make sure no mocks are interfering
     await page.unrouteAll({ behavior: 'wait' }).catch(() => {});
 
-    // Drive the form: destination + dates + transport
-    await page.keyboard.press('1');
-    await page.waitForTimeout(200);
-    // Click into the inline editor on the right and fill destination
-    await page.locator('.home-form .panel-list-item').nth(1).click(); // destination row
-    await page.waitForTimeout(150);
-    await page.locator('[data-testid="home-editor-input"]').fill('Tokyo');
-    await page.waitForTimeout(150);
-    // Click PLAN
-    await page.locator('[data-testid="trip-plan-btn"]').click();
+    // Seed a COMPLETE form via localStorage so the LLM has all the
+    // info it needs upfront — otherwise it correctly asks for
+    // clarification per the SYSTEM_PROMPT. The test's goal is to
+    // verify QUALITY of a fully-specified planning request, not to
+    // exercise the multi-turn clarification flow.
+    await page.evaluate(() => {
+      localStorage.setItem(
+        'travel-trip-form',
+        JSON.stringify({
+          origin: 'Hong Kong',
+          destination: 'Tokyo',
+          start_date: '2026-06-01',
+          end_date: '2026-06-03',
+          transport: 'transit',
+          party_size: '2',
+          interests: 'history, ramen, temples',
+        }),
+      );
+    });
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.locator('body').click();
+    await page.waitForTimeout(1500);
 
-    // Wait for the request to fully complete (up to 4 minutes)
+    // Click PLAN — turn 1: LLM geocodes, finds flight, asks for
+    // confirmation per the Step 2 bridge prompt.
+    await page.locator('[data-testid="trip-plan-btn"]').click();
+    const turn1Done = await waitFor(async () => {
+      const d = await debugState(page);
+      return d?.agentState === 'idle' && (d?.messages || []).length >= 2;
+    }, 180000);
+    record('13.8.0 Turn 1 (flight bridge) completes within 3 min', turn1Done);
+
+    if (turn1Done) {
+      // Turn 2: confirm and ask for the full plan. The LLM's auto-
+      // reopen-on-question may have already popped the popover.
+      await page.waitForTimeout(500);
+      const popoverOpen = await page.locator('.chat-popover').isVisible().catch(() => false);
+      if (!popoverOpen) {
+        await page.keyboard.press('t');
+        await page.waitForTimeout(300);
+      }
+      await page.locator('.chat-popover input[type="text"]').click();
+      await page.locator('.chat-popover input[type="text"]').fill(
+        'Yes, proceed with the full plan. Pick 3 well-rated hotels and fill every day with 3-4 distinct activities including temples, ramen, and history museums.',
+      );
+      await page.keyboard.press('Enter');
+    }
+
+    // Wait up to 5 min for turn 2 to produce a full itinerary
     const realDone = await waitFor(async () => {
       const d = await debugState(page);
-      return d?.agentState === 'idle' && d?.itinerary != null;
-    }, 240000);
-    record('13.8.1 Real LLM request completes within 4 minutes', realDone);
+      return d?.agentState === 'idle' && d?.itinerary != null && (d?.itinerary?.days?.length || 0) >= 1;
+    }, 300000);
+    record('13.8.1 Real LLM produces full itinerary within 5 min', realDone);
 
     if (realDone) {
       const real = (await debugState(page))?.itinerary;
