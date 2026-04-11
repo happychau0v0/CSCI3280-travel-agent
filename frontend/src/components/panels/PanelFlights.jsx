@@ -28,6 +28,14 @@ function stopsLabel(stops) {
   return `${stops} stops`;
 }
 
+/** Always-visible depart→arrive string with em-dash fallbacks so the
+ * row layout stays consistent even when fast-flights omits one side. */
+function formatTimeRange(opt) {
+  const dep = opt?.departure_time || "—";
+  const arr = opt?.arrival_time || "—";
+  return `${dep} → ${arr}`;
+}
+
 export default function PanelFlights({ itinerary, listIndex, onSelect, onPick }) {
   const flight = itinerary?.flight;
   const options = flight?.options || [];
@@ -109,12 +117,8 @@ export default function PanelFlights({ itinerary, listIndex, onSelect, onPick })
               </span>
               <span className="flight-option-meta">
                 {opt.duration_min ? formatDuration(opt.duration_min) : "—"}
-                {opt.departure_time && opt.arrival_time && (
-                  <>
-                    {" · "}
-                    {opt.departure_time} → {opt.arrival_time}
-                  </>
-                )}
+                {" · "}
+                {formatTimeRange(opt)}
               </span>
             </li>
           ))}
@@ -151,22 +155,18 @@ export default function PanelFlights({ itinerary, listIndex, onSelect, onPick })
                 </div>
                 <div className="flight-stat-label">stops</div>
               </div>
-              {selected.departure_time && (
-                <div className="flight-stat">
-                  <div className="flight-stat-value">
-                    {selected.departure_time}
-                  </div>
-                  <div className="flight-stat-label">depart</div>
+              <div className="flight-stat">
+                <div className="flight-stat-value">
+                  {selected.departure_time || "—"}
                 </div>
-              )}
-              {selected.arrival_time && (
-                <div className="flight-stat">
-                  <div className="flight-stat-value">
-                    {selected.arrival_time}
-                  </div>
-                  <div className="flight-stat-label">arrive</div>
+                <div className="flight-stat-label">depart</div>
+              </div>
+              <div className="flight-stat">
+                <div className="flight-stat-value">
+                  {selected.arrival_time || "—"}
                 </div>
-              )}
+                <div className="flight-stat-label">arrive</div>
+              </div>
             </div>
 
             <button
