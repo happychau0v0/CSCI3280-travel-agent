@@ -181,6 +181,12 @@ async def get_day_windows(
     trip_days = max(1, int(trip_days or 1))
     arrival_time = None
     departure_time = None
+    # Round 10 — pull through the full flight metadata so each returned
+    # window can carry arrival_airport / departure_airport coordinates.
+    # The LLM copies these verbatim into Day 1's first activity and the
+    # last day's last activity (Step 5), no guessing required.
+    arrival_airport: dict | None = None
+    departure_airport: dict | None = None
     if isinstance(flight, dict):
         arrival_time = flight.get("arrival_time") or flight.get("arrival")
         departure_time = flight.get("departure_time") or flight.get("departure")
@@ -193,6 +199,35 @@ async def get_day_windows(
                     departure_time = departure_time or opt.get("departure_time") or opt.get("departure")
                     if arrival_time and departure_time:
                         break
+
+        to_lat = flight.get("to_lat")
+        to_lng = flight.get("to_lng")
+        if to_lat is not None and to_lng is not None:
+            arrival_airport = {
+                "iata": flight.get("to_iata"),
+                "city": flight.get("to_city"),
+                "lat": to_lat,
+                "lng": to_lng,
+                "arrival_time": arrival_time,
+            }
+        from_lat = flight.get("from_lat")
+        from_lng = flight.get("from_lng")
+        # The destination-side airport is where the user boards the return
+        # (or final) flight, so the "departure airport" pin for the last
+        # day is the same physical airport as the arrival. We still
+        # expose from_* for symmetry when the LLM needs origin coords.
+        if to_lat is not None and to_lng is not None:
+            departure_airport = {
+                "iata": flight.get("to_iata"),
+                "city": flight.get("to_city"),
+                "lat": to_lat,
+                "lng": to_lng,
+                "departure_time": departure_time,
+                "origin_iata": flight.get("from_iata"),
+                "origin_city": flight.get("from_city"),
+                "origin_lat": from_lat,
+                "origin_lng": from_lng,
+            }
 
     windows: list[dict] = []
     for day_idx in range(trip_days):
@@ -219,14 +254,21 @@ async def get_day_windows(
             end = DEFAULT_EVENING_END
             notes = "Full day"
 
-        windows.append(
-            {
-                "day": day_num,
-                "date": date_str,
-                "start_time": start,
-                "end_time": end,
-                "notes": notes,
-            }
-        )
+        window: dict = {
+            "day": day_num,
+            "date": date_str,
+            "start_time": start,
+            "end_time": end,
+            "notes": notes,
+            "arrival_airport": None,
+            "departure_airport": None,
+        }
+        # Day 1 carries arrival_airport; the last day carries
+        # departure_airport; single-day trips carry both.
+        if day_num == 1:
+            window["arrival_airport"] = arrival_airport
+        if day_num == trip_days:
+            window["departure_airport"] = departure_airport
+        windows.append(window)
 
     return windows
