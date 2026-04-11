@@ -98,6 +98,12 @@ function App() {
   // fires. Without this, pressing PLAN again while an auto-reopen
   // is queued would briefly pop the popover then slam it shut.
   const autoReopenTimerRef = useRef(null);
+  // Round 11 — buffer the LLM's navigate_menu target until the
+  // `done` event fires with the final itinerary. Without this,
+  // the backend fires the navigate event mid-stream (during the
+  // navigate_menu tool_start), which yanks the user to an empty
+  // HOTELS panel before the itinerary data has landed.
+  const pendingNavigateRef = useRef(null);
   // Per-panel imperative handle: panels with actionable rows expose
   // an `activateRow(index)` method via ref. App.jsx's onActivate
   // (Space hotkey) reads the current panel's ref and invokes it.
@@ -363,8 +369,13 @@ function App() {
                 if (label) subtitles.push(label);
               }
             } else if (type === "navigate") {
-              menu.navigate(payload);
-              cues.select();
+              // Round 11 — buffer instead of applying immediately.
+              // The backend fires this during the navigate_menu
+              // tool_start, which arrives BEFORE the `done` event
+              // with the final itinerary. If we applied the nav
+              // here, the user would land on an empty HOTELS
+              // panel during loading. Flush in the done branch.
+              pendingNavigateRef.current = payload;
             } else if (type === "request_input") {
               // The LLM is asking for a single structured value via
               // an inline form row on HOME. Flag the pending request
@@ -397,6 +408,34 @@ function App() {
             return merged;
           });
           cues.chime();
+        }
+
+        // Round 11 — flush any buffered navigate_menu target now
+        // that the itinerary has landed. Override to FLIGHTS on the
+        // initial plan so the user sees real flight options instead
+        // of landing on an empty HOTELS page. A hotel-replan turn
+        // (followed by a "selected_hotel" already-set state) still
+        // honors the LLM's DAYS target.
+        if (data.itinerary) {
+          const pending = pendingNavigateRef.current;
+          pendingNavigateRef.current = null;
+          const hasHotelReplan = !!data.itinerary.selected_hotel &&
+            messages.some((m) => m.role === "user" &&
+              /base hotel|replan every day/i.test(m.content || ""));
+          let target = null;
+          if (pending && pending.panel) {
+            if (hasHotelReplan) {
+              target = pending.panel;
+            } else {
+              target = "FLIGHTS";
+            }
+          } else if (data.itinerary.flight?.options?.length) {
+            target = "FLIGHTS";
+          }
+          if (target) {
+            menu.navigate({ panel: target });
+            cues.select();
+          }
         }
         subtitles.pushParagraph(data.reply);
         // ── Done state: brief ✓ READY flash, then collapse to idle
