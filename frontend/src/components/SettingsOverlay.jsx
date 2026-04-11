@@ -65,15 +65,42 @@ export function preferencesForApi(prefs) {
   return Object.keys(out).length > 0 ? out : null;
 }
 
+const TTS_STORAGE_KEY = "travel-tts";
+
+export function loadTts() {
+  try {
+    const raw = localStorage.getItem(TTS_STORAGE_KEY);
+    if (!raw) return { rate: 1.15, voiceName: null };
+    const parsed = JSON.parse(raw);
+    return {
+      rate: typeof parsed.rate === "number" ? parsed.rate : 1.15,
+      voiceName: typeof parsed.voiceName === "string" ? parsed.voiceName : null,
+    };
+  } catch {
+    return { rate: 1.15, voiceName: null };
+  }
+}
+
+function saveTts(tts) {
+  try {
+    localStorage.setItem(TTS_STORAGE_KEY, JSON.stringify(tts));
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function SettingsOverlay({
   open,
   onClose,
   onChange,
+  onTtsChange,
   muted = false,
   onToggleMute,
   onClearAll,
 }) {
   const [prefs, setPrefs] = useState(() => loadPrefs());
+  const [tts, setTts] = useState(() => loadTts());
+  const [voices, setVoices] = useState([]);
   const [confirmClear, setConfirmClear] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
   const [savedFlash, setSavedFlash] = useState(false);
@@ -83,6 +110,39 @@ export default function SettingsOverlay({
   useEffect(() => {
     onChange?.(preferencesForApi(prefs));
   }, [prefs, onChange]);
+
+  // Notify the parent whenever TTS config changes so useSubtitleQueue
+  // applies the new rate/voice on the next utterance.
+  useEffect(() => {
+    onTtsChange?.(tts);
+  }, [tts, onTtsChange]);
+
+  // speechSynthesis.getVoices() returns [] until the voices finish
+  // loading on some browsers (Chrome). Subscribe to the onvoiceschanged
+  // event so the dropdown populates when voices become available.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return undefined;
+    const load = () => {
+      try {
+        setVoices(window.speechSynthesis.getVoices() || []);
+      } catch {
+        setVoices([]);
+      }
+    };
+    load();
+    window.speechSynthesis.onvoiceschanged = load;
+    return () => {
+      if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
+
+  const updateTts = (patch) => {
+    const next = { ...tts, ...patch };
+    setTts(next);
+    saveTts(next);
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 600);
+  };
 
   useEffect(() => {
     if (open) {
@@ -109,8 +169,24 @@ export default function SettingsOverlay({
   };
 
   // Same row schema as the old PanelSettings
+  const voiceOptions = [
+    ["", "System default"],
+    ...voices.map((v) => [v.name, `${v.name} (${v.lang})`]),
+  ];
   const rows = [
     ...PREF_FIELDS.map((f) => ({ kind: "field", ...f })),
+    {
+      kind: "tts",
+      key: "tts_voice",
+      label: "TTS VOICE",
+      value: tts.voiceName || "System default",
+    },
+    {
+      kind: "tts",
+      key: "tts_rate",
+      label: "TTS SPEED",
+      value: `${tts.rate.toFixed(2)}×`,
+    },
     {
       kind: "action",
       key: "mute",
@@ -258,6 +334,48 @@ export default function SettingsOverlay({
                   </option>
                 ))}
               </select>
+            )}
+
+            {selected.kind === "tts" && selected.key === "tts_voice" && (
+              <>
+                <select
+                  value={tts.voiceName || ""}
+                  onChange={(e) => updateTts({ voiceName: e.target.value || null })}
+                  className="panel-input"
+                  data-testid="settings-tts-voice"
+                >
+                  {voiceOptions.map(([v, label]) => (
+                    <option key={v} value={v}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <p className="panel-detail-hint">
+                  Pick a voice for spoken subtitles. Voices depend on your
+                  browser / OS. "System default" uses the browser's built-in.
+                </p>
+              </>
+            )}
+
+            {selected.kind === "tts" && selected.key === "tts_rate" && (
+              <>
+                <input
+                  type="range"
+                  min="0.8"
+                  max="1.5"
+                  step="0.05"
+                  value={tts.rate}
+                  onChange={(e) =>
+                    updateTts({ rate: parseFloat(e.target.value) })
+                  }
+                  className="panel-input"
+                  data-testid="settings-tts-rate"
+                />
+                <p className="panel-detail-hint">
+                  Speaking rate (0.8–1.5×). Higher is faster. Applies to the
+                  next spoken subtitle.
+                </p>
+              </>
             )}
 
             {selected.kind === "action" && selected.key === "mute" && (

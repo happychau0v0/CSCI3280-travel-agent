@@ -5,7 +5,7 @@ import Subtitle from "./components/Subtitle";
 import ChatPopover from "./components/ChatPopover";
 import AgentStatusBar from "./components/AgentStatusBar";
 import HistoryOverlay from "./components/HistoryOverlay";
-import SettingsOverlay from "./components/SettingsOverlay";
+import SettingsOverlay, { loadTts } from "./components/SettingsOverlay";
 import PanelHome from "./components/panels/PanelHome";
 import PanelFlights from "./components/panels/PanelFlights";
 import PanelHotels from "./components/panels/PanelHotels";
@@ -118,7 +118,12 @@ function App() {
   const tripDates = loadTripDates(); // edited via PanelProfile in the future
   const { location: userLocation, requestPermission } = useGeolocation();
   const menu = useMenuState();
-  const subtitles = useSubtitleQueue({ muted });
+  const [tts, setTts] = useState(() => loadTts());
+  const subtitles = useSubtitleQueue({
+    muted,
+    rate: tts.rate,
+    voiceName: tts.voiceName,
+  });
   const cues = useAudioCues({ muted });
 
   // Compute the size of the active panel's left list so the keyboard
@@ -629,6 +634,7 @@ function App() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onChange={setPreferences}
+        onTtsChange={setTts}
         muted={muted}
         onToggleMute={() => setMuted((m) => !m)}
         onClearAll={handleClearAll}
