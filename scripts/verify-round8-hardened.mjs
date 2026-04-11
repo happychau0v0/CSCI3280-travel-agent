@@ -2998,6 +2998,101 @@ const FAKE_MESSAGES = [
     `collapse: ${collapseActive} expand: ${expandStillActive}`,
   );
 
+  // ─── PHASE 25 — Round 16 notes + share + subtitle history ─────────
+  console.log('\n=== Phase 25: Round 16 notes + share + subtitle history ===');
+
+  // 25.1 — Activity note input appears when a real activity is
+  // expanded (click to expand, then look for the note input).
+  await clearAll(page);
+  await seed(page, { itinerary: R15_ITIN });
+  await page.keyboard.press('4');
+  await page.waitForTimeout(400);
+  // Click activity row 1 (Senso-ji on day 1) to expand
+  await page.locator('[data-testid="activity-row-1"]').click();
+  await page.waitForTimeout(200);
+  const noteInput = await page.locator('[data-testid="activity-note-1"]').count();
+  record('25.1 Activity note input renders when expanded', noteInput === 1);
+
+  // 25.2 — Typing a note + blur persists to currentItinerary
+  if (noteInput === 1) {
+    await page.locator('[data-testid="activity-note-1"]').fill('Reserve ahead');
+    await page.locator('[data-testid="activity-note-1"]').blur();
+    await page.waitForTimeout(200);
+    dbg = await debugState(page);
+    const act = dbg?.itinerary?.days?.[0]?.activities?.[1];
+    record(
+      '25.2 Note persists on the activity',
+      act?.user_note === 'Reserve ahead',
+      `note: ${act?.user_note}`,
+    );
+  } else {
+    record('25.2 (skipped — no note input)', false);
+  }
+
+  // 25.3 — Plan history SHARE button renders
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'travel-plan-history',
+      JSON.stringify([
+        {
+          id: 'sh1',
+          created_at: Date.now(),
+          destination: 'Tokyo',
+          origin: 'Hong Kong',
+          start_date: '2026-05-15',
+          end_date: '2026-05-18',
+          day_count: 3,
+          itinerary: { destination: 'Tokyo' },
+          messages: [],
+        },
+      ]),
+    );
+  });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(500);
+  await page.locator('body').click();
+  await page.waitForTimeout(200);
+  const shareBtnCount = await page.locator('[data-testid="plan-history-share-sh1"]').count();
+  record('25.3 Plan history card has a SHARE button', shareBtnCount === 1);
+
+  // 25.4 — Subtitle history toggle appears after a subtitle has
+  // been pushed. Seed by installing a stream mock that emits a
+  // tool narration + done.
+  await clearAll(page);
+  await installStreamMock(page, [
+    { type: 'tool_start', data: { name: 'search_places', args: {} } },
+    { type: 'done', data: { reply: 'Planning complete for Tokyo.', itinerary: FAKE_ITINERARY, tool_calls_made: [] } },
+  ]);
+  await page.locator('.tab-strip').click().catch(() => {});
+  await page.waitForTimeout(150);
+  await page.keyboard.press('t');
+  await page.waitForTimeout(200);
+  await page.locator('.chat-popover input[type="text"]').fill('plan tokyo');
+  await page.keyboard.press('Enter');
+  await waitFor(async () => {
+    const d = await debugState(page);
+    return d?.agentState === 'idle' && (d?.itinerary?.destination || null) != null;
+  }, 4000);
+  await page.waitForTimeout(500);
+  await clearStreamMock(page);
+
+  const historyToggle = await page.locator('[data-testid="subtitle-history-toggle"]').count();
+  record(
+    '25.4 Subtitle history toggle appears after narration',
+    historyToggle >= 1,
+    `count: ${historyToggle}`,
+  );
+
+  // 25.5 — Clicking the toggle opens the history popover
+  if (historyToggle >= 1) {
+    await page.locator('[data-testid="subtitle-history-toggle"]').click();
+    await page.waitForTimeout(200);
+    const popoverOpen = await page.locator('[data-testid="subtitle-history"]').count();
+    record('25.5 Clicking toggle opens subtitle history popover', popoverOpen === 1);
+  } else {
+    record('25.5 (skipped — no toggle)', false);
+  }
+
   // ─── PHASE 14 — Globe + idempotency + console sweep (5) ────────────
   console.log('\n=== Phase 14: Globe + final sweep ===');
   await page.keyboard.press('1');
