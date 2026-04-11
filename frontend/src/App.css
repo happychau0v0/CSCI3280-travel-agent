@@ -1003,6 +1003,37 @@
   letter-spacing: 0.04em;
 }
 
+/* Round 15 — DAYS expand/collapse controls */
+.day-expand-controls {
+  margin-left: 10px;
+  display: inline-flex;
+  gap: 4px;
+}
+
+.day-expand-chip {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  padding: 2px 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.1s;
+}
+
+.day-expand-chip:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.day-expand-chip.active {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* Round 14 — keyboard help overlay */
 .help-overlay-backdrop {
   position: fixed;

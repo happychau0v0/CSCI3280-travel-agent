@@ -35,6 +35,7 @@ function ActivityRow({
   isAirport,
   isActive,
   isDragTarget,
+  expandOverride,
   onClick,
   onDragStart,
   onDragOver,
@@ -44,7 +45,13 @@ function ActivityRow({
   onRemove,
   onReplace,
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expandedLocal, setExpandedLocal] = useState(false);
+  // Round 15 — when expandOverride is non-null (from expand/collapse
+  // all button), use it and ignore local toggle state.
+  const expanded = expandOverride != null ? expandOverride : expandedLocal;
+  const setExpanded = (v) => {
+    if (expandOverride == null) setExpandedLocal(v);
+  };
   const gallery =
     activity.photos?.length > 0
       ? activity.photos
@@ -159,6 +166,9 @@ export default function PanelDays({
   // Round 13 — drag state for activity reordering within a day.
   const [dragFromIdx, setDragFromIdx] = useState(-1);
   const [dragOverIdx, setDragOverIdx] = useState(-1);
+  // Round 15 — null = per-row local toggle, true = all expanded,
+  // false = all collapsed.
+  const [expandAllOverride, setExpandAllOverride] = useState(null);
 
   if (days.length === 0) {
     return (
@@ -252,6 +262,24 @@ export default function PanelDays({
           {" · "}
           <strong>{activities.length}</strong>
           <span className="home-summary-meta"> stops</span>
+          <span className="day-expand-controls">
+            <button
+              type="button"
+              className={`day-expand-chip${expandAllOverride === true ? " active" : ""}`}
+              onClick={() => setExpandAllOverride(expandAllOverride === true ? null : true)}
+              data-testid="day-expand-all"
+            >
+              EXPAND ALL
+            </button>
+            <button
+              type="button"
+              className={`day-expand-chip${expandAllOverride === false ? " active" : ""}`}
+              onClick={() => setExpandAllOverride(expandAllOverride === false ? null : false)}
+              data-testid="day-collapse-all"
+            >
+              COLLAPSE
+            </button>
+          </span>
         </div>
         {days.some((d) => d.weather) && (
           <div className="day-forecast-strip" data-testid="day-forecast-strip">
@@ -327,6 +355,7 @@ export default function PanelDays({
               isAirport={/airport/i.test(act.name || "")}
               isActive={i === activeActivityIdx}
               isDragTarget={i === dragOverIdx && dragFromIdx !== i}
+              expandOverride={expandAllOverride}
               onClick={() => setActiveActivityIdx(i)}
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}
