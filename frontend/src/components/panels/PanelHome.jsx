@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import PlanHistoryPanel from "../PlanHistoryPanel";
+import { formatDisplayPrice } from "../SettingsOverlay";
 
 /**
  * PLAN (was HOME) — the trip-setup panel. Left = editable form,
@@ -166,6 +167,56 @@ function buildPrompt(form) {
   );
 }
 
+// Round 15 — rough estimate of per-person, per-night hotel cost by
+// Google Places price_level. Pure HKD approximations.
+const HOTEL_NIGHTLY_HKD = {
+  PRICE_LEVEL_FREE: 0,
+  PRICE_LEVEL_INEXPENSIVE: 600,
+  PRICE_LEVEL_MODERATE: 1200,
+  PRICE_LEVEL_EXPENSIVE: 2500,
+  PRICE_LEVEL_VERY_EXPENSIVE: 4500,
+};
+
+const DEFAULT_ACTIVITY_COST_HKD = 250;
+
+function computeTripCostHkd(itinerary) {
+  if (!itinerary) return null;
+  const party = Number(itinerary.party_size) || 1;
+  // Flight: party * price_low of the picked or recommended option
+  const flight = itinerary.flight;
+  const flightOpt = itinerary.selected_flight || flight?.options?.[0] || null;
+  const flightCost =
+    flightOpt && typeof flightOpt.price_low === "number"
+      ? flightOpt.price_low * party
+      : 0;
+  // Hotel: price_level → nightly rate × nights × 1 (shared room)
+  const hotel = itinerary.selected_hotel || itinerary.hotels?.[0] || null;
+  const days = itinerary.days || [];
+  const nights = Math.max(0, days.length - 1);
+  const nightly = hotel ? HOTEL_NIGHTLY_HKD[hotel.price_level] ?? 1200 : 0;
+  const hotelCost = nightly * nights;
+  // Activities: rough DEFAULT_ACTIVITY_COST_HKD per non-hotel, non-airport activity × party
+  const hotelName = hotel?.name || null;
+  let activityCount = 0;
+  for (const d of days) {
+    for (const a of d.activities || []) {
+      if (a.name === hotelName) continue;
+      if (/airport/i.test(a.name || "")) continue;
+      activityCount += 1;
+    }
+  }
+  const activityCost = activityCount * DEFAULT_ACTIVITY_COST_HKD * party;
+  return {
+    total: flightCost + hotelCost + activityCost,
+    flight: flightCost,
+    hotel: hotelCost,
+    activity: activityCost,
+    activityCount,
+    nights,
+    party,
+  };
+}
+
 export default function PanelHome({
   itinerary,
   userLocation,
@@ -175,6 +226,7 @@ export default function PanelHome({
   isLoading = false,
   pendingInputRequest = null,
   planHistory = [],
+  currency = "HKD",
   onLoadPlan,
   onDeletePlan,
   onImportPlan,
@@ -320,6 +372,21 @@ export default function PanelHome({
             Fill the form on the left and press START PLANNING
           </div>
         )}
+        {(() => {
+          const cost = computeTripCostHkd(itinerary);
+          if (!cost || cost.total <= 0) return null;
+          return (
+            <div className="home-summary-cost" data-testid="home-summary-cost">
+              <span className="home-summary-meta">EST TOTAL</span>{" "}
+              <strong>{formatDisplayPrice(cost.total, currency)}</strong>
+              <span className="home-summary-meta">
+                {" "}· flight {formatDisplayPrice(cost.flight, currency)}
+                {cost.hotel > 0 && ` · hotel ${formatDisplayPrice(cost.hotel, currency)}`}
+                {cost.activity > 0 && ` · ${cost.activityCount} stops`}
+              </span>
+            </div>
+          );
+        })()}
         <div className="home-template-strip" data-testid="home-template-strip">
           <span className="home-template-label">QUICK START</span>
           {TEMPLATES.map((tpl) => (

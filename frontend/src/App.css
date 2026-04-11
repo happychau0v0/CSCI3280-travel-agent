@@ -936,6 +936,21 @@
   color: var(--accent);
 }
 
+/* Round 15 — trip cost summary row in the PLAN top-center band */
+.home-summary-cost {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text);
+  letter-spacing: 0.04em;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+}
+
+.home-summary-cost strong {
+  color: var(--accent);
+  font-size: 14px;
+}
+
 /* Round 14 — keyboard help overlay */
 .help-overlay-backdrop {
   position: fixed;

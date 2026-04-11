@@ -798,6 +798,7 @@ function App() {
             isLoading={isLoading}
             pendingInputRequest={pendingInputRequest}
             planHistory={planHistory}
+            currency={currency}
             onLoadPlan={(id) => {
               loadPlanFromHistory(id);
               setPanelWithCue("FLIGHTS");
