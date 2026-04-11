@@ -826,14 +826,15 @@ const FAKE_MESSAGES = [
   const settingsVisible = await page.locator('.settings-overlay').isVisible().catch(() => false);
   record('10.1 S opens SETTINGS overlay', settingsVisible);
 
-  // Round 14 — 12 rows (5 prefs + 2 TTS + theme + currency + mute +
-  // clear + about). Row indices: 0..4 prefs, 5 tts_voice, 6 tts_rate,
-  // 7 theme, 8 currency, 9 mute, 10 clear, 11 about.
+  // Round 17 — 13 rows (5 prefs + 2 TTS + theme + currency +
+  // subtitle_size + mute + clear + about). Row indices: 0..4 prefs,
+  // 5 tts_voice, 6 tts_rate, 7 theme, 8 currency, 9 subtitle_size,
+  // 10 mute, 11 clear, 12 about.
   const settingsRows = await page.locator('.settings-overlay .panel-list-item').count();
-  record('10.2 SETTINGS has 12 rows (incl. CURRENCY)', settingsRows === 12);
+  record('10.2 SETTINGS has 13 rows (incl. SUBTITLE SIZE)', settingsRows === 13);
 
-  // ↓ × 9 to reach mute row (index 9)
-  for (let i = 0; i < 9; i++) {
+  // ↓ × 10 to reach mute row (index 10)
+  for (let i = 0; i < 10; i++) {
     await page.keyboard.press('ArrowDown');
     await page.waitForTimeout(80);
   }
@@ -3091,6 +3092,74 @@ const FAKE_MESSAGES = [
     record('25.5 Clicking toggle opens subtitle history popover', popoverOpen === 1);
   } else {
     record('25.5 (skipped — no toggle)', false);
+  }
+
+  // ─── PHASE 26 — Round 17 print + subtitle size + phrasebook ───────
+  console.log('\n=== Phase 26: Round 17 print + subtitle size + phrasebook ===');
+
+  // 26.1 — Press P opens the print view
+  await clearAll(page);
+  await seed(page, { itinerary: R15_ITIN });
+  await page.waitForTimeout(200);
+  await page.locator('.tab-strip').click().catch(() => {});
+  await page.waitForTimeout(150);
+  await page.keyboard.press('p');
+  await page.waitForTimeout(300);
+  const printVisible = await page.locator('[data-testid="print-view"]').count();
+  record('26.1 Press P opens the print view', printVisible === 1);
+
+  // 26.2 — Print view shows destination heading
+  if (printVisible === 1) {
+    const printText = await page.locator('.print-itinerary').innerText();
+    record(
+      '26.2 Print view shows destination heading',
+      printText.toLowerCase().includes('tokyo'),
+      `contains Tokyo: ${printText.toLowerCase().includes('tokyo')}`,
+    );
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+  } else {
+    record('26.2 (skipped — no print view)', false);
+  }
+
+  // 26.3 — SETTINGS has a SUBTITLE SIZE row
+  await clearAll(page);
+  await page.locator('.tab-strip').click().catch(() => {});
+  await page.waitForTimeout(150);
+  await page.keyboard.press('s');
+  await page.waitForTimeout(300);
+  const sizeRowCount = await page.locator('.settings-overlay .panel-list-item')
+    .filter({ hasText: 'SUBTITLE SIZE' }).count();
+  record('26.3 SETTINGS has a SUBTITLE SIZE row', sizeRowCount >= 1);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+
+  // 26.4 — Phrasebook card renders when itinerary has phrasebook
+  const PHRASEBOOK_ITIN = {
+    ...R15_ITIN,
+    phrasebook: {
+      language: 'Japanese',
+      language_code: 'ja',
+      phrases: [
+        { key: 'hello', english: 'Hello', romanized: 'Konnichiwa', native: 'こんにちは' },
+        { key: 'thank_you', english: 'Thank you', romanized: 'Arigatou', native: 'ありがとう' },
+        { key: 'where_is_bathroom', english: 'Where bathroom', romanized: 'Toire wa doko', native: 'トイレ' },
+      ],
+    },
+  };
+  await clearAll(page);
+  await seed(page, { itinerary: PHRASEBOOK_ITIN });
+  await page.keyboard.press('4');
+  await page.waitForTimeout(400);
+  const phrasebookCard = await page.locator('[data-testid="day-phrasebook"]').count();
+  record('26.4 DAYS renders phrasebook card when present', phrasebookCard === 1);
+
+  // 26.5 — Phrasebook shows at least 3 rows
+  if (phrasebookCard === 1) {
+    const phraseRows = await page.locator('.day-phrasebook-row').count();
+    record('26.5 Phrasebook shows ≥3 rows', phraseRows >= 3, `rows: ${phraseRows}`);
+  } else {
+    record('26.5 (skipped — no phrasebook)', false);
   }
 
   // ─── PHASE 14 — Globe + idempotency + console sweep (5) ────────────
