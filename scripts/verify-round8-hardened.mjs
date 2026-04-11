@@ -826,14 +826,14 @@ const FAKE_MESSAGES = [
   const settingsVisible = await page.locator('.settings-overlay').isVisible().catch(() => false);
   record('10.1 S opens SETTINGS overlay', settingsVisible);
 
-  // Round 12 — 11 rows (5 prefs + 2 TTS + theme + mute + clear + about).
-  // Row indices: 0..4 prefs, 5 tts_voice, 6 tts_rate, 7 theme, 8 mute,
-  // 9 clear, 10 about.
+  // Round 14 — 12 rows (5 prefs + 2 TTS + theme + currency + mute +
+  // clear + about). Row indices: 0..4 prefs, 5 tts_voice, 6 tts_rate,
+  // 7 theme, 8 currency, 9 mute, 10 clear, 11 about.
   const settingsRows = await page.locator('.settings-overlay .panel-list-item').count();
-  record('10.2 SETTINGS has 11 rows (incl. THEME)', settingsRows === 11);
+  record('10.2 SETTINGS has 12 rows (incl. CURRENCY)', settingsRows === 12);
 
-  // ↓ × 8 to reach mute row (index 8)
-  for (let i = 0; i < 8; i++) {
+  // ↓ × 9 to reach mute row (index 9)
+  for (let i = 0; i < 9; i++) {
     await page.keyboard.press('ArrowDown');
     await page.waitForTimeout(80);
   }
@@ -2793,6 +2793,93 @@ const FAKE_MESSAGES = [
     hotelDraggable !== 'true',
     `draggable: ${hotelDraggable}`,
   );
+
+  // ─── PHASE 23 — Round 14 templates + currency + help overlay ──────
+  console.log('\n=== Phase 23: Round 14 templates + currency + help ===');
+
+  // 23.1 — Quick-start template chips render on PLAN
+  await clearAll(page);
+  await page.waitForTimeout(300);
+  const templatesPresent = await page.locator('[data-testid="home-template-strip"]').count();
+  record('23.1 PLAN has quick-start template strip', templatesPresent === 1);
+
+  // 23.2 — Clicking FOODIE template fills the interests field
+  await page.locator('[data-testid="home-template-foodie"]').click();
+  await page.waitForTimeout(200);
+  const interestsValue = await page.locator('[data-testid="home-input-interests"]').inputValue();
+  record(
+    '23.2 FOODIE template fills interests',
+    /restaurant|food|market/.test(interestsValue),
+    `interests: ${interestsValue}`,
+  );
+
+  // 23.3 — HONEYMOON template sets seat_class to business
+  await page.locator('[data-testid="home-template-honeymoon"]').click();
+  await page.waitForTimeout(200);
+  const seatValue = await page.locator('[data-testid="home-input-seat_class"]').inputValue();
+  record(
+    '23.3 HONEYMOON template sets seat_class=business',
+    seatValue === 'business',
+    `seat: ${seatValue}`,
+  );
+
+  // 23.4 — SETTINGS has a CURRENCY row
+  await clearAll(page);
+  await page.locator('.tab-strip').click().catch(() => {});
+  await page.waitForTimeout(150);
+  await page.keyboard.press('s');
+  await page.waitForTimeout(300);
+  const currencyRowCount = await page.locator('.settings-overlay .panel-list-item')
+    .filter({ hasText: 'CURRENCY' }).count();
+  record('23.4 SETTINGS has a CURRENCY row', currencyRowCount >= 1);
+
+  // 23.5 — Currency cycles on Space
+  const currencyBefore = await page.locator('.settings-overlay .panel-list-item')
+    .filter({ hasText: 'CURRENCY' }).first().innerText();
+  // Nav down to CURRENCY row (index 8 now: 5 prefs + 2 tts + theme + currency)
+  // Press ArrowDown 8 times from index 0
+  for (let i = 0; i < 8; i++) {
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(50);
+  }
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(300);
+  const currencyAfter = await page.locator('.settings-overlay .panel-list-item')
+    .filter({ hasText: 'CURRENCY' }).first().innerText();
+  record(
+    '23.5 CURRENCY value changes on Space activation',
+    currencyBefore !== currencyAfter,
+    `before: ${currencyBefore.slice(0, 30)} after: ${currencyAfter.slice(0, 30)}`,
+  );
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+
+  // 23.6 — Press ? opens the help overlay
+  await clearAll(page);
+  await page.locator('.tab-strip').click().catch(() => {});
+  await page.waitForTimeout(150);
+  await page.keyboard.press('?');
+  await page.waitForTimeout(300);
+  const helpVisible = await page.locator('[data-testid="help-overlay"]').count();
+  record('23.6 Press ? opens HelpOverlay', helpVisible === 1);
+
+  // 23.7 — Help overlay lists at least one ⌘Z row
+  if (helpVisible === 1) {
+    const helpText = await page.locator('.help-overlay').innerText();
+    record(
+      '23.7 Help overlay lists ⌘Z Undo row',
+      helpText.includes('Undo'),
+      `contains Undo: ${helpText.includes('Undo')}`,
+    );
+    // 23.8 — Esc closes help
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    const helpGone = await page.locator('[data-testid="help-overlay"]').count();
+    record('23.8 Esc closes help overlay', helpGone === 0);
+  } else {
+    record('23.7 (skipped — help overlay not visible)', false);
+    record('23.8 (skipped — help overlay not visible)', false);
+  }
 
   // ─── PHASE 14 — Globe + idempotency + console sweep (5) ────────────
   console.log('\n=== Phase 14: Globe + final sweep ===');
