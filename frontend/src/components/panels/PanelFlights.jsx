@@ -203,16 +203,49 @@ export default function PanelFlights({ itinerary, listIndex, onSelect, onPick })
         )}
       </aside>
 
-      {/* BOTTOM band — stops detail when >0 stops */}
-      {selected && selected.stops > 0 && (
-        <footer className="panel-grid-bottom-band home-summary-top">
-          <div className="home-card-label">STOPS DETAIL</div>
-          <div className="home-summary-line">
-            {selected.stops} {selected.stops === 1 ? "stop" : "stops"} · total{" "}
-            <strong>{formatDuration(selected.duration_min)}</strong>
-          </div>
-        </footer>
-      )}
+      {/* BOTTOM band — stops detail and alternate airports */}
+      {(() => {
+        const altFrom = (flight.from_alternates || []).slice(0, 3);
+        const altTo = (flight.to_alternates || []).slice(0, 3);
+        const hasStops = selected && selected.stops > 0;
+        const hasAlts = altFrom.length > 0 || altTo.length > 0;
+        if (!hasStops && !hasAlts) return null;
+        return (
+          <footer className="panel-grid-bottom-band home-summary-top">
+            {hasStops && (
+              <>
+                <div className="home-card-label">STOPS DETAIL</div>
+                <div className="home-summary-line">
+                  {selected.stops} {selected.stops === 1 ? "stop" : "stops"} · total{" "}
+                  <strong>{formatDuration(selected.duration_min)}</strong>
+                </div>
+              </>
+            )}
+            {hasAlts && (
+              <>
+                <div className="home-card-label" style={{ marginTop: hasStops ? 8 : 0 }}>
+                  ALSO NEARBY
+                </div>
+                <div className="home-summary-line" style={{ fontSize: 11 }}>
+                  {altFrom.length > 0 && (
+                    <>
+                      From {flight.from_iata}:{" "}
+                      {altFrom.map((a) => `${a.iata} (${a.km_from_primary}km)`).join(", ")}
+                      {altTo.length > 0 && <span> · </span>}
+                    </>
+                  )}
+                  {altTo.length > 0 && (
+                    <>
+                      To {flight.to_iata}:{" "}
+                      {altTo.map((a) => `${a.iata} (${a.km_from_primary}km)`).join(", ")}
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </footer>
+        );
+      })()}
     </section>
   );
 }

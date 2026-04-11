@@ -343,15 +343,25 @@ class FlightOption(BaseModel):
     seat_class_label: str | None = None
 
 
+class AlternateAirport(BaseModel):
+    iata: str
+    name: str
+    lat: float
+    lng: float
+    km_from_primary: float | None = None
+
+
 class Flight(BaseModel):
     from_city: str
     from_iata: str
     from_lat: float | None = None
     from_lng: float | None = None
+    from_alternates: list[AlternateAirport] = []
     to_city: str
     to_iata: str
     to_lat: float | None = None
     to_lng: float | None = None
+    to_alternates: list[AlternateAirport] = []
     date: str | None = None
     airline: str | None = None
     estimate_low: float | None = None

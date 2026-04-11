@@ -42,6 +42,7 @@ from datetime import datetime, timezone
 from urllib.parse import quote_plus
 
 from app.tools.airports import lookup as lookup_airport
+from app.tools.airports import lookup_alternates as lookup_airport_alternates
 
 logger = logging.getLogger(__name__)
 
@@ -567,17 +568,38 @@ async def search_flights(
     # FlightCards that don't iterate options still render meaningful values.
     primary = options[0]
 
+    # Round 12 — surface alternate airports near either end so the
+    # user knows they have options (e.g. Tokyo HND vs NRT). Each
+    # entry carries the IATA, full name, and haversine distance
+    # from the primary airport.
+    def _alternates(city: str, anchor_lat: float, anchor_lng: float) -> list[dict]:
+        out = []
+        for iata, name, lat, lng in lookup_airport_alternates(city):
+            out.append({
+                "iata": iata,
+                "name": name,
+                "lat": lat,
+                "lng": lng,
+                "km_from_primary": round(_haversine_km(anchor_lat, anchor_lng, lat, lng), 1),
+            })
+        return out
+
+    from_alternates = _alternates(origin, from_lat, from_lng)
+    to_alternates = _alternates(destination, to_lat, to_lng)
+
     return {
         "from_city": origin.split(",")[0].strip(),
         "from_iata": from_iata,
         "from_name": from_name,
         "from_lat": from_lat,
         "from_lng": from_lng,
+        "from_alternates": from_alternates,
         "to_city": destination.split(",")[0].strip(),
         "to_iata": to_iata,
         "to_name": to_name,
         "to_lat": to_lat,
         "to_lng": to_lng,
+        "to_alternates": to_alternates,
         "date": date,
         "distance_km": round(distance_km),
         "currency": "HKD",

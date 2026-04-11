@@ -851,6 +851,33 @@ async def test_search_flights_unknown_seat_class_falls_back_to_economy():
     assert result["seat_class"] == "economy"
 
 
+@pytest.mark.asyncio
+async def test_search_flights_includes_alternate_airports():
+    """Round 12 — Tokyo has HND as a nearby alternate; the return
+    dict surfaces it under to_alternates with a km distance."""
+    with patch("app.tools.flights._try_fast_flights", return_value=[]):
+        result = await flights.search_flights("Hong Kong", "Tokyo", "2026-06-01")
+    assert isinstance(result["to_alternates"], list)
+    assert any(a["iata"] == "HND" for a in result["to_alternates"])
+    hnd = next(a for a in result["to_alternates"] if a["iata"] == "HND")
+    assert hnd["km_from_primary"] > 0
+    # Hong Kong has no bundled alternates — from_alternates should be empty
+    assert result["from_alternates"] == []
+
+
+@pytest.mark.asyncio
+async def test_search_flights_london_has_multiple_alternates():
+    """London has LGW + STN + LTN alternates."""
+    with patch("app.tools.flights._try_fast_flights", return_value=[]):
+        result = await flights.search_flights("New York", "London", "2026-06-01")
+    iatas = {a["iata"] for a in result["to_alternates"]}
+    assert "LGW" in iatas
+    assert "STN" in iatas
+    # NYC from_alternates include EWR + LGA
+    from_iatas = {a["iata"] for a in result["from_alternates"]}
+    assert "EWR" in from_iatas or "LGA" in from_iatas
+
+
 # ─── flights.py round 9 — 4-6 options ────────────────────────────────────
 
 

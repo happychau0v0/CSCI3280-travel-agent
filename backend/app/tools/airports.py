@@ -104,3 +104,77 @@ def lookup(city: str) -> tuple[str, str, float, float] | None:
     if key.endswith(" airport"):
         key = key[: -len(" airport")]
     return AIRPORTS.get(key)
+
+
+# Round 12 — alternate airports per metro area. Key is the primary
+# city (as it appears in AIRPORTS); value is a list of (iata, name,
+# lat, lng) tuples for OTHER nearby airports the user might consider.
+# Kept small — the user's "please wait, is this close enough?" question
+# is answered by the primary airport plus these alternates.
+CITY_ALTERNATES: dict[str, list[tuple[str, str, float, float]]] = {
+    "tokyo": [("HND", "Tokyo Haneda", 35.5494, 139.7798)],
+    "osaka": [("ITM", "Osaka Itami (domestic)", 34.7854, 135.4383)],
+    "seoul": [("GMP", "Seoul Gimpo", 37.5583, 126.7908)],
+    "new york": [
+        ("EWR", "Newark Liberty", 40.6925, -74.1687),
+        ("LGA", "New York LaGuardia", 40.7769, -73.8740),
+    ],
+    "los angeles": [
+        ("BUR", "Hollywood Burbank", 34.2007, -118.3587),
+        ("LGB", "Long Beach", 33.8177, -118.1516),
+    ],
+    "san francisco": [
+        ("OAK", "Oakland International", 37.7213, -122.2208),
+        ("SJC", "San Jose International", 37.3626, -121.9290),
+    ],
+    "london": [
+        ("LGW", "London Gatwick", 51.1537, -0.1821),
+        ("STN", "London Stansted", 51.8860, 0.2389),
+        ("LTN", "London Luton", 51.8747, -0.3683),
+    ],
+    "paris": [
+        ("ORY", "Paris Orly", 48.7233, 2.3794),
+        ("BVA", "Paris Beauvais", 49.4544, 2.1128),
+    ],
+    "milan": [
+        ("LIN", "Milan Linate", 45.4451, 9.2767),
+        ("BGY", "Bergamo Orio al Serio", 45.6739, 9.7042),
+    ],
+    "rome": [("CIA", "Rome Ciampino", 41.7994, 12.5949)],
+    "moscow": [
+        ("DME", "Moscow Domodedovo", 55.4088, 37.9063),
+        ("VKO", "Moscow Vnukovo", 55.5914, 37.2615),
+    ],
+    "chicago": [("MDW", "Chicago Midway", 41.7868, -87.7522)],
+    "washington": [
+        ("DCA", "Reagan National", 38.8521, -77.0377),
+        ("BWI", "Baltimore Washington", 39.1754, -76.6684),
+    ],
+    "houston": [("HOU", "Houston Hobby", 29.6454, -95.2788)],
+    "toronto": [("YTZ", "Billy Bishop (downtown)", 43.6275, -79.3962)],
+    "shanghai": [("SHA", "Shanghai Hongqiao", 31.1979, 121.3363)],
+    "beijing": [("PKX", "Beijing Daxing", 39.5098, 116.4105)],
+    "taipei": [("TSA", "Taipei Songshan (downtown)", 25.0697, 121.5519)],
+    "istanbul": [("SAW", "Istanbul Sabiha Gokcen", 40.8986, 29.3092)],
+    "dubai": [
+        ("DWC", "Dubai Al Maktoum", 24.8966, 55.1614),
+        ("AUH", "Abu Dhabi (alternate metro)", 24.4330, 54.6511),
+    ],
+    "bangkok": [("DMK", "Bangkok Don Mueang", 13.9130, 100.6066)],
+}
+
+
+def lookup_alternates(city: str) -> list[tuple[str, str, float, float]]:
+    """Return alternate airports near a given city, or [] if none.
+
+    Uses the same normalization as `lookup` so "Tokyo, Japan" and
+    "Tokyo" both map to the same alternates list.
+    """
+    if not city:
+        return []
+    key = city.strip().lower()
+    if "," in key:
+        key = key.split(",", 1)[0].strip()
+    if key.endswith(" airport"):
+        key = key[: -len(" airport")]
+    return CITY_ALTERNATES.get(key, [])
