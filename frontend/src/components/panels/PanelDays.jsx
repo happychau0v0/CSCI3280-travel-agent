@@ -395,7 +395,14 @@ export default function PanelDays({
         {(() => {
           const bad = badOutdoorWeather(selected?.weather);
           if (!bad) return null;
-          const outdoors = (activities || []).filter(isLikelyOutdoor);
+          // Exclude hotel bookends and airport activities from the
+          // outdoor check — "Park Hyatt" would otherwise match the
+          // "park" keyword and false-positive as outdoor.
+          const outdoors = (activities || []).filter((a) => {
+            if (hotelName && a.name === hotelName) return false;
+            if (/airport/i.test(a.name || "")) return false;
+            return isLikelyOutdoor(a);
+          });
           if (outdoors.length === 0) return null;
           return (
             <div

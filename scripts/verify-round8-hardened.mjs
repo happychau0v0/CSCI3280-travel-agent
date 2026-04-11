@@ -3162,6 +3162,90 @@ const FAKE_MESSAGES = [
     record('26.5 (skipped — no phrasebook)', false);
   }
 
+  // ─── PHASE 27 — Round 18 checklist + weather hint + pause ────────
+  console.log('\n=== Phase 27: Round 18 checklist + weather hint + pause ===');
+
+  // 27.1 — Press L opens the trip checklist
+  await clearAll(page);
+  await page.locator('.tab-strip').click().catch(() => {});
+  await page.waitForTimeout(150);
+  await page.keyboard.press('l');
+  await page.waitForTimeout(300);
+  const checklistVisible = await page.locator('[data-testid="trip-checklist"]').count();
+  record('27.1 Press L opens trip checklist', checklistVisible === 1);
+
+  // 27.2 — Checkbox toggle persists in localStorage
+  if (checklistVisible === 1) {
+    await page.locator('[data-testid="trip-checklist-passport"]').check();
+    await page.waitForTimeout(150);
+    const stored = await page.evaluate(() => {
+      try {
+        return JSON.parse(localStorage.getItem('travel-checklist') || '{}');
+      } catch {
+        return {};
+      }
+    });
+    const anyChecked = Object.values(stored).some((v) => v?.passport === true);
+    record(
+      '27.2 Checkbox persists to localStorage',
+      anyChecked,
+      `stored: ${JSON.stringify(stored).slice(0, 60)}`,
+    );
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+  } else {
+    record('27.2 (skipped — checklist not open)', false);
+  }
+
+  // 27.3 — Weather hint appears when day has rainy weather + outdoor
+  const RAINY_DAY_ITIN = {
+    ...R15_ITIN,
+    days: [
+      {
+        day: 1, date: '2026-05-15', theme: 'Arrival',
+        weather: { condition: 'Rainy', temp_c: 17, icon: 'rainy' },
+        activities: [
+          { time: '09:00', name: 'Park Hyatt Tokyo', address: 'hotel', lat: 35.689, lng: 139.692 },
+          { time: '10:00', name: 'Ueno Park', address: 'Ueno', lat: 35.715, lng: 139.773 },
+          { time: '12:00', name: 'Senso-ji Temple', address: '2-3-1 Asakusa', lat: 35.715, lng: 139.796 },
+          { time: '20:00', name: 'Park Hyatt Tokyo', address: 'hotel', lat: 35.689, lng: 139.692 },
+        ],
+      },
+    ],
+  };
+  await clearAll(page);
+  await seed(page, { itinerary: RAINY_DAY_ITIN });
+  await page.keyboard.press('4');
+  await page.waitForTimeout(400);
+  const weatherHint = await page.locator('[data-testid="day-weather-hint"]').count();
+  record('27.3 Weather hint shows on rainy day with outdoor stops', weatherHint === 1);
+
+  // 27.4 — Weather hint does NOT appear when all activities are indoor
+  const RAINY_INDOOR_ITIN = {
+    ...R15_ITIN,
+    days: [
+      {
+        day: 1, date: '2026-05-15', theme: 'Arrival',
+        weather: { condition: 'Rainy', temp_c: 17, icon: 'rainy' },
+        activities: [
+          { time: '09:00', name: 'Park Hyatt Tokyo', address: 'hotel', lat: 35.689, lng: 139.692 },
+          { time: '10:00', name: 'Ueno Museum', address: 'Ueno', lat: 35.715, lng: 139.773 },
+          { time: '13:00', name: 'Ichiran Ramen', address: 'Shibuya', lat: 35.661, lng: 139.698 },
+          { time: '20:00', name: 'Park Hyatt Tokyo', address: 'hotel', lat: 35.689, lng: 139.692 },
+        ],
+      },
+    ],
+  };
+  await seed(page, { itinerary: RAINY_INDOOR_ITIN });
+  await page.keyboard.press('4');
+  await page.waitForTimeout(400);
+  const indoorHint = await page.locator('[data-testid="day-weather-hint"]').count();
+  record('27.4 No hint when all activities indoor on rainy day', indoorHint === 0);
+
+  // 27.5 — Subtitle bar exists with onMouseEnter/Leave wiring
+  const subtitleBar = await page.locator('[data-testid="subtitle-bar"]').count();
+  record('27.5 Subtitle bar carries data-testid', subtitleBar === 1);
+
   // ─── PHASE 14 — Globe + idempotency + console sweep (5) ────────────
   console.log('\n=== Phase 14: Globe + final sweep ===');
   await page.keyboard.press('1');
