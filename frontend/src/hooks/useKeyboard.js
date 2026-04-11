@@ -47,6 +47,7 @@ export function useKeyboard({
   onOpenHelp,
   onOpenPrint,
   onOpenChecklist,
+  onOpenFavorites,
   enabled = true,
 }) {
   useEffect(() => {
@@ -178,6 +179,15 @@ export function useKeyboard({
           }
           break;
 
+        case "f":
+        case "F":
+          // Round 20 — open the favorites overlay
+          if (!e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            onOpenFavorites?.();
+          }
+          break;
+
         case "h":
         case "H":
           if (!e.metaKey && !e.ctrlKey) {
@@ -241,5 +251,6 @@ export function useKeyboard({
     onOpenHelp,
     onOpenPrint,
     onOpenChecklist,
+    onOpenFavorites,
   ]);
 }

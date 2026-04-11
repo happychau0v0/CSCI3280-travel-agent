@@ -41,6 +41,7 @@ const GROUPS = [
       ["S", "Open SETTINGS overlay (preferences, theme, currency)"],
       ["P", "Open print-friendly trip view"],
       ["L", "Open trip checkList (packing + reminders)"],
+      ["F", "Open Favorites overlay"],
       ["?", "Open this keyboard help"],
     ],
   },
