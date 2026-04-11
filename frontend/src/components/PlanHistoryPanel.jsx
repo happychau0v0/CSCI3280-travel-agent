@@ -34,6 +34,49 @@ function downloadPlanAsJson(entry) {
   }
 }
 
+// Round 16 — copy a permalink URL that embeds the plan as base64
+// in the query string. Opening the URL in another browser imports
+// the plan automatically.
+function buildPlanPermalink(entry) {
+  try {
+    // Strip messages to keep the URL short — receiving browser
+    // still gets enough to render + re-load the itinerary.
+    const slim = {
+      destination: entry.destination,
+      origin: entry.origin,
+      start_date: entry.start_date,
+      end_date: entry.end_date,
+      day_count: entry.day_count,
+      itinerary: entry.itinerary,
+    };
+    const json = JSON.stringify(slim);
+    // Use unescape/btoa for UTF-8 safety
+    const b64 = btoa(unescape(encodeURIComponent(json)));
+    const url = new URL(window.location.href);
+    url.hash = `plan=${b64}`;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+async function copyPermalink(entry) {
+  const link = buildPlanPermalink(entry);
+  if (!link) return false;
+  try {
+    await navigator.clipboard.writeText(link);
+    return true;
+  } catch {
+    // Fallback: prompt so the user can copy manually
+    try {
+      window.prompt("Copy this shareable link:", link);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
 async function readImportedFile(file) {
   try {
     const text = await file.text();
@@ -156,6 +199,28 @@ export default function PlanHistoryPanel({ plans = [], onLoad, onDelete, onImpor
                   data-testid={`plan-history-load-${p.id}`}
                 >
                   LOAD
+                </button>
+                <button
+                  type="button"
+                  className="plan-history-card-btn share"
+                  onClick={async () => {
+                    const ok = await copyPermalink(p);
+                    if (ok) {
+                      // Brief visual confirmation via class toggle
+                      const el = document.querySelector(
+                        `[data-testid="plan-history-share-${p.id}"]`,
+                      );
+                      if (el) {
+                        el.classList.add("copied");
+                        setTimeout(() => el.classList.remove("copied"), 1500);
+                      }
+                    }
+                  }}
+                  data-testid={`plan-history-share-${p.id}`}
+                  aria-label="Copy shareable link"
+                  title="Copy shareable link"
+                >
+                  ⇪
                 </button>
                 <button
                   type="button"

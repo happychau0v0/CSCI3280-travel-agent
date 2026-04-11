@@ -363,6 +363,43 @@ function App() {
     applyTheme(loadTheme());
   }, []);
 
+  // Round 16 — check for a #plan=… hash on first mount; if one is
+  // present, decode the base64 JSON and import it into history +
+  // load it as the current itinerary so shared links "just work".
+  useEffect(() => {
+    try {
+      const hash = window.location.hash || "";
+      const match = hash.match(/plan=([^&]+)/);
+      if (!match) return;
+      const b64 = decodeURIComponent(match[1]);
+      const json = decodeURIComponent(escape(atob(b64)));
+      const parsed = JSON.parse(json);
+      if (!parsed?.itinerary?.destination) return;
+      // Strip the hash so a reload doesn't re-import
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      const fresh = {
+        id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+        created_at: Date.now(),
+        destination: parsed.destination,
+        origin: parsed.origin,
+        start_date: parsed.start_date,
+        end_date: parsed.end_date,
+        day_count: parsed.day_count,
+        itinerary: parsed.itinerary,
+        messages: [],
+      };
+      setPlanHistory((prev) => {
+        const next = [fresh, ...prev].slice(0, PLAN_HISTORY_MAX);
+        savePlanHistory(next);
+        return next;
+      });
+      setCurrentItinerary(fresh.itinerary);
+    } catch {
+      /* ignore malformed hashes */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Expose internal state to a window-level debug object so the
   // Playwright test can probe state without relying on CSS class
   // heuristics. Updated on every render via a tiny effect. No-op

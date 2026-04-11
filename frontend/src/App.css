@@ -808,6 +808,30 @@
   border-color: var(--accent-2);
 }
 
+.plan-history-card-btn.share {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.plan-history-card-btn.share:hover {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.plan-history-card-btn.share.copied {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+
+.plan-history-card-btn.share.copied::before {
+  content: "✓ ";
+}
+
 .plan-history-panel.plan-history-dragover {
   border-color: var(--accent);
   box-shadow: 0 0 24px var(--accent-glow);
