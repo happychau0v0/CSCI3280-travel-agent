@@ -200,12 +200,14 @@ async def _run_loop(
             }
         )
 
-        # Execute each tool call requested by the model. Tools may run in any
-        # order (we go sequentially for simplicity); errors are caught and
-        # reported back to the model as a structured error so it can recover
-        # gracefully — e.g. tell the user "the weather service is unavailable"
-        # instead of crashing the request.
-        for tc in msg.tool_calls:
+        # Execute tool calls in PARALLEL via asyncio.gather. The LLM
+        # often requests multiple independent calls per round
+        # (e.g. get_directions between several pairs of activities,
+        # or search_places for hotels + the next day's activities at
+        # once). Running them serially added ~15s per multi-day plan
+        # on the benchmark; gather brings that down to the slowest
+        # single call's latency.
+        async def _run_one(tc):
             fn_name = tc.function.name
             try:
                 fn_args = json.loads(tc.function.arguments or "{}")
@@ -243,13 +245,14 @@ async def _run_loop(
             if on_event is not None:
                 await on_event("tool_end", {"name": fn_name})
 
-            full_messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "content": json.dumps(tool_result, default=str),
-                }
-            )
+            return {
+                "role": "tool",
+                "tool_call_id": tc.id,
+                "content": json.dumps(tool_result, default=str),
+            }
+
+        tool_results = await asyncio.gather(*(_run_one(tc) for tc in msg.tool_calls))
+        full_messages.extend(tool_results)
     else:
         logger.warning("Hit MAX_TOOL_ROUNDS=%d without final reply", MAX_TOOL_ROUNDS)
 
