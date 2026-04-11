@@ -116,12 +116,13 @@ def _typical_duration_min(distance_km: float) -> int:
 
 
 def _build_options(distance_km: float, when: str | None) -> list[dict]:
-    """Return 1-3 flight options (non-stop, 1-stop, 1-stop budget) in HKD.
+    """Return at least 3 flight options in HKD for any distance.
 
-    Short hops (< 2000 km) only get the non-stop option since connecting
-    flights would take longer than driving and don't make economic sense.
-    Medium and long-haul routes get all three options so the user can
-    compare convenience vs price.
+    Round 11 — previously short-haul routes (<2000 km) returned only a
+    single non-stop option, which meant the user saw 1 flight card when
+    fast-flights was blocked. Now every route gets a baseline of 3
+    estimator options (early, day, evening) so there's always something
+    to compare. Medium/long-haul gets two additional 1-stop variants.
     """
     base_usd = _base_price_usd(distance_km)
     month = datetime.now(timezone.utc).month
@@ -134,17 +135,44 @@ def _build_options(distance_km: float, when: str | None) -> list[dict]:
     median_usd = base_usd * mult
     duration_direct = _typical_duration_min(distance_km)
 
-    # Non-stop is always present.
-    options = [
+    # Three synthetic non-stop time slots — early, midday, evening.
+    # The prices fan out around the median to reflect typical intraday
+    # variance: early flights cheaper, midday standard, evening a hair
+    # more expensive due to after-work demand.
+    options: list[dict] = [
         {
             "type": "non-stop",
-            "label": "Non-stop",
-            "price_low": _to_hkd(median_usd * 0.85),
-            "price_high": _to_hkd(median_usd * 1.30),
+            "label": "Non-stop · early",
+            "price_low": _to_hkd(median_usd * 0.80),
+            "price_high": _to_hkd(median_usd * 1.15),
             "duration_min": duration_direct,
             "stops": 0,
+            "departure_time": "06:30",
+            "arrival_time": _offset_hhmm("06:30", duration_direct),
             "recommended": True,
-        }
+        },
+        {
+            "type": "non-stop",
+            "label": "Non-stop · midday",
+            "price_low": _to_hkd(median_usd * 0.95),
+            "price_high": _to_hkd(median_usd * 1.25),
+            "duration_min": duration_direct,
+            "stops": 0,
+            "departure_time": "12:15",
+            "arrival_time": _offset_hhmm("12:15", duration_direct),
+            "recommended": False,
+        },
+        {
+            "type": "non-stop",
+            "label": "Non-stop · evening",
+            "price_low": _to_hkd(median_usd * 1.00),
+            "price_high": _to_hkd(median_usd * 1.35),
+            "duration_min": duration_direct,
+            "stops": 0,
+            "departure_time": "19:45",
+            "arrival_time": _offset_hhmm("19:45", duration_direct),
+            "recommended": False,
+        },
     ]
 
     if distance_km >= 2000:
@@ -157,6 +185,8 @@ def _build_options(distance_km: float, when: str | None) -> list[dict]:
                 "price_high": _to_hkd(median_usd * 1.05),
                 "duration_min": duration_direct + 90,
                 "stops": 1,
+                "departure_time": "08:00",
+                "arrival_time": _offset_hhmm("08:00", duration_direct + 90),
                 "recommended": False,
             }
         )
@@ -169,11 +199,24 @@ def _build_options(distance_km: float, when: str | None) -> list[dict]:
                 "price_high": _to_hkd(median_usd * 0.85),
                 "duration_min": duration_direct + 180,
                 "stops": 1,
+                "departure_time": "22:30",
+                "arrival_time": _offset_hhmm("22:30", duration_direct + 180),
                 "recommended": False,
             }
         )
 
     return options
+
+
+def _offset_hhmm(start: str, minutes: int) -> str:
+    """Add `minutes` to an HH:MM string, wrapping at 24h. Used by the
+    estimator to derive synthetic arrival times from departure + duration."""
+    try:
+        h, m = start.split(":")
+        total = (int(h) * 60 + int(m) + int(minutes)) % (24 * 60)
+        return f"{total // 60:02d}:{total % 60:02d}"
+    except (ValueError, AttributeError):
+        return start
 
 
 # ─── Google Flights deep link ─────────────────────────────────────────────
@@ -355,7 +398,15 @@ def _options_from_live(live: list[dict]) -> list[dict]:
     options: list[dict] = []
 
     def _add(flight: dict, type_str: str, label: str, recommended: bool) -> bool:
-        key = (flight.get("airline", ""), flight.get("price_num"))
+        # Round 11 — include departure_time in the dedupe key so two
+        # flights from the same airline at the same price but different
+        # times count as distinct options. Before this, e.g. a JAL
+        # 06:30 and a JAL 14:00 both at HK$1,300 collapsed into one.
+        key = (
+            flight.get("airline", ""),
+            flight.get("price_num"),
+            _normalize_time(flight.get("departure")) or "",
+        )
         if key in seen:
             return False
         seen.add(key)
@@ -402,16 +453,14 @@ def _options_from_live(live: list[dict]) -> list[dict]:
                 _add(candidate, "non-stop", "Premium non-stop", recommended=False)
                 break
 
-    # If we still don't have ≥4 options, pad first from remaining nonstops,
-    # then from remaining onestops. This guarantees a meaningful list when
-    # fast-flights returns few results or when most routes are 1-stops
-    # (e.g. smaller airports with limited direct service).
+    # Round 11 — pad up to 8 (not 6) from remaining nonstops and
+    # onestops so busy routes actually yield 7-8 distinct options.
     for candidate in nonstops:
-        if len(options) >= 6:
+        if len(options) >= 8:
             break
         _add(candidate, "non-stop", candidate.get("airline") or "Non-stop", recommended=False)
     for candidate in onestops:
-        if len(options) >= 6:
+        if len(options) >= 8:
             break
         label = candidate.get("airline") or "1 stop"
         _add(candidate, "1-stop", f"{label} · 1 stop", recommended=False)
