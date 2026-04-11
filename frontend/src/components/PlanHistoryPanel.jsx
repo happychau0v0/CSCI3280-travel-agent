@@ -3,12 +3,50 @@
  * Shows recent itineraries from localStorage["travel-plan-history"]
  * and lets the user re-load any past plan via a LOAD button.
  *
+ * Round 13 — each card also has an EXPORT button that downloads the
+ * plan as a JSON file. The panel is also a drop zone for .json
+ * files exported from another browser / device, so plans become
+ * portable without a backend.
+ *
  * Props:
  *   plans:    [{id, created_at, destination, origin, start_date,
  *              end_date, day_count, itinerary, messages}, ...]
  *   onLoad:   (id) => void — restore the plan into currentItinerary
  *   onDelete: (id) => void — remove from history
+ *   onImport: (entry) => void — accept an imported plan JSON
  */
+
+function downloadPlanAsJson(entry) {
+  try {
+    const json = JSON.stringify(entry, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const safeDest = (entry.destination || "plan").replace(/[^a-z0-9]+/gi, "-");
+    a.download = `travel-plan-${safeDest.toLowerCase()}-${entry.id}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+  } catch {
+    /* ignore — user's browser blocked blob downloads */
+  }
+}
+
+async function readImportedFile(file) {
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    if (!parsed || typeof parsed !== "object") return null;
+    // Accept either a single plan entry or an array of them.
+    const entry = Array.isArray(parsed) ? parsed[0] : parsed;
+    if (!entry?.itinerary?.destination) return null;
+    return entry;
+  } catch {
+    return null;
+  }
+}
 
 function formatDateRange(start, end) {
   if (!start) return "";
@@ -39,9 +77,32 @@ function formatRelativeTime(ts) {
   return new Date(ts).toLocaleDateString();
 }
 
-export default function PlanHistoryPanel({ plans = [], onLoad, onDelete }) {
+export default function PlanHistoryPanel({ plans = [], onLoad, onDelete, onImport }) {
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    e.currentTarget.classList.add("plan-history-dragover");
+  };
+  const handleDragLeave = (e) => {
+    e.currentTarget.classList.remove("plan-history-dragover");
+  };
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    e.currentTarget.classList.remove("plan-history-dragover");
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    const entry = await readImportedFile(file);
+    if (entry && onImport) onImport(entry);
+  };
+
   return (
-    <aside className="plan-history-panel" data-testid="plan-history-panel">
+    <aside
+      className="plan-history-panel"
+      data-testid="plan-history-panel"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <div className="plan-history-header">
         <span className="plan-history-chevron">◢</span>
         <span className="plan-history-label">PLAN HISTORY</span>
@@ -54,7 +115,8 @@ export default function PlanHistoryPanel({ plans = [], onLoad, onDelete }) {
           <p>No past plans yet.</p>
           <p className="plan-history-hint">
             Press START PLANNING to create your first trip. Every completed
-            plan shows up here so you can revisit or tweak it later.
+            plan shows up here so you can revisit or tweak it later. You
+            can also drag a .json plan export into this panel to import it.
           </p>
         </div>
       ) : (
@@ -94,6 +156,16 @@ export default function PlanHistoryPanel({ plans = [], onLoad, onDelete }) {
                   data-testid={`plan-history-load-${p.id}`}
                 >
                   LOAD
+                </button>
+                <button
+                  type="button"
+                  className="plan-history-card-btn export"
+                  onClick={() => downloadPlanAsJson(p)}
+                  data-testid={`plan-history-export-${p.id}`}
+                  aria-label="Export plan as JSON"
+                  title="Export as JSON"
+                >
+                  ↓
                 </button>
                 <button
                   type="button"

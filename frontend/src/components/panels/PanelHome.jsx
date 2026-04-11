@@ -114,6 +114,7 @@ export default function PanelHome({
   planHistory = [],
   onLoadPlan,
   onDeletePlan,
+  onImportPlan,
   onJumpTo,
   onPlan,
   onResolveInput,
@@ -385,6 +386,7 @@ export default function PanelHome({
           plans={planHistory}
           onLoad={onLoadPlan}
           onDelete={onDeletePlan}
+          onImport={onImportPlan}
         />
       </div>
     </section>

@@ -448,6 +448,25 @@ function App() {
     });
   }, []);
 
+  // Round 13 — accept a plan entry imported from a .json file drop.
+  // The file is parsed in PlanHistoryPanel and passed here as the
+  // already-validated entry object.
+  const importPlanEntry = useCallback((entry) => {
+    if (!entry?.itinerary?.destination) return;
+    // Rewrite id + created_at so imports don't collide with the
+    // user's existing local plans and always sort to the top.
+    const fresh = {
+      ...entry,
+      id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      created_at: Date.now(),
+    };
+    setPlanHistory((prev) => {
+      const next = [fresh, ...prev].slice(0, PLAN_HISTORY_MAX);
+      savePlanHistory(next);
+      return next;
+    });
+  }, []);
+
   const handleSend = useCallback(
     async (text, { editLast = false, truncateBefore = null } = {}) => {
       const userMsg = { role: "user", content: text };
@@ -779,6 +798,7 @@ function App() {
               setPanelWithCue("FLIGHTS");
             }}
             onDeletePlan={deletePlanFromHistory}
+            onImportPlan={importPlanEntry}
             onJumpTo={(panel, fieldIdx) => {
               if (panel === "HOME" && typeof fieldIdx === "number") {
                 // Click on a HOME form field row → enter list scope

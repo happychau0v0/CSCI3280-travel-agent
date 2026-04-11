@@ -794,6 +794,25 @@
   border-color: var(--danger);
 }
 
+.plan-history-card-btn.export {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--accent-2);
+}
+
+.plan-history-card-btn.export:hover {
+  color: var(--bg);
+  background: var(--accent-2);
+  border-color: var(--accent-2);
+}
+
+.plan-history-panel.plan-history-dragover {
+  border-color: var(--accent);
+  box-shadow: 0 0 24px var(--accent-glow);
+}
+
 .home-next-todo li {
   margin-top: 3px;
   color: var(--text);
