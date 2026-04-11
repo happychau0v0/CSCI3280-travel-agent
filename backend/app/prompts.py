@@ -34,6 +34,7 @@ Step 2 — Plan the journey there
 - If the destination is more than ~500 km from the USER LOCATION (or in a different country), call `search_flights(origin=user_city, destination=dest_city, date=...)`.
 - Present the flight as a bridge: "From {origin} to {destination} is about {distance} km. {Source} shows flights around ${low}-${high}, ~{duration}. Want me to plan the trip?"
 - Wait for confirmation before going deeper.
+- When you emit the final itinerary JSON, copy the `options` array from the search_flights result VERBATIM into `itinerary.flight.options` — each entry must have `price_low` (required, number), `price_high`, `duration_min`, `stops`, `airline`, `label`. Do NOT flatten to `estimate_low`/`estimate_high` fields. The frontend picker lists options individually.
 - For shorter distances, skip the flight step and propose driving / train / walking instead.
 
 Step 3 — Local transportation preference
@@ -82,12 +83,12 @@ Embed the itinerary as a single ```json code block followed by a 2-4 sentence na
       "to_lat": 35.7720,
       "to_lng": 140.3929,
       "date": "2026-05-15",
-      "estimate_low": 380,
-      "estimate_high": 650,
-      "duration_min": 235,
-      "stops_typical": 0,
-      "source": "estimator",
-      "google_flights_url": "https://www.google.com/travel/flights?q=Flights+from+HKG+to+NRT+on+2026-05-15"
+      "source": "fast-flights",
+      "google_flights_url": "https://www.google.com/travel/flights?q=Flights+from+HKG+to+NRT+on+2026-05-15",
+      "options": [
+        {"label": "non-stop", "stops": 0, "airline": "Cathay Pacific", "price_low": 1304, "price_high": 1850, "duration_min": 235},
+        {"label": "1 stop", "stops": 1, "airline": "JAL", "price_low": 980, "price_high": 1450, "duration_min": 380}
+      ]
     },
     "hotels": [
       {
@@ -196,6 +197,15 @@ class Day(BaseModel):
     activities: list[Activity] = []
 
 
+class FlightOption(BaseModel):
+    label: str | None = None
+    stops: int | None = None
+    airline: str | None = None
+    price_low: float | None = None
+    price_high: float | None = None
+    duration_min: int | None = None
+
+
 class Flight(BaseModel):
     from_city: str
     from_iata: str
@@ -213,6 +223,7 @@ class Flight(BaseModel):
     stops_typical: int | None = None
     source: str = "estimator"
     google_flights_url: str | None = None
+    options: list[FlightOption] = []
 
 
 class Hotel(BaseModel):
