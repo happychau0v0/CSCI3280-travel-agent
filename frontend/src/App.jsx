@@ -144,6 +144,14 @@ function App() {
   // navigate_menu tool_start), which yanks the user to an empty
   // HOTELS panel before the itinerary data has landed.
   const pendingNavigateRef = useRef(null);
+  // Round 12 — undo / redo stacks for user-driven picks
+  // (selected_flight and selected_hotel only). Each entry is a
+  // {selected_flight, selected_hotel} snapshot taken BEFORE a pick
+  // is applied, so Ctrl+Z reverts to the previous state.
+  const undoStackRef = useRef([]);
+  const redoStackRef = useRef([]);
+  const [undoCount, setUndoCount] = useState(0);
+  const [redoCount, setRedoCount] = useState(0);
   // Per-panel imperative handle: panels with actionable rows expose
   // an `activateRow(index)` method via ref. App.jsx's onActivate
   // (Space hotkey) reads the current panel's ref and invokes it.
@@ -291,6 +299,8 @@ function App() {
       cues.select();
       setSettingsOpen(true);
     },
+    onUndo: handleUndoPick,
+    onRedo: handleRedoPick,
     enabled: !historyOpen && !settingsOpen,
   });
 
@@ -331,6 +341,8 @@ function App() {
       // otherwise.
       globeFocus,
       planHistory,
+      undoCount,
+      redoCount,
     };
   });
 
@@ -385,6 +397,49 @@ function App() {
       return next;
     });
   }, []);
+
+  // Round 12 — undo/redo helpers for flight + hotel picks. Only
+  // user-driven selections are tracked; LLM replans don't push a
+  // new undo entry.
+  const pushPickSnapshot = useCallback(() => {
+    const snap = {
+      selected_flight: currentItinerary?.selected_flight || null,
+      selected_hotel: currentItinerary?.selected_hotel || null,
+    };
+    undoStackRef.current.push(snap);
+    if (undoStackRef.current.length > 20) undoStackRef.current.shift();
+    redoStackRef.current = [];
+    setUndoCount(undoStackRef.current.length);
+    setRedoCount(0);
+  }, [currentItinerary]);
+
+  const handleUndoPick = useCallback(() => {
+    if (undoStackRef.current.length === 0) return;
+    const current = {
+      selected_flight: currentItinerary?.selected_flight || null,
+      selected_hotel: currentItinerary?.selected_hotel || null,
+    };
+    const prev = undoStackRef.current.pop();
+    redoStackRef.current.push(current);
+    setUndoCount(undoStackRef.current.length);
+    setRedoCount(redoStackRef.current.length);
+    setCurrentItinerary((ci) => (ci ? { ...ci, ...prev } : ci));
+    cues.tick?.();
+  }, [currentItinerary, cues]);
+
+  const handleRedoPick = useCallback(() => {
+    if (redoStackRef.current.length === 0) return;
+    const current = {
+      selected_flight: currentItinerary?.selected_flight || null,
+      selected_hotel: currentItinerary?.selected_hotel || null,
+    };
+    const next = redoStackRef.current.pop();
+    undoStackRef.current.push(current);
+    setUndoCount(undoStackRef.current.length);
+    setRedoCount(redoStackRef.current.length);
+    setCurrentItinerary((ci) => (ci ? { ...ci, ...next } : ci));
+    cues.tick?.();
+  }, [currentItinerary, cues]);
 
   const handleSend = useCallback(
     async (text, { editLast = false, truncateBefore = null } = {}) => {
@@ -744,6 +799,9 @@ function App() {
             onPick={(i) => {
               const opt = currentItinerary?.flight?.options?.[i];
               if (!opt) return;
+              // Round 12 — snapshot previous pick state so Ctrl+Z
+              // can revert this action.
+              pushPickSnapshot();
               // Round 10 — plan is already complete; a flight pick
               // just stamps the selection locally and advances the
               // panel to HOTELS so the user can pick accommodation
@@ -762,6 +820,9 @@ function App() {
             onPick={(i) => {
               const hotel = currentItinerary?.hotels?.[i];
               if (!hotel) return;
+              // Round 12 — snapshot previous pick state so Ctrl+Z
+              // can revert this action.
+              pushPickSnapshot();
               // Stamp the pick locally so the detail card and the
               // .picked class update immediately without waiting
               // for the agent.

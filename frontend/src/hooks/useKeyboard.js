@@ -42,6 +42,8 @@ export function useKeyboard({
   onToggleMute,
   onOpenHistory,
   onOpenSettings,
+  onUndo,
+  onRedo,
   enabled = true,
 }) {
   useEffect(() => {
@@ -127,6 +129,28 @@ export function useKeyboard({
           }
           break;
 
+        case "z":
+        case "Z":
+          // Round 12 — Ctrl/Cmd+Z undoes the last flight/hotel pick.
+          // Shift+Ctrl/Cmd+Z (or Ctrl+Y) redoes it.
+          if (e.metaKey || e.ctrlKey) {
+            e.preventDefault();
+            if (e.shiftKey) {
+              onRedo?.();
+            } else {
+              onUndo?.();
+            }
+          }
+          break;
+
+        case "y":
+        case "Y":
+          if (e.metaKey || e.ctrlKey) {
+            e.preventDefault();
+            onRedo?.();
+          }
+          break;
+
         case "h":
         case "H":
           if (!e.metaKey && !e.ctrlKey) {
@@ -185,5 +209,7 @@ export function useKeyboard({
     onToggleMute,
     onOpenHistory,
     onOpenSettings,
+    onUndo,
+    onRedo,
   ]);
 }
