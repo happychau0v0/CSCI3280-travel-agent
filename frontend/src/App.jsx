@@ -1009,8 +1009,8 @@ function App() {
 
       <HelpOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
 
-      {/* Bottom-center subtitle bar with auto-TTS */}
-      <Subtitle text={subtitles.current} />
+      {/* Bottom-center subtitle bar with auto-TTS + R16 history */}
+      <Subtitle text={subtitles.current} history={subtitles.history || []} />
 
       {/* Chat popover (opens on Enter / Cmd+K) */}
       <ChatPopover

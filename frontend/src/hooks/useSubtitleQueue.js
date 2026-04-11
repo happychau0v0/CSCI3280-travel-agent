@@ -53,6 +53,7 @@ export function useSubtitleQueue({
   voiceName = null,
 } = {}) {
   const [current, setCurrent] = useState(null);
+  const [history, setHistory] = useState([]);
   const currentRef = useRef(null);
   const queueRef = useRef([]);
   const safetyTimerRef = useRef(null);
@@ -109,6 +110,16 @@ export function useSubtitleQueue({
     }
     const { text, spoken } = next;
     setCurrentBoth(text);
+    // Round 16 — track the last ~20 subtitles so the user can scroll
+    // back through missed narration via the Subtitle history popover.
+    // User echoes (spoken=false) are excluded from history since
+    // they're just the prompt preview.
+    if (spoken !== false) {
+      setHistory((prev) => {
+        const next2 = [...prev, text];
+        return next2.length > 20 ? next2.slice(-20) : next2;
+      });
+    }
 
     const speak = spoken && !mutedRef.current &&
       typeof window !== "undefined" && window.speechSynthesis;
@@ -189,8 +200,10 @@ export function useSubtitleQueue({
     };
   }, [clear]);
 
+  const clearHistory = useCallback(() => setHistory([]), []);
+
   return useMemo(
-    () => ({ current, push, pushParagraph, clear }),
-    [current, push, pushParagraph, clear],
+    () => ({ current, history, push, pushParagraph, clear, clearHistory }),
+    [current, history, push, pushParagraph, clear, clearHistory],
   );
 }
