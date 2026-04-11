@@ -2676,6 +2676,124 @@ const FAKE_MESSAGES = [
   await page.keyboard.press('Escape');
   await page.waitForTimeout(200);
 
+  // ─── PHASE 22 — Round 13 export/import + filters + drag + swap ─────
+  console.log('\n=== Phase 22: Round 13 export/import + filters + swap ===');
+
+  // 22.1 — HOTELS panel has filter chips
+  await clearAll(page);
+  await seed(page, { itinerary: FAKE_ITINERARY });
+  await page.keyboard.press('3');
+  await page.waitForTimeout(400);
+  const filtersPresent = await page.locator('[data-testid="hotel-filters"]').count();
+  record('22.1 HOTELS has filter chips container', filtersPresent === 1);
+
+  // 22.2 — Clicking a rating filter ≥4.5 filters visible hotels
+  const beforeCount = await page.locator('.panel-hotels .hotel-option-row').count();
+  await page.locator('[data-testid="hotel-filter-rating-great"]').click();
+  await page.waitForTimeout(200);
+  const afterCount = await page.locator('.panel-hotels .hotel-option-row').count();
+  record(
+    '22.2 Rating filter narrows hotel list',
+    afterCount > 0 && afterCount <= beforeCount,
+    `before=${beforeCount} after=${afterCount}`,
+  );
+  // Reset
+  await page.locator('[data-testid="hotel-filter-rating-any"]').click();
+  await page.waitForTimeout(150);
+
+  // 22.3 — Plan history export button renders on cards
+  await clearAll(page);
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'travel-plan-history',
+      JSON.stringify([
+        {
+          id: 'testid1',
+          created_at: Date.now(),
+          destination: 'Tokyo',
+          origin: 'Hong Kong',
+          start_date: '2026-05-15',
+          end_date: '2026-05-18',
+          day_count: 3,
+          itinerary: { destination: 'Tokyo' },
+          messages: [],
+        },
+      ]),
+    );
+  });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(500);
+  await page.locator('body').click();
+  await page.waitForTimeout(200);
+  const exportBtn = await page.locator('[data-testid="plan-history-export-testid1"]').count();
+  record('22.3 Plan history card has an EXPORT button', exportBtn === 1);
+
+  // 22.4 — Activity row REPLACE + REMOVE buttons render on non-hotel,
+  // non-airport activities.
+  await clearAll(page);
+  const R13_DAYS_ITIN = {
+    ...FAKE_ITINERARY,
+    days: [
+      {
+        day: 1, date: '2026-05-15', theme: 'Tokyo',
+        activities: [
+          { time: '09:00', name: 'Park Hyatt Tokyo', address: 'hotel', lat: 35.689, lng: 139.692 },
+          { time: '10:00', name: 'Senso-ji Temple', address: '2-3-1 Asakusa', lat: 35.715, lng: 139.796 },
+          { time: '12:30', name: 'Ichiran Ramen', address: '1-22-7 Jinnan', lat: 35.661, lng: 139.698 },
+          { time: '20:00', name: 'Park Hyatt Tokyo', address: 'hotel', lat: 35.689, lng: 139.692 },
+        ],
+      },
+    ],
+    hotels: [
+      { name: 'Park Hyatt Tokyo', address: 'hotel', rating: 4.6, place_id: 'p1', lat: 35.689, lng: 139.692 },
+    ],
+    selected_hotel: { name: 'Park Hyatt Tokyo', address: 'hotel', rating: 4.6, place_id: 'p1', lat: 35.689, lng: 139.692 },
+  };
+  await seed(page, { itinerary: R13_DAYS_ITIN });
+  await page.keyboard.press('4');
+  await page.waitForTimeout(400);
+  // Senso-ji is index 1 (non-hotel, non-airport)
+  const replaceBtn = await page.locator('[data-testid="activity-replace-1"]').count();
+  const removeBtn = await page.locator('[data-testid="activity-remove-1"]').count();
+  record('22.4 Non-hotel activity has REPLACE button', replaceBtn === 1);
+  record('22.5 Non-hotel activity has REMOVE button', removeBtn === 1);
+
+  // 22.6 — Hotel bookend activity does NOT have REPLACE button
+  const replaceOnHotel = await page.locator('[data-testid="activity-replace-0"]').count();
+  record(
+    '22.6 Hotel bookend has no REPLACE button',
+    replaceOnHotel === 0,
+    `count: ${replaceOnHotel}`,
+  );
+
+  // 22.7 — Clicking REMOVE splices the activity out
+  const before22 = await page.locator('.panel-days .activity').count();
+  await page.locator('[data-testid="activity-remove-2"]').click();
+  await page.waitForTimeout(300);
+  const after22 = await page.locator('.panel-days .activity').count();
+  record(
+    '22.7 REMOVE splices the activity out',
+    after22 === before22 - 1,
+    `before=${before22} after=${after22}`,
+  );
+
+  // 22.8 — Draggable attribute set on real activities. Re-seed
+  // because 22.7 removed one and reload lands on PLAN.
+  await seed(page, { itinerary: R13_DAYS_ITIN });
+  await page.waitForTimeout(200);
+  await page.keyboard.press('4');
+  await page.waitForTimeout(400);
+  const draggable = await page.locator('[data-testid="activity-row-1"]').getAttribute('draggable');
+  record('22.8 Real activity row is draggable', draggable === 'true', `draggable: ${draggable}`);
+
+  // 22.9 — Hotel bookend is NOT draggable
+  const hotelDraggable = await page.locator('[data-testid="activity-row-0"]').getAttribute('draggable');
+  record(
+    '22.9 Hotel bookend is not draggable',
+    hotelDraggable !== 'true',
+    `draggable: ${hotelDraggable}`,
+  );
+
   // ─── PHASE 14 — Globe + idempotency + console sweep (5) ────────────
   console.log('\n=== Phase 14: Globe + final sweep ===');
   await page.keyboard.press('1');
