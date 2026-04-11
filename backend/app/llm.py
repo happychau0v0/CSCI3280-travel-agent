@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 # 2-4 place searches, a handful of directions). 10 rounds gives plenty of
 # headroom while still capping pathological loops where the model keeps
 # calling tools without producing a final reply.
-MAX_TOOL_ROUNDS = 10
+MAX_TOOL_ROUNDS = 20
 
 _client: AsyncOpenAI | None = None
 
