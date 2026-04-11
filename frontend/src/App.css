@@ -40,21 +40,36 @@
   color: var(--text-dim);
 }
 
-/* PanelHome dashboard — 4 corner cards with the globe in the center */
-
-.panel-home {
+/* Shared panel grid — HOME, FLIGHTS, HOTELS, DAYS all use this grid
+ * as their top-level layout. Left + right columns host content cards
+ * (lists, summaries, detail panes); the center column is reserved for
+ * the globe (HOME/FLIGHTS) or a Leaflet map (HOTELS/DAYS). The middle
+ * row has `minmax(0, 1fr)` so that overflow in the content columns
+ * scrolls internally instead of spilling into the bottom row.
+ */
+.panel-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) 1fr minmax(280px, 1fr);
-  grid-template-rows: auto 1fr auto;
+  grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr) minmax(280px, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 16px;
   padding: 16px 0;
   margin: 0;
   width: 100%;
   height: 100%;
+  min-height: 0;
   pointer-events: none;
 }
 
-/* Trip form panel — left column, spans the middle row */
+/* PanelHome dashboard — 4 corner cards with the globe in the center */
+.panel-home {
+  /* Inherits .panel-grid via both classes on the section. No extra
+   * rules for now, but keep the hook in case HOME-specific tweaks
+   * are needed later (e.g. bigger globe, different card spans). */
+}
+
+/* Trip form panel — left column, spans the middle row. Inline
+ * inputs per row; no separate editor column. The list scrolls
+ * internally when it overflows the grid cell. */
 .home-form {
   grid-column: 1;
   grid-row: 2;
@@ -66,6 +81,8 @@
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .home-form-list {
@@ -80,14 +97,100 @@
   border-left: none;
   border-right: none;
   border-bottom: none;
+  flex: 0 0 auto;
 }
 
-/* Inline editor on the right side, spans middle row */
-.home-editor {
+/* Inline row shape — label on the left, input fills the rest */
+.home-form-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.home-form-row:last-child {
+  border-bottom: none;
+}
+
+.home-form-row .panel-list-label {
+  flex: 0 0 92px;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.home-form-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid transparent;
+  color: var(--text-h);
+  font-family: var(--mono);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.1s ease, background 0.1s ease;
+}
+
+.home-form-input:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.home-form-input:focus {
+  border-color: var(--accent);
+  background: rgba(0, 217, 255, 0.08);
+}
+
+.home-form-row.field-pending .home-form-input {
+  border-color: #5eead4;
+  box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.35) inset;
+  animation: field-pulse 1.4s ease-in-out infinite;
+}
+
+.home-form-prompt {
+  flex: 1 0 100%;
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: rgba(94, 234, 212, 0.08);
+  border-left: 2px solid #5eead4;
+  font-size: 11px;
+  color: var(--text-h);
+}
+
+.home-form-resolve-btn {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  background: rgba(94, 234, 212, 0.18);
+  color: #5eead4;
+  border: 1px solid rgba(94, 234, 212, 0.5);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.1s ease;
+}
+
+.home-form-resolve-btn:hover:not(:disabled) {
+  background: rgba(94, 234, 212, 0.3);
+  box-shadow: 0 0 10px rgba(94, 234, 212, 0.4);
+}
+
+.home-form-resolve-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* NEXT STEPS card — right column, middle row */
+.home-next-steps {
   grid-column: 3;
   grid-row: 2;
   pointer-events: auto;
-  padding: 18px 22px;
+  padding: 14px 18px;
   background: var(--bg-glass);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -95,30 +198,71 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
+  overflow-y: auto;
+  min-height: 0;
+  font-family: var(--mono);
 }
 
-.home-editor::before,
-.home-editor::after {
+.home-next-steps::before,
+.home-next-steps::after {
   content: "";
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border: 1px solid var(--accent);
 }
 
-.home-editor::before {
+.home-next-steps::before {
   top: -1px;
   left: -1px;
   border-right: none;
   border-bottom: none;
 }
 
-.home-editor::after {
+.home-next-steps::after {
   bottom: -1px;
   right: -1px;
   border-left: none;
   border-top: none;
+}
+
+.home-next-body {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.home-next-line {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin-bottom: 8px;
+}
+
+.home-next-line.home-next-working {
+  color: var(--accent);
+  animation: home-card-pulse 1.6s ease-in-out infinite;
+}
+
+.home-next-line.home-next-error {
+  color: var(--danger);
+}
+
+.home-next-hint {
+  margin: 0;
+  color: var(--text-dim);
+}
+
+.home-next-todo {
+  margin: 6px 0 0 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+
+.home-next-todo li {
+  margin-top: 3px;
+  color: var(--text);
 }
 
 /* NEXT TRIP summary band along the top center */
@@ -679,10 +823,22 @@
 
 .settings-overlay-list {
   flex: 0 0 240px;
+  overflow-y: auto;
+  min-height: 0;
+  max-height: 60vh;
 }
 
 .settings-overlay-detail {
   flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  max-height: 60vh;
+  padding-right: 4px;
+}
+
+/* The overlay frame also needs bounds so the body flex can size it */
+.settings-overlay-frame {
+  max-height: 80vh;
 }
 
 /* PanelHistory — legacy scrolling pane (kept for fallback selectors) */

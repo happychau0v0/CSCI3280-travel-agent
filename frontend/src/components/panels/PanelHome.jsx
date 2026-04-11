@@ -113,7 +113,12 @@ export default function PanelHome({
   rowDispatchRef,
 }) {
   const [form, setForm] = useState(() => loadForm());
-  const editorRef = useRef(null);
+  // Per-row refs keyed by field key so we can focus a specific input
+  // when request_input arrives or when the user clicks a row.
+  const rowRefs = useRef({});
+  const setRowRef = (key) => (el) => {
+    rowRefs.current[key] = el;
+  };
 
   // Seed defaults from existing itinerary + GPS on first mount.
   useEffect(() => {
@@ -129,11 +134,21 @@ export default function PanelHome({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Focus the inline editor only when the LLM has driven the user
-  // here via request_input. Regular ↑/↓ keeps focus on body.
+  // When the LLM sends request_input, focus the matching row's input.
+  // For date fields, also call showPicker() if the browser supports
+  // it (Chrome/Edge) so the calendar pops up without a click.
   useEffect(() => {
-    if (pendingInputRequest && editorRef.current) {
-      editorRef.current.focus();
+    if (!pendingInputRequest) return;
+    const el = rowRefs.current[pendingInputRequest.field];
+    if (!el) return;
+    el.focus();
+    if (typeof el.showPicker === "function") {
+      try {
+        el.showPicker();
+      } catch {
+        // Some browsers throw if showPicker is called without a user
+        // gesture; ignore, the focus alone is enough.
+      }
     }
   }, [pendingInputRequest]);
 
@@ -143,15 +158,6 @@ export default function PanelHome({
     saveForm(next);
   };
 
-  // When the LLM asks for a specific field, override the user's
-  // listIndex so the editor jumps to it on arrival.
-  const requestedIdx = pendingInputRequest
-    ? FIELDS.findIndex((f) => f.key === pendingInputRequest.field)
-    : -1;
-  const selectedIdx =
-    requestedIdx >= 0 ? requestedIdx : Math.min(Math.max(0, listIndex), FIELDS.length - 1);
-  const selected = FIELDS[selectedIdx];
-
   const handleResolveSubmit = () => {
     if (!pendingInputRequest) return;
     const value = form[pendingInputRequest.field];
@@ -160,14 +166,12 @@ export default function PanelHome({
     onResolveInput?.(pendingInputRequest.field, value, fieldIdx);
   };
 
-  const handleEditorKeyDown = (e) => {
+  const handleFieldKeyDown = (fieldKey) => (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      if (pendingInputRequest) {
+      if (pendingInputRequest && pendingInputRequest.field === fieldKey) {
         handleResolveSubmit();
       } else if (form.destination?.trim() && !isLoading) {
-        // Plain Enter inside the editor (not during request_input)
-        // submits the PLAN button — the form's primary action.
         handlePlan();
       }
     }
@@ -176,21 +180,28 @@ export default function PanelHome({
   const prompt = useMemo(() => buildPrompt(form), [form]);
   const handlePlan = () => onPlan?.(prompt);
 
-  // Register a row activator so the global Space hotkey can focus
-  // the inline editor without forcing the user to click. The dispatch
-  // returns true if it activated, so the global handler can stop.
+  // Register a row activator for the Space hotkey — focus the row
+  // matching the current listIndex so the user can start typing
+  // without a click.
   useEffect(() => {
     if (!rowDispatchRef) return undefined;
-    rowDispatchRef.current = () => {
-      if (editorRef.current) {
-        editorRef.current.focus();
-      }
+    rowDispatchRef.current = (i) => {
+      const field = FIELDS[Math.min(Math.max(0, i), FIELDS.length - 1)];
+      const el = field && rowRefs.current[field.key];
+      if (el) el.focus();
     };
     return () => {
       if (rowDispatchRef.current) rowDispatchRef.current = null;
     };
   }, [rowDispatchRef]);
 
+  // selectedIdx still drives the visual "active" highlight on the
+  // row list. When request_input is pending, override to that field.
+  const requestedIdx = pendingInputRequest
+    ? FIELDS.findIndex((f) => f.key === pendingInputRequest.field)
+    : -1;
+  const selectedIdx =
+    requestedIdx >= 0 ? requestedIdx : Math.min(Math.max(0, listIndex), FIELDS.length - 1);
   const focusedField = pendingInputRequest?.field || null;
 
   // Selected flight = the currently picked option, defaults to options[0]
@@ -205,7 +216,7 @@ export default function PanelHome({
   const planLabel = hasItinerary ? "REPLAN TRIP →" : "PLAN TRIP →";
 
   return (
-    <section className="panel panel-home" aria-label="Home dashboard">
+    <section className="panel panel-grid panel-home" aria-label="Home dashboard">
       {/* TOP-LEFT — live status */}
       <button
         type="button"
@@ -247,28 +258,123 @@ export default function PanelHome({
         )}
       </div>
 
-      {/* LEFT — editable trip form */}
-      <div className="home-form" data-testid="home-form">
+      {/* LEFT — editable trip form (inline inputs per row) */}
+      <div className="home-form home-form-inline" data-testid="home-form">
         <ul className="panel-list-items home-form-list">
           {FIELDS.map((field, i) => {
             const value = form[field.key];
-            const display =
-              field.type === "select"
-                ? field.options.find(([v]) => v === value)?.[1] || "—"
-                : value || "—";
             const isFocused = focusedField === field.key;
+            const isActive = i === selectedIdx;
+            const rowClass =
+              `panel-list-item home-form-row home-form-row-${field.type}` +
+              (isActive ? " active" : "") +
+              (isFocused ? " field-pending" : "");
             return (
               <li
                 key={field.key}
-                className={
-                  `panel-list-item${i === selectedIdx ? " active" : ""}` +
-                  (isFocused ? " field-pending" : "")
-                }
-                onClick={() => onJumpTo && onJumpTo("HOME", i)}
+                className={rowClass}
                 data-field={field.key}
+                onClick={() => {
+                  onJumpTo && onJumpTo("HOME", i);
+                  rowRefs.current[field.key]?.focus();
+                }}
               >
                 <span className="panel-list-label">{field.label}</span>
-                <span className="panel-list-value">{display}</span>
+                {field.type === "text" && (
+                  <input
+                    ref={setRowRef(field.key)}
+                    type="text"
+                    value={value || ""}
+                    onChange={update(field.key)}
+                    onKeyDown={handleFieldKeyDown(field.key)}
+                    onFocus={() => onJumpTo && onJumpTo("HOME", i)}
+                    placeholder={field.placeholder}
+                    className="home-form-input"
+                    data-testid={
+                      isFocused
+                        ? "home-editor-input"
+                        : `home-input-${field.key}`
+                    }
+                    data-field={field.key}
+                  />
+                )}
+                {field.type === "date" && (
+                  <input
+                    ref={setRowRef(field.key)}
+                    type="date"
+                    value={value || ""}
+                    onChange={update(field.key)}
+                    onKeyDown={handleFieldKeyDown(field.key)}
+                    onFocus={() => onJumpTo && onJumpTo("HOME", i)}
+                    className="home-form-input"
+                    data-testid={
+                      isFocused
+                        ? "home-editor-input"
+                        : `home-input-${field.key}`
+                    }
+                    data-field={field.key}
+                  />
+                )}
+                {field.type === "number" && (
+                  <input
+                    ref={setRowRef(field.key)}
+                    type="number"
+                    min={field.min}
+                    max={field.max}
+                    value={value || ""}
+                    onChange={update(field.key)}
+                    onKeyDown={handleFieldKeyDown(field.key)}
+                    onFocus={() => onJumpTo && onJumpTo("HOME", i)}
+                    placeholder={String(field.min)}
+                    className="home-form-input"
+                    data-testid={
+                      isFocused
+                        ? "home-editor-input"
+                        : `home-input-${field.key}`
+                    }
+                    data-field={field.key}
+                  />
+                )}
+                {field.type === "select" && (
+                  <select
+                    ref={setRowRef(field.key)}
+                    value={value || ""}
+                    onChange={update(field.key)}
+                    onFocus={() => onJumpTo && onJumpTo("HOME", i)}
+                    className="home-form-input"
+                    data-testid={
+                      isFocused
+                        ? "home-editor-input"
+                        : `home-input-${field.key}`
+                    }
+                    data-field={field.key}
+                  >
+                    {field.options.map(([v, label]) => (
+                      <option key={v} value={v}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {isFocused && pendingInputRequest?.prompt && (
+                  <div className="home-form-prompt" role="status">
+                    {pendingInputRequest.prompt}
+                  </div>
+                )}
+                {isFocused && (
+                  <button
+                    type="button"
+                    className="home-form-resolve-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleResolveSubmit();
+                    }}
+                    disabled={!form[field.key]}
+                    data-testid="trip-form-resolve-btn"
+                  >
+                    SEND →
+                  </button>
+                )}
               </li>
             );
           })}
@@ -284,78 +390,59 @@ export default function PanelHome({
         </button>
       </div>
 
-      {/* RIGHT — inline editor for the focused field */}
-      <div className="home-editor">
-        <div className="panel-detail-label">{selected.label}</div>
-        {pendingInputRequest && pendingInputRequest.field === selected.key && (
-          <div className="trip-form-prompt">{pendingInputRequest.prompt}</div>
-        )}
-        {selected.type === "text" && (
-          <input
-            ref={editorRef}
-            type="text"
-            value={form[selected.key] || ""}
-            onChange={update(selected.key)}
-            onKeyDown={handleEditorKeyDown}
-            placeholder={selected.placeholder}
-            className="panel-input"
-            data-testid="home-editor-input"
-          />
-        )}
-        {selected.type === "date" && (
-          <input
-            ref={editorRef}
-            type="date"
-            value={form[selected.key] || ""}
-            onChange={update(selected.key)}
-            onKeyDown={handleEditorKeyDown}
-            className="panel-input"
-            data-testid="home-editor-input"
-          />
-        )}
-        {selected.type === "number" && (
-          <input
-            ref={editorRef}
-            type="number"
-            min={selected.min}
-            max={selected.max}
-            value={form[selected.key] || ""}
-            onChange={update(selected.key)}
-            onKeyDown={handleEditorKeyDown}
-            className="panel-input"
-            data-testid="home-editor-input"
-          />
-        )}
-        {selected.type === "select" && (
-          <select
-            ref={editorRef}
-            value={form[selected.key] || ""}
-            onChange={update(selected.key)}
-            className="panel-input"
-            data-testid="home-editor-input"
-          >
-            {selected.options.map(([v, label]) => (
-              <option key={v} value={v}>
-                {label}
-              </option>
-            ))}
-          </select>
-        )}
-        {pendingInputRequest && pendingInputRequest.field === selected.key && (
-          <button
-            type="button"
-            className="trip-form-resolve-btn"
-            onClick={handleResolveSubmit}
-            disabled={!form[selected.key]}
-            data-testid="trip-form-resolve-btn"
-          >
-            SEND ANSWER →
-          </button>
-        )}
-        <p className="panel-detail-hint">
-          Click a row or press ↑/↓ to focus a field. Space focuses the editor.
-        </p>
-      </div>
+      {/* RIGHT — next steps / agent status */}
+      <aside className="home-next-steps" data-testid="home-next-steps">
+        <div className="home-card-label">◢ NEXT STEPS</div>
+        {(() => {
+          const missing = [];
+          if (!form.destination?.trim()) missing.push("Destination");
+          if (!form.start_date) missing.push("Start date");
+          if (!form.end_date) missing.push("End date");
+          if (!form.transport) missing.push("Transport");
+          if (agentState === "working") {
+            return (
+              <div className="home-next-body">
+                <div className="home-next-line home-next-working">
+                  Agent working{currentTool ? ` · ${currentTool}` : "…"}
+                </div>
+                <p className="home-next-hint">Hold tight — your plan is cooking.</p>
+              </div>
+            );
+          }
+          if (agentState === "error") {
+            return (
+              <div className="home-next-body">
+                <div className="home-next-line home-next-error">Agent error</div>
+                <p className="home-next-hint">Try again or check settings.</p>
+              </div>
+            );
+          }
+          if (hasItinerary) {
+            return (
+              <div className="home-next-body">
+                <div className="home-next-line">Trip ready · {days.length} day{days.length !== 1 ? "s" : ""}</div>
+                <ul className="home-next-todo">
+                  {!itinerary.selected_hotel && <li>Pick a hotel in the HOTELS tab</li>}
+                  {!itinerary.selected_flight && <li>Pick a flight in the FLIGHTS tab</li>}
+                  <li>Review day activities in DAYS</li>
+                </ul>
+              </div>
+            );
+          }
+          return (
+            <div className="home-next-body">
+              <p className="home-next-hint">Fill in the form on the left and press PLAN TRIP.</p>
+              {missing.length > 0 && (
+                <ul className="home-next-todo">
+                  {missing.map((m) => (
+                    <li key={m}>{m} missing</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })()}
+      </aside>
 
       {/* BOTTOM-LEFT — selected flight */}
       <button
