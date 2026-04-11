@@ -854,6 +854,20 @@
   color: var(--accent);
 }
 
+/* Round 13 — drag-to-reorder highlights */
+.activity[draggable="true"] {
+  cursor: grab;
+}
+
+.activity[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.activity.activity-drag-target {
+  border-top: 2px solid var(--accent);
+  background: rgba(0, 217, 255, 0.08);
+}
+
 .home-next-todo li {
   margin-top: 3px;
   color: var(--text);

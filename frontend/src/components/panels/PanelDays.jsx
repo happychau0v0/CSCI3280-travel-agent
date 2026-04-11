@@ -28,7 +28,20 @@ function weatherIcon(weather) {
   return WEATHER_ICONS[key] || "🌡️";
 }
 
-function ActivityRow({ activity, isHotel, isActive, onClick }) {
+function ActivityRow({
+  activity,
+  index,
+  isHotel,
+  isAirport,
+  isActive,
+  isDragTarget,
+  onClick,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onDragEnd,
+}) {
   const [expanded, setExpanded] = useState(false);
   const gallery =
     activity.photos?.length > 0
@@ -37,23 +50,37 @@ function ActivityRow({ activity, isHotel, isActive, onClick }) {
         ? [activity.photo_url]
         : [];
   const transport = activity.transport_to_next;
+  // Round 13 — only non-hotel, non-airport rows are draggable. Hotel
+  // bookends and airport activities are anchors the LLM computed;
+  // letting the user drag them mid-day would invalidate the day
+  // window logic.
+  const isDraggable = !isHotel && !isAirport;
   return (
     <li
       className={
         `activity` +
         (isHotel ? " activity-hotel" : "") +
-        (isActive ? " activity-active" : "")
+        (isActive ? " activity-active" : "") +
+        (isDragTarget ? " activity-drag-target" : "")
       }
+      draggable={isDraggable}
+      onDragStart={isDraggable ? (e) => onDragStart?.(e, index) : undefined}
+      onDragOver={(e) => onDragOver?.(e, index)}
+      onDragLeave={(e) => onDragLeave?.(e, index)}
+      onDrop={(e) => onDrop?.(e, index)}
+      onDragEnd={onDragEnd}
       onClick={() => {
         onClick?.();
         setExpanded((x) => !x);
       }}
+      data-testid={`activity-row-${index}`}
     >
       <div className="activity-row">
         <span className="activity-time">{activity.time}</span>
         <div className="activity-info">
           <strong>
             {isHotel && <span className="activity-hotel-tag">🏨 HOTEL </span>}
+            {isAirport && <span className="activity-hotel-tag">✈ AIRPORT </span>}
             {activity.name}
           </strong>
           {activity.address && <p className="activity-addr">{activity.address}</p>}
@@ -86,11 +113,14 @@ function ActivityRow({ activity, isHotel, isActive, onClick }) {
   );
 }
 
-export default function PanelDays({ itinerary, listIndex, onSelect }) {
+export default function PanelDays({ itinerary, listIndex, onSelect, onReorderActivities }) {
   const days = itinerary?.days || [];
   const hotelName =
     itinerary?.selected_hotel?.name || itinerary?.hotels?.[0]?.name || null;
   const [activeActivityIdx, setActiveActivityIdx] = useState(-1);
+  // Round 13 — drag state for activity reordering within a day.
+  const [dragFromIdx, setDragFromIdx] = useState(-1);
+  const [dragOverIdx, setDragOverIdx] = useState(-1);
 
   if (days.length === 0) {
     return (
@@ -106,6 +136,41 @@ export default function PanelDays({ itinerary, listIndex, onSelect }) {
   const selectedIdx = Math.min(Math.max(0, listIndex), days.length - 1);
   const selected = days[selectedIdx];
   const activities = selected?.activities || [];
+
+  // Round 13 — drag-to-reorder handlers. Only non-hotel, non-airport
+  // activities can be dragged. The target row is highlighted via
+  // dragOverIdx so the user sees where the drop will land.
+  const handleDragStart = (e, idx) => {
+    setDragFromIdx(idx);
+    e.dataTransfer.effectAllowed = "move";
+    // Firefox requires some payload or drag is cancelled.
+    e.dataTransfer.setData("text/plain", String(idx));
+  };
+  const handleDragOver = (e, idx) => {
+    if (dragFromIdx < 0) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (idx !== dragOverIdx) setDragOverIdx(idx);
+  };
+  const handleDragLeave = (e, idx) => {
+    if (idx === dragOverIdx) setDragOverIdx(-1);
+  };
+  const handleDrop = (e, toIdx) => {
+    if (dragFromIdx < 0 || dragFromIdx === toIdx) {
+      setDragFromIdx(-1);
+      setDragOverIdx(-1);
+      return;
+    }
+    e.preventDefault();
+    const fromIdx = dragFromIdx;
+    setDragFromIdx(-1);
+    setDragOverIdx(-1);
+    onReorderActivities?.(selectedIdx, fromIdx, toIdx);
+  };
+  const handleDragEnd = () => {
+    setDragFromIdx(-1);
+    setDragOverIdx(-1);
+  };
 
   // Airport reference pin — shown on Day 1 (arrival) and the last
   // day (departure). Both use the destination airport (to_lat/to_lng)
@@ -193,11 +258,19 @@ export default function PanelDays({ itinerary, listIndex, onSelect }) {
         <ol className="activities">
           {activities.map((act, i) => (
             <ActivityRow
-              key={i}
+              key={`${selectedIdx}-${i}-${act.name || ""}`}
               activity={act}
+              index={i}
               isHotel={hotelName && act.name === hotelName}
+              isAirport={/airport/i.test(act.name || "")}
               isActive={i === activeActivityIdx}
+              isDragTarget={i === dragOverIdx && dragFromIdx !== i}
               onClick={() => setActiveActivityIdx(i)}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onDragEnd={handleDragEnd}
             />
           ))}
         </ol>

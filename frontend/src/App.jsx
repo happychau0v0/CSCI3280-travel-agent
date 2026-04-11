@@ -879,6 +879,25 @@ function App() {
             itinerary={currentItinerary}
             listIndex={menu.state.listIndex}
             onSelect={selectListItem}
+            onReorderActivities={(dayIdx, fromIdx, toIdx) => {
+              // Round 13 — reorder activities within one day in
+              // place. Does not re-query the LLM; times stay the
+              // same (the user is saying "visit these in a
+              // different order", not "replan").
+              setCurrentItinerary((prev) => {
+                if (!prev?.days?.[dayIdx]?.activities) return prev;
+                const day = prev.days[dayIdx];
+                const acts = [...day.activities];
+                const [moved] = acts.splice(fromIdx, 1);
+                if (!moved) return prev;
+                const insertAt = toIdx > fromIdx ? toIdx - 1 : toIdx;
+                acts.splice(insertAt, 0, moved);
+                const days = [...prev.days];
+                days[dayIdx] = { ...day, activities: acts };
+                return { ...prev, days };
+              });
+              cues.tick?.();
+            }}
           />
         )}
       </MenuShell>
