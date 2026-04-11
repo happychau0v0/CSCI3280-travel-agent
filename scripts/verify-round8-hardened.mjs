@@ -1597,17 +1597,22 @@ const FAKE_MESSAGES = [
         `${replyWords} words`,
       );
 
-      // Activities have realistic structure (name + at least one of address/place_id/lat)
+      // Activities have realistic structure (name + at least one of
+      // address/place_id/lat). Hotel bookends are excluded because
+      // the hotel's details live on itinerary.selected_hotel, not on
+      // the bookend activity row.
+      const hotelName3 = real?.selected_hotel?.name || real?.hotels?.[0]?.name;
       const malformedActivities = [];
       for (const day of days) {
         for (const a of day.activities || []) {
+          if (a.name === hotelName3) continue; // skip hotel bookends
           if (!a.name || (!a.address && !a.place_id && a.lat == null)) {
             malformedActivities.push(`day ${day.day}: ${a.name || '(no name)'}`);
           }
         }
       }
       record(
-        '13.8.8 All activities have name + (address|place_id|lat)',
+        '13.8.8 Non-hotel activities have name + (address|place_id|lat)',
         malformedActivities.length === 0,
         malformedActivities.slice(0, 3).join('; '),
       );
@@ -1630,13 +1635,29 @@ const FAKE_MESSAGES = [
       }
 
       // After the initial plan, fire a hotel replan and verify the
-      // bookend rule kicks in.
+      // bookend rule kicks in. The LLM may have pre-selected a hotel
+      // (per the Step 4 prompt), so we must pick one that is NOT
+      // currently selected — otherwise the PICK button is disabled
+      // with the "✓ PICKED" state.
       const beforeHotelCount = (real.hotels || []).length;
-      if (beforeHotelCount >= 1) {
+      if (beforeHotelCount >= 2) {
         await page.keyboard.press('3'); // HOTELS
         await page.waitForTimeout(300);
-        await page.locator('.panel-list-items .panel-list-item').first().click();
-        await page.waitForTimeout(150);
+        // Find a hotel that is NOT currently selected
+        const currentPickName = real?.selected_hotel?.name;
+        let pickIdx = 0;
+        if (currentPickName) {
+          const foundIdx = (real.hotels || []).findIndex((h) => h.name !== currentPickName);
+          if (foundIdx >= 0) pickIdx = foundIdx;
+        }
+        await page.locator('.panel-list-items .panel-list-item').nth(pickIdx).click();
+        await page.waitForTimeout(200);
+        // Wait for the button to become enabled (in case the click
+        // hadn't propagated listIndex yet)
+        await waitFor(
+          async () => await page.locator('[data-testid="hotel-pick-btn"]').isEnabled(),
+          3000,
+        );
         await page.locator('[data-testid="hotel-pick-btn"]').click();
 
         // Wait for the replan to settle (also up to 4 minutes)
@@ -1667,9 +1688,9 @@ const FAKE_MESSAGES = [
           `count: ${replannedActCount}`,
         );
       } else {
-        record('13.8.11 (skipped, no hotels)', true);
-        record('13.8.12 (skipped, no hotels)', true);
-        record('13.8.13 (skipped, no hotels)', true);
+        record('13.8.11 (skipped, <2 hotels)', true);
+        record('13.8.12 (skipped, <2 hotels)', true);
+        record('13.8.13 (skipped, <2 hotels)', true);
       }
     }
   }
