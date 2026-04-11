@@ -37,7 +37,7 @@ export default function PanelFlights({ itinerary, listIndex, onSelect, onPick })
       <section className="panel panel-grid panel-flights" aria-label="Flights">
         <div className="panel-grid-empty">
           <h2>NO FLIGHTS YET</h2>
-          <p>Fill the HOME form and press PLAN to fetch flights.</p>
+          <p>Fill the PLAN form and press START PLANNING to fetch flights.</p>
         </div>
       </section>
     );

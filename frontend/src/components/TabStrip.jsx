@@ -1,7 +1,7 @@
 import { PANELS } from "../hooks/useMenuState";
 
 const TAB_LABELS = {
-  HOME: "HOME",
+  HOME: "PLAN",
   FLIGHTS: "FLIGHTS",
   HOTELS: "HOTELS",
   DAYS: "DAYS",

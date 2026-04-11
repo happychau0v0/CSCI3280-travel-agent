@@ -213,7 +213,7 @@ export default function PanelHome({
     itinerary?.selected_hotel || itinerary?.hotels?.[0] || null;
   const days = itinerary?.days || [];
   const hasItinerary = !!itinerary;
-  const planLabel = hasItinerary ? "REPLAN TRIP →" : "PLAN TRIP →";
+  const planLabel = hasItinerary ? "REPLAN →" : "START PLANNING →";
 
   return (
     <section className="panel panel-grid panel-home" aria-label="Home dashboard">
@@ -253,7 +253,7 @@ export default function PanelHome({
           </div>
         ) : (
           <div className="home-summary-line home-card-empty">
-            Fill the form on the left and press PLAN TRIP
+            Fill the form on the left and press START PLANNING
           </div>
         )}
       </div>
@@ -419,7 +419,7 @@ export default function PanelHome({
           }
           return (
             <div className="home-next-body">
-              <p className="home-next-hint">Fill in the form on the left and press PLAN TRIP.</p>
+              <p className="home-next-hint">Fill in the form on the left and press START PLANNING.</p>
               {missing.length > 0 && (
                 <ul className="home-next-todo">
                   {missing.map((m) => (
