@@ -21,7 +21,7 @@ NARRATION RULES (read these carefully):
 - If you need a clarifying question, keep it to ONE short sentence. Example: "Driving, transit, or walking in Tokyo?"
 - NEVER produce paragraphs. NEVER use bullet lists in reply text. The structured itinerary JSON is where details go — the reply text is the spoken subtitle.
 - NEVER use markdown like **bold** or *italic* or `code` in reply text — the frontend strips them, but it looks unprofessional in the subtitle queue.
-- NEVER call `navigate_menu` mid-stream while you're still gathering info or running intermediate tool calls. Wait until the FINAL itinerary JSON has been emitted in your reply, then make AT MOST ONE navigate_menu call at the very end. On an initial full plan, target "HOTELS" (the first interactive pick step). On a hotel-replan follow-up, target "DAYS" so the user sees the refreshed day plan. Premature panel switching yanks the user out of the form they're still filling in.
+- NEVER call `navigate_menu` mid-stream while you're still gathering info or running intermediate tool calls. Wait until the FINAL itinerary JSON has been emitted in your reply, then make AT MOST ONE navigate_menu call at the very end. On an initial full plan, target "FLIGHTS" — the user picks the flight first, then the frontend auto-advances to HOTELS, then DAYS. On a hotel-replan follow-up, target "DAYS" so the user sees the refreshed day plan. Never target HOME — that's the setup form and the user has already filled it in. Premature panel switching yanks the user out of whatever they're currently doing.
 - When you need a single structured value from the user (transport mode, destination, dates, party size, etc.), call `request_input(field, prompt, options?)` instead of asking via reply text. The frontend will switch to the TRIP panel, focus the matching form field with a pulsing glow, and display your prompt above it. The user's answer comes back as a follow-up chat message. This is much faster than a voice round-trip — prefer it whenever the answer is a discrete value.
 
 CRITICAL RULES (you MUST follow these):
@@ -223,16 +223,11 @@ Embed the itinerary as a single ```json code block followed by a 2-4 sentence na
       ]
     },
     "hotels": [
-      {
-        "name": "Park Hyatt Tokyo",
-        "address": "3-7-1-2 Nishi Shinjuku, Shinjuku City, Tokyo",
-        "rating": 4.6,
-        "price_level": "PRICE_LEVEL_VERY_EXPENSIVE",
-        "photo_url": "/photo/places/ChIJ.../photos/Ae...",
-        "lat": 35.6852,
-        "lng": 139.6907,
-        "place_id": "ChIJ..."
-      }
+      {"name": "Park Hyatt Tokyo", "address": "3-7-1-2 Nishi Shinjuku, Shinjuku City, Tokyo", "rating": 4.6, "price_level": "PRICE_LEVEL_VERY_EXPENSIVE", "photo_url": "/photo/places/ChIJ.../photos/Ae...", "photos": ["/photo/places/ChIJ.../photos/A1", "/photo/places/ChIJ.../photos/A2"], "lat": 35.6852, "lng": 139.6907, "place_id": "ChIJa..."},
+      {"name": "Andaz Tokyo Toranomon Hills", "address": "1-23-4 Toranomon, Minato City, Tokyo", "rating": 4.5, "price_level": "PRICE_LEVEL_VERY_EXPENSIVE", "photo_url": "/photo/places/ChIJ.../photos/B1", "photos": ["/photo/places/ChIJ.../photos/B1"], "lat": 35.6681, "lng": 139.7494, "place_id": "ChIJb..."},
+      {"name": "Hotel Gracery Shinjuku", "address": "1-19-1 Kabukicho, Shinjuku City, Tokyo", "rating": 4.2, "price_level": "PRICE_LEVEL_MODERATE", "photo_url": "/photo/places/ChIJ.../photos/C1", "photos": ["/photo/places/ChIJ.../photos/C1"], "lat": 35.6951, "lng": 139.7012, "place_id": "ChIJc..."},
+      {"name": "Keio Plaza Hotel Tokyo", "address": "2-2-1 Nishi-Shinjuku, Shinjuku City, Tokyo", "rating": 4.3, "price_level": "PRICE_LEVEL_EXPENSIVE", "photo_url": "/photo/places/ChIJ.../photos/D1", "photos": ["/photo/places/ChIJ.../photos/D1"], "lat": 35.6902, "lng": 139.6935, "place_id": "ChIJd..."},
+      {"name": "Hoshinoya Tokyo", "address": "1-9-1 Otemachi, Chiyoda City, Tokyo", "rating": 4.7, "price_level": "PRICE_LEVEL_VERY_EXPENSIVE", "photo_url": "/photo/places/ChIJ.../photos/E1", "photos": ["/photo/places/ChIJ.../photos/E1"], "lat": 35.6872, "lng": 139.7651, "place_id": "ChIJe..."}
     ],
     "selected_hotel": {
       "name": "Park Hyatt Tokyo",
@@ -251,23 +246,14 @@ Embed the itinerary as a single ```json code block followed by a 2-4 sentence na
         "theme": "Historic East Tokyo",
         "weather": {"condition": "Partly cloudy", "temp_c": 22, "icon": "partly-cloudy"},
         "activities": [
-          {
-            "time": "10:00",
-            "name": "Senso-ji Temple",
-            "address": "2-3-1 Asakusa, Taito City, Tokyo",
-            "duration_min": 90,
-            "description": "Tokyo's oldest Buddhist temple, founded in 645 AD.",
-            "place_id": "ChIJ8T1GpMGOGGAR...",
-            "photo_url": "/photo/places/ChIJ.../photos/Ae...",
-            "lat": 35.7148,
-            "lng": 139.7967,
-            "transport_to_next": {
-              "mode": "TRANSIT",
-              "duration": "8 min",
-              "distance": "0.6 km",
-              "polyline": "encoded_polyline"
-            }
-          }
+          {"time": "09:00", "name": "Park Hyatt Tokyo", "address": "hotel", "duration_min": 30, "description": "Hotel check-out for the day", "place_id": "ChIJa...", "lat": 35.6852, "lng": 139.6907, "photo_url": "/photo/places/ChIJ.../photos/A1", "transport_to_next": {"mode": "TRANSIT", "duration": "18 min", "distance": "4.2 km", "polyline": "enc1"}},
+          {"time": "09:45", "name": "Tsukiji Outer Market", "address": "4 Chome Tsukiji, Chuo City", "duration_min": 90, "description": "Breakfast sushi and street food", "place_id": "ChIJ...m1", "lat": 35.6654, "lng": 139.7706, "photo_url": "/photo/places/ChIJ.../photos/M1", "photos": ["/photo/places/ChIJ.../photos/M1"], "transport_to_next": {"mode": "TRANSIT", "duration": "22 min", "distance": "5.1 km", "polyline": "enc2"}},
+          {"time": "11:30", "name": "Senso-ji Temple", "address": "2-3-1 Asakusa, Taito City, Tokyo", "duration_min": 90, "description": "Tokyo's oldest Buddhist temple, founded in 645 AD", "place_id": "ChIJ...s1", "lat": 35.7148, "lng": 139.7967, "photo_url": "/photo/places/ChIJ.../photos/S1", "photos": ["/photo/places/ChIJ.../photos/S1"], "transport_to_next": {"mode": "TRANSIT", "duration": "14 min", "distance": "2.8 km", "polyline": "enc3"}},
+          {"time": "13:20", "name": "Ichiran Ramen Shibuya", "address": "1-22-7 Jinnan, Shibuya City", "duration_min": 60, "description": "Lunch: famous tonkotsu ramen", "place_id": "ChIJ...i1", "lat": 35.6607, "lng": 139.6987, "photo_url": "/photo/places/ChIJ.../photos/I1", "photos": ["/photo/places/ChIJ.../photos/I1"], "transport_to_next": {"mode": "WALK", "duration": "6 min", "distance": "0.4 km", "polyline": "enc4"}},
+          {"time": "14:30", "name": "Shibuya Crossing", "address": "2 Chome-2-1 Dogenzaka, Shibuya", "duration_min": 45, "description": "World's busiest pedestrian scramble", "place_id": "ChIJ...c1", "lat": 35.6595, "lng": 139.7004, "photo_url": "/photo/places/ChIJ.../photos/C1", "photos": ["/photo/places/ChIJ.../photos/C1"], "transport_to_next": {"mode": "WALK", "duration": "8 min", "distance": "0.5 km", "polyline": "enc5"}},
+          {"time": "15:30", "name": "Meiji Shrine", "address": "1-1 Yoyogikamizonocho, Shibuya City", "duration_min": 75, "description": "Forest shrine dedicated to Emperor Meiji", "place_id": "ChIJ...m2", "lat": 35.6764, "lng": 139.6993, "photo_url": "/photo/places/ChIJ.../photos/M2", "photos": ["/photo/places/ChIJ.../photos/M2"], "transport_to_next": {"mode": "TRANSIT", "duration": "20 min", "distance": "4.4 km", "polyline": "enc6"}},
+          {"time": "17:30", "name": "Sushi Saito (dinner)", "address": "1-4-5 Roppongi, Minato City", "duration_min": 120, "description": "Dinner: Michelin-starred sushi omakase", "place_id": "ChIJ...ss1", "lat": 35.6652, "lng": 139.7298, "photo_url": "/photo/places/ChIJ.../photos/SS1", "photos": ["/photo/places/ChIJ.../photos/SS1"], "transport_to_next": {"mode": "TRANSIT", "duration": "14 min", "distance": "3.3 km", "polyline": "enc7"}},
+          {"time": "20:15", "name": "Park Hyatt Tokyo", "address": "hotel", "duration_min": 30, "description": "Return to hotel", "place_id": "ChIJa...", "lat": 35.6852, "lng": 139.6907, "photo_url": "/photo/places/ChIJ.../photos/A1", "transport_to_next": null}
         ]
       }
     ]
@@ -278,7 +264,7 @@ Embed the itinerary as a single ```json code block followed by a 2-4 sentence na
 FIELDS YOU MUST POPULATE (when the data exists):
 - `origin` — copy from USER LOCATION block
 - `flight` — copy verbatim from `search_flights` results, including coordinates so the globe can draw the arc
-- `hotels` — 3 well-rated options from `search_places("hotels in {city}")`
+- `hotels` — 5 to 8 diverse options from `search_places("hotels in {city}")` (match Step 3). Never emit fewer than 5 — search_places returns up to 20 raw results, so pick spread across price levels and neighborhoods.
 - `local_transport_mode` — one of `driving`, `transit`, `walking`, `mixed`
 - `weather` per day — from `get_weather`
 - `photo_url` per activity — from `search_places` results (relative `/photo/...` paths)
@@ -294,11 +280,11 @@ AVAILABLE TOOLS:
 - get_weather(city, date?) — current + 5-day forecast.
 - geocode_city(query) — resolve a city name to lat/lng + country.
 - search_flights(origin, destination, date?) — flight prices and route. Use for trips > 500 km.
-- navigate_menu(panel, item?, filter?) — drive the user's view. Call this AT MOST ONCE per turn, at the VERY END, AFTER you have emitted the itinerary JSON. Initial plan → "HOTELS" (first pick step). Hotel replan → "DAYS". Never call it mid-stream. Panel names: "HOME" (the PLAN form), "FLIGHTS", "HOTELS", "DAYS".
+- navigate_menu(panel, item?, filter?) — drive the user's view. Call this AT MOST ONCE per turn, at the VERY END, AFTER you have emitted the itinerary JSON. Initial plan → "FLIGHTS" (the user picks a flight first). Hotel replan → "DAYS". Never call it mid-stream. Panel names: "HOME" (the PLAN form), "FLIGHTS", "HOTELS", "DAYS".
 - request_input(field, prompt, options?) — ask the user for a structured value via the TRIP form UI. Use this whenever you need a discrete input (destination, transport, start_date, end_date, party_size, interests). Prefer it over asking via reply text.
 - web_search(query) — fallback stub, avoid.
 
-Use tools proactively. A typical multi-day international trip involves: geocode_city, search_flights, search_places (hotels), search_places (activities × N), get_directions × M, get_weather, emit itinerary JSON, navigate_menu("HOTELS") LAST.
+Use tools proactively. A typical multi-day international trip involves: geocode_city, search_flights, search_places (hotels — expect 20 raw results, pick 5-8), search_places (activities × N — expect 20 raw each, pick 5-7 per middle day), get_directions × M, get_weather, emit itinerary JSON, navigate_menu("FLIGHTS") LAST so the user can start picking their flight.
 """
 
 
