@@ -122,6 +122,36 @@
   grid-row: 3;
 }
 
+/* Center slot — hosts a Leaflet map on HOTELS/DAYS. Sits above the
+ * background globe via z-index so the user sees a zoomed-in map
+ * instead of the spinning globe once the destination is known. */
+.panel-grid-center {
+  grid-column: 2;
+  grid-row: 2;
+  pointer-events: auto;
+  position: relative;
+  min-height: 0;
+  z-index: 3;
+  border: 1px solid var(--border);
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  overflow: hidden;
+  animation: panel-grid-center-fade 400ms ease-out 150ms backwards;
+}
+
+.panel-grid-center > .day-mini-map {
+  height: 100%;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+}
+
+@keyframes panel-grid-center-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .panel-grid-empty {
   grid-column: 1 / -1;
   grid-row: 2;
@@ -2973,6 +3003,36 @@ select.panel-input {
   font-size: 11px;
   border: 2px solid #002;
   box-shadow: 0 0 8px rgba(0, 217, 255, 0.6);
+}
+
+.day-mini-pin.active {
+  width: 26px;
+  height: 26px;
+  background: #fbbf24;
+  border-color: #201500;
+  box-shadow: 0 0 14px rgba(251, 191, 36, 0.8);
+  z-index: 500;
+}
+
+.day-mini-pin.airport {
+  width: 28px;
+  height: 28px;
+  background: #5eead4;
+  color: #002;
+  border-color: #002;
+  font-size: 14px;
+  box-shadow: 0 0 12px rgba(94, 234, 212, 0.9);
+}
+
+.day-mini-map-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-dim);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 /* ─── Itinerary card (rendered inside drawer) ────────────── */

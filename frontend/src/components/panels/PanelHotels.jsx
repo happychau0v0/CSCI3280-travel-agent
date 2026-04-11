@@ -1,11 +1,12 @@
 import { photoSrc } from "../../api/client";
 import PhotoGallery from "../PhotoGallery";
+import HotelsMap from "../HotelsMap";
 
 /**
- * HOTELS panel — shares the .panel-grid layout with HOME/FLIGHTS/DAYS.
+ * HOTELS panel — shares the .panel-grid layout with PLAN/FLIGHTS/DAYS.
  * Left column: vertical list of hotels with a small thumbnail.
- * Center: reserved for the globe (background) — hotel pins live on
- *         the globe via App.jsx's points memo.
+ * Center: Leaflet map showing all hotel pins + a ✈ arrival airport
+ *         reference pin, zoomed to fit. Round 10.
  * Right column: detail card for the focused hotel — photo gallery,
  *         rating, price, address, PICK & REPLAN button, Maps link.
  * Top band: summary "HOTELS · N near {destination}".
@@ -60,6 +61,16 @@ export default function PanelHotels({ itinerary, listIndex, onSelect, onPick }) 
         ? [selected.photo_url]
         : [];
 
+  const airportPin =
+    itinerary?.flight?.to_lat != null && itinerary?.flight?.to_lng != null
+      ? {
+          lat: itinerary.flight.to_lat,
+          lng: itinerary.flight.to_lng,
+          iata: itinerary.flight.to_iata,
+          label: `${itinerary.flight.to_iata || ""} Airport`.trim(),
+        }
+      : null;
+
   return (
     <section className="panel panel-grid panel-hotels" aria-label="Hotels">
       {/* TOP band — summary */}
@@ -77,6 +88,15 @@ export default function PanelHotels({ itinerary, listIndex, onSelect, onPick }) 
           )}
         </div>
       </header>
+
+      {/* CENTER — Leaflet map with hotel pins + airport reference */}
+      <div className="panel-grid-center">
+        <HotelsMap
+          hotels={hotels}
+          airport={airportPin}
+          selectedIdx={selectedIdx}
+        />
+      </div>
 
       {/* LEFT — hotels list with thumbnails */}
       <div className="panel-grid-left panel-grid-scroll">
