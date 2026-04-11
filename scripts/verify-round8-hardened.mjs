@@ -1507,11 +1507,18 @@ const FAKE_MESSAGES = [
     if (turn1Done) {
       // Turn 2: confirm and ask for the full plan. The LLM's auto-
       // reopen-on-question may have already popped the popover.
+      //
+      // Round 9 caveat: request_input focuses an inline form input,
+      // so pressing 't' at the page level would type into that input
+      // instead of opening the chat popover. Blur any active element
+      // first by clicking the tab strip, which is a neutral landing.
       await page.waitForTimeout(500);
+      await page.locator('.tab-strip').click().catch(() => {});
+      await page.waitForTimeout(150);
       const popoverOpen = await page.locator('.chat-popover').isVisible().catch(() => false);
       if (!popoverOpen) {
         await page.keyboard.press('t');
-        await page.waitForTimeout(300);
+        await page.waitForTimeout(500);
       }
       await page.locator('.chat-popover input[type="text"]').click();
       await page.locator('.chat-popover input[type="text"]').fill(
