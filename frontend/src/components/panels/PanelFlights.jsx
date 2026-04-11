@@ -1,3 +1,5 @@
+import { formatDisplayPrice } from "../SettingsOverlay";
+
 /**
  * FLIGHTS panel — shares the .panel-grid layout with HOME/HOTELS/DAYS.
  * Left column: vertical list of flight options with airline + price.
@@ -6,12 +8,11 @@
  * Right column: detail card for the focused option with big airline,
  * price, duration, PICK button, Google Flights link.
  * Top band: summary "HKG → NRT · N options".
+ *
+ * Round 14 — currency prop controls the displayed currency, backed
+ * by a fixed rate table in SettingsOverlay. Backend always returns
+ * HKD; the frontend re-labels.
  */
-
-function formatHKD(n) {
-  if (n == null) return "—";
-  return `HK$${n.toLocaleString("en-HK")}`;
-}
 
 function formatDuration(min) {
   if (!min) return "—";
@@ -36,7 +37,8 @@ function formatTimeRange(opt) {
   return `${dep} → ${arr}`;
 }
 
-export default function PanelFlights({ itinerary, listIndex, onSelect, onPick }) {
+export default function PanelFlights({ itinerary, listIndex, currency = "HKD", onSelect, onPick }) {
+  const formatPrice = (n) => formatDisplayPrice(n, currency);
   const flight = itinerary?.flight;
   const options = flight?.options || [];
 
@@ -121,7 +123,7 @@ export default function PanelFlights({ itinerary, listIndex, onSelect, onPick })
                     {opt.airline}
                   </span>
                 )}
-                {formatHKD(opt.price_low)}
+                {formatPrice(opt.price_low)}
               </span>
               <span className="flight-option-meta">
                 {opt.duration_min ? formatDuration(opt.duration_min) : "—"}
@@ -141,11 +143,11 @@ export default function PanelFlights({ itinerary, listIndex, onSelect, onPick })
               {selected.airline || selected.label || stopsLabel(selected.stops)}
             </div>
             <div className="flight-detail-price">
-              {formatHKD(selected.price_low)}
+              {formatPrice(selected.price_low)}
               {selected.price_high &&
                 selected.price_high !== selected.price_low && (
                   <span className="flight-detail-price-range">
-                    {" "}– {formatHKD(selected.price_high)}
+                    {" "}– {formatPrice(selected.price_high)}
                   </span>
                 )}
             </div>

@@ -99,6 +99,60 @@ export function loadTheme() {
   }
 }
 
+// Round 14 — display currency conversion. Rates are hardcoded
+// approximations from HKD (the backend's native currency).
+const CURRENCY_STORAGE_KEY = "travel-currency";
+
+export const CURRENCY_TO_HKD = {
+  HKD: 1.0,
+  USD: 7.8,   // 1 USD ≈ 7.8 HKD
+  EUR: 8.4,   // 1 EUR ≈ 8.4 HKD
+  JPY: 0.052, // 1 JPY ≈ 0.052 HKD
+  GBP: 9.9,   // 1 GBP ≈ 9.9 HKD
+  CNY: 1.1,   // 1 CNY ≈ 1.1 HKD
+};
+
+export const CURRENCY_LABELS = {
+  HKD: "HK$",
+  USD: "US$",
+  EUR: "€",
+  JPY: "¥",
+  GBP: "£",
+  CNY: "¥CN",
+};
+
+export function loadCurrency() {
+  try {
+    const raw = localStorage.getItem(CURRENCY_STORAGE_KEY);
+    return raw && raw in CURRENCY_TO_HKD ? raw : "HKD";
+  } catch {
+    return "HKD";
+  }
+}
+
+function saveCurrency(code) {
+  try {
+    localStorage.setItem(CURRENCY_STORAGE_KEY, code);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Convert an HKD price into the display currency. Backend returns
+ * HKD, the frontend re-labels with a fixed rate. */
+export function priceInDisplayCurrency(hkd, currency) {
+  if (typeof hkd !== "number" || !Number.isFinite(hkd)) return null;
+  const rate = CURRENCY_TO_HKD[currency] || 1;
+  return hkd / rate;
+}
+
+export function formatDisplayPrice(hkd, currency) {
+  const converted = priceInDisplayCurrency(hkd, currency);
+  if (converted == null) return "—";
+  const label = CURRENCY_LABELS[currency] || CURRENCY_LABELS.HKD;
+  return `${label}${Math.round(converted).toLocaleString("en")}`;
+}
+
 function saveTheme(theme) {
   try {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
@@ -124,6 +178,7 @@ export default function SettingsOverlay({
   onClose,
   onChange,
   onTtsChange,
+  onCurrencyChange,
   muted = false,
   onToggleMute,
   onClearAll,
@@ -131,6 +186,7 @@ export default function SettingsOverlay({
   const [prefs, setPrefs] = useState(() => loadPrefs());
   const [tts, setTts] = useState(() => loadTts());
   const [theme, setTheme] = useState(() => loadTheme());
+  const [currency, setCurrency] = useState(() => loadCurrency());
   const [voices, setVoices] = useState([]);
   const [confirmClear, setConfirmClear] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -147,6 +203,10 @@ export default function SettingsOverlay({
   useEffect(() => {
     onTtsChange?.(tts);
   }, [tts, onTtsChange]);
+
+  useEffect(() => {
+    onCurrencyChange?.(currency);
+  }, [currency, onCurrencyChange]);
 
   // speechSynthesis.getVoices() returns [] until the voices finish
   // loading on some browsers (Chrome). Subscribe to the onvoiceschanged
@@ -228,6 +288,21 @@ export default function SettingsOverlay({
         setTheme(next);
         saveTheme(next);
         applyTheme(next);
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 600);
+      },
+    },
+    {
+      kind: "action",
+      key: "currency",
+      label: "CURRENCY",
+      value: currency,
+      onActivate: () => {
+        const codes = Object.keys(CURRENCY_TO_HKD);
+        const idx = codes.indexOf(currency);
+        const next = codes[(idx + 1) % codes.length];
+        setCurrency(next);
+        saveCurrency(next);
         setSavedFlash(true);
         setTimeout(() => setSavedFlash(false), 600);
       },

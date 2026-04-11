@@ -5,7 +5,7 @@ import Subtitle from "./components/Subtitle";
 import ChatPopover from "./components/ChatPopover";
 import AgentStatusBar from "./components/AgentStatusBar";
 import HistoryOverlay from "./components/HistoryOverlay";
-import SettingsOverlay, { loadTts, loadTheme, applyTheme } from "./components/SettingsOverlay";
+import SettingsOverlay, { loadTts, loadTheme, applyTheme, loadCurrency } from "./components/SettingsOverlay";
 import PanelHome from "./components/panels/PanelHome";
 import PanelFlights from "./components/panels/PanelFlights";
 import PanelHotels from "./components/panels/PanelHotels";
@@ -173,6 +173,7 @@ function App() {
   const { location: userLocation, requestPermission } = useGeolocation();
   const menu = useMenuState();
   const [tts, setTts] = useState(() => loadTts());
+  const [currency, setCurrency] = useState(() => loadCurrency());
   const subtitles = useSubtitleQueue({
     muted,
     rate: tts.rate,
@@ -822,6 +823,7 @@ function App() {
           <PanelFlights
             itinerary={currentItinerary}
             listIndex={menu.state.listIndex}
+            currency={currency}
             onSelect={selectListItem}
             onPick={(i) => {
               const opt = currentItinerary?.flight?.options?.[i];
@@ -942,6 +944,7 @@ function App() {
         onClose={() => setSettingsOpen(false)}
         onChange={setPreferences}
         onTtsChange={setTts}
+        onCurrencyChange={setCurrency}
         muted={muted}
         onToggleMute={() => setMuted((m) => !m)}
         onClearAll={handleClearAll}
