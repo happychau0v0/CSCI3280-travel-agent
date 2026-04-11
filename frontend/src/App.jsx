@@ -601,6 +601,27 @@ function App() {
               if (!opt) return;
               setCurrentItinerary({ ...currentItinerary, selected_flight: opt });
               cues.chime();
+              // Round 10 — fire the turn-2 follow-up so the LLM
+              // switches into the transport question step. The
+              // prompt's 4-turn flow expects this exact shape.
+              const airline = opt.airline || opt.label || "the selected flight";
+              const stopsLbl =
+                opt.stops === 0 ? "non-stop" :
+                opt.stops === 1 ? "1 stop" :
+                `${opt.stops || 0} stops`;
+              const priceLbl =
+                typeof opt.price_low === "number"
+                  ? `HK$${opt.price_low.toLocaleString("en-HK")}`
+                  : "price unknown";
+              const durLbl =
+                opt.duration_min
+                  ? `${Math.floor(opt.duration_min / 60)}h ${opt.duration_min % 60}m`
+                  : "unknown duration";
+              const depLbl = opt.departure_time || "?";
+              const followUp =
+                `I picked ${airline} (${stopsLbl}, ${priceLbl}, ${durLbl}, ` +
+                `departs ${depLbl}). Ask me about local transport.`;
+              handleSend(followUp);
             }}
           />
         )}
@@ -612,20 +633,21 @@ function App() {
             onPick={(i) => {
               const hotel = currentItinerary?.hotels?.[i];
               if (!hotel) return;
-              // Stamp the pick locally so the HOME card and the .picked
-              // class update immediately without waiting for the agent.
+              // Stamp the pick locally so the detail card and the
+              // .picked class update immediately without waiting
+              // for the agent.
               setCurrentItinerary({
                 ...currentItinerary,
                 selected_hotel: hotel,
               });
               cues.chime();
-              // Auto-fire a replan chat. The backend SYSTEM_PROMPT
-              // (R3b) instructs the LLM to anchor each day at this
-              // hotel.
-              const prompt =
-                `Set "${hotel.name}" as the base hotel. ` +
-                `Replan every day so each route starts and ends at this hotel.`;
-              handleSend(prompt);
+              // Round 10 — fire the turn-4 follow-up so the LLM
+              // starts the day-by-day planning step. Matches the
+              // 4-turn flow in prompts.py.
+              const addr = hotel.address ? ` at ${hotel.address}` : "";
+              const followUp =
+                `I picked ${hotel.name}${addr}. Start the day-by-day plan now.`;
+              handleSend(followUp);
             }}
           />
         )}
