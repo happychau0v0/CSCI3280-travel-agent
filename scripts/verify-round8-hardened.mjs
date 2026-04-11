@@ -3246,6 +3246,74 @@ const FAKE_MESSAGES = [
   const subtitleBar = await page.locator('[data-testid="subtitle-bar"]').count();
   record('27.5 Subtitle bar carries data-testid', subtitleBar === 1);
 
+  // ─── PHASE 28 — Round 19 favorites + ICS export ─────────────────
+  console.log('\n=== Phase 28: Round 19 favorites + ICS export ===');
+
+  // 28.1 — Activity favorite button renders on real activities
+  await clearAll(page);
+  await seed(page, { itinerary: R15_ITIN });
+  await page.keyboard.press('4');
+  await page.waitForTimeout(400);
+  const favBtn = await page.locator('[data-testid="activity-fav-1"]').count();
+  record('28.1 Activity row has a favorite button', favBtn === 1);
+
+  // 28.2 — Clicking favorite persists to localStorage
+  if (favBtn === 1) {
+    await page.locator('[data-testid="activity-fav-1"]').click();
+    await page.waitForTimeout(200);
+    const stored = await page.evaluate(() => {
+      try {
+        return JSON.parse(localStorage.getItem('travel-favorites') || '[]');
+      } catch {
+        return [];
+      }
+    });
+    record(
+      '28.2 Favorite persists to localStorage',
+      Array.isArray(stored) && stored.length >= 1,
+      `count: ${stored?.length || 0}`,
+    );
+  } else {
+    record('28.2 (skipped — no favorite button)', false);
+  }
+
+  // 28.3 — Plan history ICS export button renders
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'travel-plan-history',
+      JSON.stringify([
+        {
+          id: 'ics1',
+          created_at: Date.now(),
+          destination: 'Tokyo',
+          origin: 'Hong Kong',
+          start_date: '2026-05-15',
+          end_date: '2026-05-17',
+          day_count: 3,
+          itinerary: {
+            destination: 'Tokyo',
+            days: [
+              {
+                day: 1,
+                date: '2026-05-15',
+                activities: [
+                  { time: '10:00', name: 'Senso-ji', address: 'Asakusa', duration_min: 60 },
+                ],
+              },
+            ],
+          },
+          messages: [],
+        },
+      ]),
+    );
+  });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(500);
+  await page.locator('body').click();
+  await page.waitForTimeout(200);
+  const icsBtn = await page.locator('[data-testid="plan-history-ics-ics1"]').count();
+  record('28.3 Plan history card has an ICS button', icsBtn === 1);
+
   // ─── PHASE 14 — Globe + idempotency + console sweep (5) ────────────
   console.log('\n=== Phase 14: Globe + final sweep ===');
   await page.keyboard.press('1');
