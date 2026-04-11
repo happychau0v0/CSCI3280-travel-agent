@@ -309,6 +309,9 @@ class Activity(BaseModel):
     lat: float | None = None
     lng: float | None = None
     transport_to_next: TransportStep | None = None
+    # Round 16 — user-authored note attached to an activity. Never
+    # emitted by the LLM, only set by the frontend.
+    user_note: str | None = None
 
 
 class Weather(BaseModel):

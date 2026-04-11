@@ -44,6 +44,7 @@ function ActivityRow({
   onDragEnd,
   onRemove,
   onReplace,
+  onNoteChange,
 }) {
   const [expandedLocal, setExpandedLocal] = useState(false);
   // Round 15 — when expandOverride is non-null (from expand/collapse
@@ -118,6 +119,28 @@ function ActivityRow({
       {gallery.length > 0 && (
         <PhotoGallery photos={gallery} altPrefix={activity.name} maxCount={4} />
       )}
+      {expanded && onNoteChange && (
+        <div className="activity-note-wrap" onClick={(e) => e.stopPropagation()}>
+          <span className="activity-note-label">NOTE</span>
+          <input
+            type="text"
+            className="activity-note-input"
+            placeholder="Add a personal note (e.g. reserve ahead)…"
+            defaultValue={activity.user_note || ""}
+            onBlur={(e) => onNoteChange(index, e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                e.target.blur();
+              }
+            }}
+            data-testid={`activity-note-${index}`}
+          />
+        </div>
+      )}
+      {activity.user_note && !expanded && (
+        <div className="activity-note-preview">◇ {activity.user_note}</div>
+      )}
       {isDraggable && (onRemove || onReplace) && (
         <div
           className="activity-actions"
@@ -158,6 +181,7 @@ export default function PanelDays({
   onReorderActivities,
   onRemoveActivity,
   onReplaceActivity,
+  onSetActivityNote,
 }) {
   const days = itinerary?.days || [];
   const hotelName =
@@ -364,6 +388,7 @@ export default function PanelDays({
               onDragEnd={handleDragEnd}
               onRemove={onRemoveActivity ? (idx) => onRemoveActivity(selectedIdx, idx) : null}
               onReplace={onReplaceActivity ? (idx) => onReplaceActivity(selectedIdx, idx) : null}
+              onNoteChange={onSetActivityNote ? (idx, note) => onSetActivityNote(selectedIdx, idx, note) : null}
             />
           ))}
         </ol>

@@ -1034,6 +1034,51 @@
   color: var(--accent);
 }
 
+/* Round 16 — per-activity note input */
+.activity-note-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: rgba(94, 234, 212, 0.04);
+  border: 1px solid rgba(94, 234, 212, 0.25);
+}
+
+.activity-note-label {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--accent-2);
+  text-transform: uppercase;
+  flex: 0 0 auto;
+}
+
+.activity-note-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 2px 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-h);
+  font-family: var(--mono);
+  font-size: 11px;
+  outline: none;
+}
+
+.activity-note-input:hover,
+.activity-note-input:focus {
+  border-color: var(--accent-2);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.activity-note-preview {
+  margin-top: 6px;
+  padding-left: 8px;
+  font-size: 11px;
+  color: var(--accent-2);
+  font-style: italic;
+}
+
 /* Round 14 — keyboard help overlay */
 .help-overlay-backdrop {
   position: fixed;

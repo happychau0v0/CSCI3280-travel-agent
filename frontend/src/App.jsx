@@ -931,6 +931,21 @@ function App() {
                 `Keep every other activity, keep the hotel anchor, update times if needed.`,
               );
             }}
+            onSetActivityNote={(dayIdx, actIdx, note) => {
+              // Round 16 — attach a personal note to an activity.
+              // Purely local; persists via the travel-chat-state
+              // auto-save hook.
+              setCurrentItinerary((prev) => {
+                if (!prev?.days?.[dayIdx]?.activities) return prev;
+                const day = prev.days[dayIdx];
+                const acts = day.activities.map((a, i) =>
+                  i === actIdx ? { ...a, user_note: note.trim() || undefined } : a,
+                );
+                const days = [...prev.days];
+                days[dayIdx] = { ...day, activities: acts };
+                return { ...prev, days };
+              });
+            }}
           />
         )}
       </MenuShell>
