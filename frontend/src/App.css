@@ -822,6 +822,19 @@
   border-color: var(--accent);
 }
 
+.plan-history-card-btn.ics {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 1;
+  color: #fbbf24;
+}
+
+.plan-history-card-btn.ics:hover {
+  background: rgba(251, 191, 36, 0.18);
+  border-color: #fbbf24;
+}
+
 .plan-history-card-btn.share.copied {
   background: var(--accent);
   color: var(--bg);

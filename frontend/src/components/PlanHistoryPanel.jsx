@@ -77,6 +77,112 @@ async function copyPermalink(entry) {
   }
 }
 
+// Round 19 — ICS (RFC 5545) calendar export. Each day's activities
+// become VEVENT entries the user can import into Google Calendar,
+// Apple Calendar, Outlook, etc.
+function _pad2(n) {
+  return n < 10 ? `0${n}` : String(n);
+}
+
+function _formatIcsDateTime(dateStr, timeStr) {
+  // dateStr: YYYY-MM-DD, timeStr: HH:MM → YYYYMMDDTHHMMSS
+  if (!dateStr) return null;
+  const [y, m, d] = dateStr.split("-").map((n) => parseInt(n, 10));
+  let h = 9;
+  let min = 0;
+  if (timeStr) {
+    const parts = timeStr.split(":").map((n) => parseInt(n, 10));
+    if (Number.isFinite(parts[0])) h = parts[0];
+    if (Number.isFinite(parts[1])) min = parts[1];
+  }
+  return `${y}${_pad2(m)}${_pad2(d)}T${_pad2(h)}${_pad2(min)}00`;
+}
+
+function _addMinutes(icsDt, minutes) {
+  // Bare-minimum arithmetic — parse and add.
+  if (!icsDt) return null;
+  const y = parseInt(icsDt.slice(0, 4), 10);
+  const mo = parseInt(icsDt.slice(4, 6), 10);
+  const d = parseInt(icsDt.slice(6, 8), 10);
+  const h = parseInt(icsDt.slice(9, 11), 10);
+  const mi = parseInt(icsDt.slice(11, 13), 10);
+  const date = new Date(Date.UTC(y, mo - 1, d, h, mi));
+  date.setUTCMinutes(date.getUTCMinutes() + (minutes || 0));
+  return (
+    `${date.getUTCFullYear()}${_pad2(date.getUTCMonth() + 1)}${_pad2(date.getUTCDate())}` +
+    `T${_pad2(date.getUTCHours())}${_pad2(date.getUTCMinutes())}00`
+  );
+}
+
+function _escapeIcs(text) {
+  return String(text || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
+}
+
+function buildIcs(entry) {
+  const itinerary = entry?.itinerary;
+  if (!itinerary) return null;
+  const lines = [];
+  lines.push("BEGIN:VCALENDAR");
+  lines.push("VERSION:2.0");
+  lines.push("PRODID:-//CSCI3280 Travel Agent//EN");
+  lines.push("CALSCALE:GREGORIAN");
+  lines.push("METHOD:PUBLISH");
+  const title = itinerary.title || itinerary.destination || "Trip";
+  lines.push(`X-WR-CALNAME:${_escapeIcs(title)}`);
+  const now = new Date();
+  const dtstamp =
+    `${now.getUTCFullYear()}${_pad2(now.getUTCMonth() + 1)}${_pad2(now.getUTCDate())}` +
+    `T${_pad2(now.getUTCHours())}${_pad2(now.getUTCMinutes())}00Z`;
+  let eventIdx = 0;
+  for (const day of itinerary.days || []) {
+    for (const act of day.activities || []) {
+      const start = _formatIcsDateTime(day.date, act.time);
+      if (!start) continue;
+      const end = _addMinutes(start, act.duration_min || 60);
+      const uid = `${entry.id || "plan"}-${eventIdx++}@travel-agent.local`;
+      lines.push("BEGIN:VEVENT");
+      lines.push(`UID:${uid}`);
+      lines.push(`DTSTAMP:${dtstamp}`);
+      lines.push(`DTSTART:${start}`);
+      lines.push(`DTEND:${end}`);
+      lines.push(`SUMMARY:${_escapeIcs(act.name || "Activity")}`);
+      if (act.address) lines.push(`LOCATION:${_escapeIcs(act.address)}`);
+      const descParts = [];
+      if (act.description) descParts.push(act.description);
+      if (act.user_note) descParts.push(`Note: ${act.user_note}`);
+      if (descParts.length > 0) {
+        lines.push(`DESCRIPTION:${_escapeIcs(descParts.join("\n"))}`);
+      }
+      lines.push("END:VEVENT");
+    }
+  }
+  lines.push("END:VCALENDAR");
+  return lines.join("\r\n");
+}
+
+function downloadPlanAsIcs(entry) {
+  try {
+    const ics = buildIcs(entry);
+    if (!ics) return;
+    const blob = new Blob([ics], { type: "text/calendar" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const safeDest = (entry.destination || "plan").replace(/[^a-z0-9]+/gi, "-");
+    a.download = `travel-plan-${safeDest.toLowerCase()}-${entry.id}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+  } catch {
+    /* ignore */
+  }
+}
+
 async function readImportedFile(file) {
   try {
     const text = await file.text();
@@ -231,6 +337,16 @@ export default function PlanHistoryPanel({ plans = [], onLoad, onDelete, onImpor
                   title="Export as JSON"
                 >
                   ↓
+                </button>
+                <button
+                  type="button"
+                  className="plan-history-card-btn ics"
+                  onClick={() => downloadPlanAsIcs(p)}
+                  data-testid={`plan-history-ics-${p.id}`}
+                  aria-label="Export as calendar (.ics)"
+                  title="Export as calendar (.ics)"
+                >
+                  📅
                 </button>
                 <button
                   type="button"
