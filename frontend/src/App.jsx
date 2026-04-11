@@ -14,6 +14,7 @@ import SettingsOverlay, {
   applySubtitleSize,
 } from "./components/SettingsOverlay";
 import HelpOverlay from "./components/HelpOverlay";
+import PrintView from "./components/PrintView";
 import PanelHome from "./components/panels/PanelHome";
 import PanelFlights from "./components/panels/PanelFlights";
 import PanelHotels from "./components/panels/PanelHotels";
@@ -133,6 +134,7 @@ function App() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
   // Agent status state used by the AgentStatusBar — addresses the
   // round-7 "feels unresponsive" complaint with overlapping indicators.
   const [agentState, setAgentState] = useState("idle"); // idle|working|done|error
@@ -356,7 +358,8 @@ function App() {
     onUndo: handleUndoPick,
     onRedo: handleRedoPick,
     onOpenHelp: () => setHelpOpen(true),
-    enabled: !historyOpen && !settingsOpen && !helpOpen,
+    onOpenPrint: () => setPrintOpen(true),
+    enabled: !historyOpen && !settingsOpen && !helpOpen && !printOpen,
   });
 
   // Persist messages + itinerary
@@ -423,6 +426,7 @@ function App() {
       historyOpen,
       settingsOpen,
       helpOpen,
+      printOpen,
       chatPopoverOpen,
       muted,
       messages,
@@ -1017,6 +1021,12 @@ function App() {
       />
 
       <HelpOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <PrintView
+        open={printOpen}
+        itinerary={currentItinerary}
+        currency={currency}
+        onClose={() => setPrintOpen(false)}
+      />
 
       {/* Bottom-center subtitle bar with auto-TTS + R16 history */}
       <Subtitle text={subtitles.current} history={subtitles.history || []} />

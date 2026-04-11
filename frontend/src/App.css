@@ -1253,6 +1253,150 @@
   line-height: 1.35;
 }
 
+/* Round 17 — print view overlay */
+.print-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 45;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 20px;
+  overflow-y: auto;
+  animation: help-backdrop-fade 200ms ease-out;
+}
+
+.print-overlay {
+  background: #ffffff;
+  color: #111;
+  max-width: 780px;
+  width: 100%;
+  padding: 40px 48px;
+  font-family: Georgia, "Times New Roman", serif;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+
+.print-overlay-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+}
+
+.print-overlay-actions button {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  padding: 6px 14px;
+  background: #eee;
+  color: #111;
+  border: 1px solid #888;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+.print-overlay-actions button:hover {
+  background: #111;
+  color: #fff;
+}
+
+.print-itinerary h1 {
+  font-size: 28px;
+  margin: 0 0 4px;
+  color: #111;
+  font-family: Georgia, serif;
+}
+
+.print-subheader {
+  color: #444;
+  font-size: 14px;
+  margin: 0 0 28px;
+}
+
+.print-section {
+  margin-bottom: 26px;
+}
+
+.print-section h2 {
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  border-bottom: 2px solid #111;
+  padding-bottom: 4px;
+  margin-bottom: 10px;
+  font-family: Georgia, serif;
+}
+
+.print-day {
+  margin-bottom: 18px;
+  break-inside: avoid;
+}
+
+.print-day h3 {
+  font-size: 15px;
+  margin: 0 0 4px;
+  font-family: Georgia, serif;
+}
+
+.print-weather {
+  font-style: italic;
+  color: #555;
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+
+.print-activities {
+  padding-left: 20px;
+  line-height: 1.6;
+  font-size: 13px;
+}
+
+.print-activities li {
+  margin-bottom: 6px;
+}
+
+.print-dim {
+  color: #555;
+}
+
+.print-note {
+  margin-top: 2px;
+  padding-left: 12px;
+  font-style: italic;
+  color: #333;
+  font-size: 12px;
+}
+
+.print-footer {
+  margin-top: 36px;
+  padding-top: 12px;
+  border-top: 1px solid #bbb;
+  color: #555;
+  font-size: 11px;
+}
+
+@media print {
+  body > *:not(.print-overlay-backdrop) {
+    display: none !important;
+  }
+  .print-overlay-backdrop {
+    position: static;
+    background: none;
+    padding: 0;
+    display: block;
+  }
+  .print-overlay {
+    box-shadow: none;
+    border: none;
+    padding: 0;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+
 .home-next-todo li {
   margin-top: 3px;
   color: var(--text);

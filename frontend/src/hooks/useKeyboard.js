@@ -45,6 +45,7 @@ export function useKeyboard({
   onUndo,
   onRedo,
   onOpenHelp,
+  onOpenPrint,
   enabled = true,
 }) {
   useEffect(() => {
@@ -158,6 +159,15 @@ export function useKeyboard({
           onOpenHelp?.();
           break;
 
+        case "p":
+        case "P":
+          // Round 17 — open the print-friendly trip view
+          if (!e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            onOpenPrint?.();
+          }
+          break;
+
         case "h":
         case "H":
           if (!e.metaKey && !e.ctrlKey) {
@@ -219,5 +229,6 @@ export function useKeyboard({
     onUndo,
     onRedo,
     onOpenHelp,
+    onOpenPrint,
   ]);
 }
