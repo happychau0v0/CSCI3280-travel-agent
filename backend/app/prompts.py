@@ -338,6 +338,9 @@ class FlightOption(BaseModel):
     arrival_time: str | None = None
     type: str | None = None
     recommended: bool | None = None
+    # Round 12 — cabin class the price was computed for.
+    seat_class: str | None = None
+    seat_class_label: str | None = None
 
 
 class Flight(BaseModel):
@@ -361,6 +364,10 @@ class Flight(BaseModel):
     # Top-level convenience fields populated from the chosen option.
     departure_time: str | None = None
     arrival_time: str | None = None
+    # Round 12 — cabin class carried at the top level so panels and
+    # history cards can display it alongside price.
+    seat_class: str | None = None
+    seat_class_label: str | None = None
 
 
 class Hotel(BaseModel):

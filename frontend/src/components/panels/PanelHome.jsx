@@ -36,6 +36,17 @@ const FIELDS = [
       ["mixed", "Mixed"],
     ],
   },
+  {
+    key: "seat_class",
+    label: "CABIN",
+    type: "select",
+    options: [
+      ["economy", "Economy"],
+      ["premium_economy", "Premium Economy"],
+      ["business", "Business"],
+      ["first", "First"],
+    ],
+  },
   { key: "party_size", label: "PARTY SIZE", type: "number", min: 1, max: 8 },
   { key: "interests", label: "INTERESTS", type: "text", placeholder: "history, food, hiking" },
 ];
@@ -59,6 +70,13 @@ function saveForm(form) {
   }
 }
 
+const SEAT_CLASS_TEXT = {
+  economy: "economy",
+  premium_economy: "premium economy",
+  business: "business class",
+  first: "first class",
+};
+
 function buildPrompt(form) {
   const dest = form.destination?.trim() || "somewhere";
   const start = form.start_date || "";
@@ -76,9 +94,12 @@ function buildPrompt(form) {
   const interests = form.interests?.trim() || "general sightseeing";
   const dateText = start ? ` starting ${start}` : "";
   const origin = form.origin?.trim() || "my current city";
+  const seat = form.seat_class || "economy";
+  const seatText = SEAT_CLASS_TEXT[seat] || "economy";
   return (
     `Plan a ${dayText} trip from ${origin} to ${dest}${dateText} ` +
-    `with ${transport} transport for ${party}. Interests: ${interests}.`
+    `with ${transport} transport for ${party}. Interests: ${interests}. ` +
+    `Flight cabin: ${seatText}. Use search_flights with seat_class="${seat}".`
   );
 }
 

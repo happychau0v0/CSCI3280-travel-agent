@@ -75,6 +75,14 @@ export default function PanelFlights({ itinerary, listIndex, onSelect, onPick })
           >
             {isLive ? "LIVE" : "ESTIMATE"}
           </span>
+          {flight.seat_class_label && flight.seat_class !== "economy" && (
+            <span
+              className="flight-source-badge"
+              style={{ marginLeft: 8, background: "rgba(251, 191, 36, 0.15)", color: "#fbbf24" }}
+            >
+              {flight.seat_class_label.toUpperCase()}
+            </span>
+          )}
         </div>
         <div className="home-summary-line">
           <strong>{options.length}</strong>

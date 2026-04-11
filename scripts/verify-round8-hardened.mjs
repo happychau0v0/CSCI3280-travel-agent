@@ -199,7 +199,8 @@ const FAKE_MESSAGES = [
   record('1.5b PLAN has NEXT TRIP summary band', summaryBand === 1);
 
   const formFieldCount = await page.locator('.home-form .panel-list-item').count();
-  record('1.6 PLAN form has 7 fields (incl. origin)', formFieldCount === 7, `count: ${formFieldCount}`);
+  // Round 12 added a CABIN row, so the total is 8 fields.
+  record('1.6 PLAN form has 8 fields (incl. CABIN)', formFieldCount === 8, `count: ${formFieldCount}`);
 
   const planBtn = await page.locator('[data-testid="trip-plan-btn"]').count();
   record('1.7 START PLANNING button rendered', planBtn === 1);

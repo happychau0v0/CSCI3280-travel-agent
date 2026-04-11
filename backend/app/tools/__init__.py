@@ -146,6 +146,11 @@ TOOL_DEFINITIONS: list[dict] = [
                         "type": "string",
                         "description": "Optional ISO date (YYYY-MM-DD). Defaults to 30 days from now.",
                     },
+                    "seat_class": {
+                        "type": "string",
+                        "enum": ["economy", "premium_economy", "business", "first"],
+                        "description": "Optional cabin class. Defaults to 'economy'. When the user has picked a non-economy class on the PLAN form, pass it here so prices reflect the right cabin.",
+                    },
                 },
                 "required": ["origin", "destination"],
             },

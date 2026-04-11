@@ -810,6 +810,47 @@ def test_prompts_hotel_count_is_consistent():
     assert "5 to 8" in SYSTEM_PROMPT or "5-8" in SYSTEM_PROMPT
 
 
+# ─── Round 12 — flight seat class ────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_search_flights_default_seat_class_economy():
+    """When seat_class is omitted, search_flights defaults to economy
+    and every option carries seat_class='economy'."""
+    with patch("app.tools.flights._try_fast_flights", return_value=[]):
+        result = await flights.search_flights("Hong Kong", "Tokyo", "2026-06-01")
+    assert result["seat_class"] == "economy"
+    assert result["seat_class_label"] == "Economy"
+    for opt in result["options"]:
+        assert opt["seat_class"] == "economy"
+
+
+@pytest.mark.asyncio
+async def test_search_flights_business_seat_class_scales_prices():
+    """Business seat class multiplies prices by 3.2× vs economy."""
+    with patch("app.tools.flights._try_fast_flights", return_value=[]):
+        economy = await flights.search_flights("Hong Kong", "Tokyo", "2026-06-01")
+        business = await flights.search_flights("Hong Kong", "Tokyo", "2026-06-01", seat_class="business")
+    assert business["seat_class"] == "business"
+    assert business["seat_class_label"] == "Business"
+    # The non-stop early option is always the first entry; verify
+    # its price scaled.
+    econ_price = economy["options"][0]["price_low"]
+    biz_price = business["options"][0]["price_low"]
+    # 3.2× with rounding — allow ±1 for int rounding.
+    assert abs(biz_price - round(econ_price * 3.2)) <= 1
+    for opt in business["options"]:
+        assert opt["seat_class"] == "business"
+
+
+@pytest.mark.asyncio
+async def test_search_flights_unknown_seat_class_falls_back_to_economy():
+    """Defensive: a typo or unknown value defaults to economy."""
+    with patch("app.tools.flights._try_fast_flights", return_value=[]):
+        result = await flights.search_flights("Hong Kong", "Tokyo", "2026-06-01", seat_class="coach")
+    assert result["seat_class"] == "economy"
+
+
 # ─── flights.py round 9 — 4-6 options ────────────────────────────────────
 
 

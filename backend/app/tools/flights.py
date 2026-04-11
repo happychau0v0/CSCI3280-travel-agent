@@ -472,10 +472,43 @@ def _options_from_live(live: list[dict]) -> list[dict]:
 # ─── The tool itself ──────────────────────────────────────────────────────
 
 
+SEAT_CLASS_MULTIPLIERS = {
+    "economy": 1.0,
+    "premium_economy": 1.6,
+    "business": 3.2,
+    "first": 5.5,
+}
+
+SEAT_CLASS_LABELS = {
+    "economy": "Economy",
+    "premium_economy": "Premium Economy",
+    "business": "Business",
+    "first": "First",
+}
+
+
+def _apply_seat_multiplier(options: list[dict], seat_class: str) -> list[dict]:
+    """Round 12 — scale option prices by the seat class multiplier and
+    tag each option with the effective seat_class so the frontend can
+    render it. Operates in place and returns the list for chaining."""
+    mult = SEAT_CLASS_MULTIPLIERS.get(seat_class, 1.0)
+    label = SEAT_CLASS_LABELS.get(seat_class, "Economy")
+    for opt in options:
+        if mult != 1.0:
+            if isinstance(opt.get("price_low"), (int, float)):
+                opt["price_low"] = round(opt["price_low"] * mult)
+            if isinstance(opt.get("price_high"), (int, float)):
+                opt["price_high"] = round(opt["price_high"] * mult)
+        opt["seat_class"] = seat_class
+        opt["seat_class_label"] = label
+    return options
+
+
 async def search_flights(
     origin: str,
     destination: str,
     date: str | None = None,
+    seat_class: str | None = None,
 ) -> dict:
     """Search for flights between two cities.
 
@@ -483,7 +516,15 @@ async def search_flights(
     "Paris"). We resolve them to IATA codes via the bundled airport table.
     If a city isn't in the table the call returns an error dict so the LLM
     can recover.
+
+    Round 12 — seat_class defaults to "economy" but can be set to
+    "premium_economy", "business", or "first" to scale prices by a
+    fixed multiplier (1.6×/3.2×/5.5×). Each returned option carries a
+    seat_class + seat_class_label field the frontend displays.
     """
+    seat_class = (seat_class or "economy").lower().strip()
+    if seat_class not in SEAT_CLASS_MULTIPLIERS:
+        seat_class = "economy"
     from_entry = lookup_airport(origin)
     to_entry = lookup_airport(destination)
 
@@ -517,6 +558,11 @@ async def search_flights(
         options = _build_options(distance_km, date)
         source = "estimator"
 
+    # Round 12 — apply the seat class multiplier AFTER the base
+    # options are built so both the live and estimator paths yield
+    # cabin-aware pricing.
+    _apply_seat_multiplier(options, seat_class)
+
     # Top-level summary fields point at the recommended (non-stop) option so
     # FlightCards that don't iterate options still render meaningful values.
     primary = options[0]
@@ -543,4 +589,6 @@ async def search_flights(
         "stops_typical": primary["stops"],
         "source": source,
         "google_flights_url": deep_link,
+        "seat_class": seat_class,
+        "seat_class_label": SEAT_CLASS_LABELS[seat_class],
     }
