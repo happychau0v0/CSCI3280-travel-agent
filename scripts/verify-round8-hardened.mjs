@@ -1247,7 +1247,68 @@ const FAKE_MESSAGES = [
     (replannedDay1?.activities || []).length > 2,
     `count: ${replannedDay1?.activities?.length}`,
   );
+
+  // 13.6.15-22 — additional structural sanity on the replanned day
+  const acts = replannedDay1?.activities || [];
+  record(
+    '13.6.15 All activities have a time',
+    acts.length > 0 && acts.every((a) => typeof a.time === 'string' && /^\d{1,2}:\d{2}/.test(a.time)),
+  );
+  // Times should be monotonic within a day (HH:MM sort matches)
+  const times = acts.map((a) => a.time).filter(Boolean);
+  const sorted = [...times].sort();
+  record(
+    '13.6.16 Activity times are chronologically ordered',
+    JSON.stringify(times) === JSON.stringify(sorted),
+    `times: ${times.join(',')}`,
+  );
+  record(
+    '13.6.17 All activities have non-empty names',
+    acts.every((a) => typeof a.name === 'string' && a.name.length > 0),
+  );
+  // PanelDays shows 🏨 HOTEL tag on matching activities
+  await page.keyboard.press('4'); // DAYS tab
+  await page.waitForTimeout(200);
+  const hotelTagCount = await page.locator('.activity-hotel-tag').count();
+  record(
+    '13.6.17b PanelDays renders 🏨 HOTEL tag for bookends',
+    hotelTagCount >= 2,
+    `count: ${hotelTagCount}`,
+  );
+
   await clearStreamMock(page);
+
+  // Flight sanity checks on the original FAKE_ITINERARY
+  await seed(page, { itinerary: FAKE_ITINERARY });
+  dbg = await debugState(page);
+  const flight2 = dbg?.itinerary?.flight;
+  record(
+    '13.6.18 Flight from_iata != to_iata',
+    flight2?.from_iata !== flight2?.to_iata,
+  );
+  record(
+    '13.6.19 Flight coordinates within valid lat/lng ranges',
+    Math.abs(flight2?.from_lat || 0) <= 90 && Math.abs(flight2?.to_lat || 0) <= 90 &&
+    Math.abs(flight2?.from_lng || 0) <= 180 && Math.abs(flight2?.to_lng || 0) <= 180,
+  );
+  // Hotels must have unique names
+  const hotelNames = (dbg?.itinerary?.hotels || []).map((h) => h.name);
+  record(
+    '13.6.20 Hotels have unique names',
+    new Set(hotelNames).size === hotelNames.length,
+  );
+  // Hotel rating sanity
+  record(
+    '13.6.21 Hotel ratings are within 0-5',
+    (dbg?.itinerary?.hotels || []).every((h) => h.rating == null || (h.rating >= 0 && h.rating <= 5)),
+  );
+  // Day dates strictly ascending if set
+  const dayDates = (dbg?.itinerary?.days || []).map((d) => d.date).filter(Boolean);
+  const dayDatesSorted = [...dayDates].sort();
+  record(
+    '13.6.22 Day dates are ascending',
+    JSON.stringify(dayDates) === JSON.stringify(dayDatesSorted),
+  );
 
   // ─── PHASE 13.7 — Additional UX sanity checks (12) ─────────────────
   console.log('\n=== Phase 13.7: Additional UX sanity checks ===');
@@ -1444,7 +1505,9 @@ const FAKE_MESSAGES = [
       record('13.8.4 Real itinerary has at least 1 hotel', (real?.hotels || []).length >= 1);
       record('13.8.5 Real itinerary has at least 1 day', (real?.days || []).length >= 1);
 
-      // Per-day quality: each day should have ≥2 activities
+      // Per-day quality: each day should have ≥2 activities (the
+      // user's explicit concern — a day with only 1 location doesn't
+      // make sense unless it's a theme-park-scale all-day destination).
       const days = real?.days || [];
       const sparseDays = days.filter((d) => (d.activities || []).length < 2);
       record(
@@ -1456,6 +1519,75 @@ const FAKE_MESSAGES = [
       // No empty days
       const emptyDays = days.filter((d) => (d.activities || []).length === 0);
       record('13.8.7 No empty days', emptyDays.length === 0);
+
+      // Single-activity days must be flagged — a 3-day trip with a day
+      // that only has Senso-ji Temple and nothing else is NOT sensible.
+      const singleStopDays = days.filter((d) => (d.activities || []).length === 1);
+      record(
+        '13.8.6b No day has exactly 1 activity (user quality concern)',
+        singleStopDays.length === 0,
+        `single-stop days: ${singleStopDays.map((d) => `${d.day}:${d.activities[0]?.name}`).join(',')}`,
+      );
+
+      // Average activities per day should be ≥3 for a multi-day trip
+      const totalActs = days.reduce((sum, d) => sum + (d.activities || []).length, 0);
+      const avgActs = days.length > 0 ? totalActs / days.length : 0;
+      record(
+        '13.8.6c Average ≥3 activities per day',
+        avgActs >= 3,
+        `avg: ${avgActs.toFixed(1)} across ${days.length} days`,
+      );
+
+      // Activity times should be chronological within a day
+      const outOfOrderDays = days.filter((d) => {
+        const times = (d.activities || []).map((a) => a.time).filter(Boolean);
+        if (times.length < 2) return false;
+        const sorted = [...times].sort();
+        return JSON.stringify(times) !== JSON.stringify(sorted);
+      });
+      record(
+        '13.8.6d Activity times chronological within each day',
+        outOfOrderDays.length === 0,
+        `out-of-order days: ${outOfOrderDays.map((d) => d.day).join(',')}`,
+      );
+
+      // Activity durations, when present, should be between 15 and 240 min
+      const weirdDurations = [];
+      for (const d of days) {
+        for (const a of d.activities || []) {
+          if (a.duration_min != null && (a.duration_min < 15 || a.duration_min > 240)) {
+            weirdDurations.push(`day ${d.day}: ${a.name} (${a.duration_min}min)`);
+          }
+        }
+      }
+      record(
+        '13.8.6e Activity durations within 15-240 min',
+        weirdDurations.length === 0,
+        weirdDurations.slice(0, 3).join('; '),
+      );
+
+      // No duplicate activities within the same day (except hotel bookends)
+      const dupDays = [];
+      for (const d of days) {
+        const acts = (d.activities || []).map((a) => a.name);
+        // Allow the hotel to appear twice (bookend); other names must be unique
+        const nonHotel = acts.filter((n) => n !== real?.selected_hotel?.name && n !== real?.hotels?.[0]?.name);
+        if (new Set(nonHotel).size !== nonHotel.length) dupDays.push(d.day);
+      }
+      record(
+        '13.8.6f No duplicate (non-hotel) activities within a day',
+        dupDays.length === 0,
+        `dup days: ${dupDays.join(',')}`,
+      );
+
+      // Reply text should be short (system prompt asks for ≤25 words)
+      const lastAssistant = (await debugState(page))?.messages?.filter((m) => m.role === 'assistant').pop();
+      const replyWords = (lastAssistant?.content || '').split(/```json[\s\S]*?```/)[0].trim().split(/\s+/).filter(Boolean).length;
+      record(
+        '13.8.6g Spoken summary is short (<100 words)',
+        replyWords < 100,
+        `${replyWords} words`,
+      );
 
       // Activities have realistic structure (name + at least one of address/place_id/lat)
       const malformedActivities = [];
