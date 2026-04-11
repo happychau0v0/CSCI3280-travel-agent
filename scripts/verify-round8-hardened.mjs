@@ -3314,6 +3314,96 @@ const FAKE_MESSAGES = [
   const icsBtn = await page.locator('[data-testid="plan-history-ics-ics1"]').count();
   record('28.3 Plan history card has an ICS button', icsBtn === 1);
 
+  // ─── PHASE 29 — Round 20 favorites overlay + lightbox nav ─────────
+  console.log('\n=== Phase 29: Round 20 favorites overlay + lightbox ===');
+
+  // 29.1 — Press F opens the favorites overlay
+  await clearAll(page);
+  await page.locator('.tab-strip').click().catch(() => {});
+  await page.waitForTimeout(150);
+  await page.keyboard.press('f');
+  await page.waitForTimeout(300);
+  const favOverlay = await page.locator('[data-testid="favorites-overlay"]').count();
+  record('29.1 Press F opens favorites overlay', favOverlay === 1);
+
+  // 29.2 — Empty favorites state shows "No favorites yet"
+  if (favOverlay === 1) {
+    const emptyText = await page.locator('.favorites-overlay-empty').innerText().catch(() => '');
+    record(
+      '29.2 Empty favorites shows hint',
+      emptyText.toLowerCase().includes('no favorites'),
+      `text: ${emptyText.slice(0, 40)}`,
+    );
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+  } else {
+    record('29.2 (skipped — no overlay)', false);
+  }
+
+  // 29.3 — With favorites seeded, overlay shows cards grouped by
+  // destination.
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'travel-favorites',
+      JSON.stringify([
+        { key: 'fav1', name: 'Senso-ji', address: 'Asakusa', destination: 'Tokyo', saved_at: Date.now() },
+        { key: 'fav2', name: 'Eiffel Tower', address: 'Champ de Mars', destination: 'Paris', saved_at: Date.now() },
+      ]),
+    );
+  });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(500);
+  await page.locator('body').click();
+  await page.waitForTimeout(200);
+  await page.keyboard.press('f');
+  await page.waitForTimeout(300);
+  const favCardCount = await page.locator('[data-testid^="favorites-card-"]').count();
+  record(
+    '29.3 Favorites overlay shows seeded cards',
+    favCardCount === 2,
+    `cards: ${favCardCount}`,
+  );
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+
+  // 29.4 — Photo lightbox nav buttons render on multi-photo gallery
+  await clearAll(page);
+  const MULTI_PHOTO_ITIN = {
+    ...FAKE_ITINERARY,
+    hotels: [
+      {
+        name: 'Multi Photo Hotel',
+        address: 'Tokyo',
+        rating: 4.5,
+        place_id: 'mph1',
+        photos: ['/photo/p1', '/photo/p2', '/photo/p3'],
+      },
+    ],
+  };
+  await seed(page, { itinerary: MULTI_PHOTO_ITIN });
+  await page.keyboard.press('3');
+  await page.waitForTimeout(400);
+  // Click the hero photo to open lightbox
+  await page.locator('.panel-hotels .photo-gallery-hero').click().catch(() => {});
+  await page.waitForTimeout(300);
+  const lightbox = await page.locator('[data-testid="photo-lightbox"]').count();
+  record('29.4 Photo lightbox opens on hero click', lightbox === 1);
+
+  // 29.5 — Lightbox has prev/next nav buttons
+  if (lightbox === 1) {
+    const prevBtn = await page.locator('[data-testid="photo-lightbox-prev"]').count();
+    const nextBtn = await page.locator('[data-testid="photo-lightbox-next"]').count();
+    record(
+      '29.5 Lightbox has prev + next nav buttons',
+      prevBtn === 1 && nextBtn === 1,
+      `prev: ${prevBtn} next: ${nextBtn}`,
+    );
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+  } else {
+    record('29.5 (skipped — no lightbox)', false);
+  }
+
   // ─── PHASE 14 — Globe + idempotency + console sweep (5) ────────────
   console.log('\n=== Phase 14: Globe + final sweep ===');
   await page.keyboard.press('1');
