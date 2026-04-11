@@ -93,6 +93,11 @@ function App() {
   // Tracks the in-flight done→idle setTimeout so a new request can
   // cancel it before it overwrites the new "working" state (B6).
   const idleTimerRef = useRef(null);
+  // Tracked setTimeout for auto-reopen-chat-on-question so a new
+  // request (or a re-edit) cancels the pending reopen before it
+  // fires. Without this, pressing PLAN again while an auto-reopen
+  // is queued would briefly pop the popover then slam it shut.
+  const autoReopenTimerRef = useRef(null);
   // Per-panel imperative handle: panels with actionable rows expose
   // an `activateRow(index)` method via ref. App.jsx's onActivate
   // (Space hotkey) reads the current panel's ref and invokes it.
@@ -311,6 +316,12 @@ function App() {
         clearTimeout(idleTimerRef.current);
         idleTimerRef.current = null;
       }
+      // Also cancel any pending auto-reopen-chat timer so a rapid
+      // second send doesn't re-pop the popover mid-flight.
+      if (autoReopenTimerRef.current) {
+        clearTimeout(autoReopenTimerRef.current);
+        autoReopenTimerRef.current = null;
+      }
       const startedAt = Date.now();
       setRequestStartedAt(startedAt);
       setAgentState("working");
@@ -390,7 +401,10 @@ function App() {
         // via the ref so we see the fresh value, not the closure.
         const trimmedReply = (data.reply || "").trim();
         if (trimmedReply.endsWith("?") && !pendingInputRequestRef.current) {
-          setTimeout(() => setChatPopoverOpen(true), 2000);
+          autoReopenTimerRef.current = setTimeout(() => {
+            setChatPopoverOpen(true);
+            autoReopenTimerRef.current = null;
+          }, 2000);
         }
       } catch (err) {
         setError(err);
