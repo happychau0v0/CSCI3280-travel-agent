@@ -356,7 +356,21 @@ function App() {
         const assistantMsg = { role: "assistant", content: data.reply };
         setMessages((prev) => [...prev, assistantMsg]);
         if (data.itinerary) {
-          setCurrentItinerary(data.itinerary);
+          // Merge the new itinerary with the current one so user-driven
+          // selections (selected_flight, selected_hotel) are preserved
+          // across replan round-trips even if the LLM forgets to echo
+          // them in its response. The new itinerary still wins on
+          // every OTHER field.
+          setCurrentItinerary((prev) => {
+            const merged = { ...data.itinerary };
+            if (!merged.selected_flight && prev?.selected_flight) {
+              merged.selected_flight = prev.selected_flight;
+            }
+            if (!merged.selected_hotel && prev?.selected_hotel) {
+              merged.selected_hotel = prev.selected_hotel;
+            }
+            return merged;
+          });
           cues.chime();
         }
         subtitles.pushParagraph(data.reply);
