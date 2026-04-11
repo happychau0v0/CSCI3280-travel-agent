@@ -146,24 +146,45 @@ async function runOnce(runIdx) {
 
   // ── Turn 1 ───────────────────────────────────────────────────────
   console.log('  firing turn 1 (PLAN)…');
-  planClickAt = Date.now();
-  await page.locator('[data-testid="trip-plan-btn"]').click();
 
-  // Status bar first visible
-  const statusBarAppeared = await waitFor(
-    async () => (await page.locator('.agent-status-bar').count()) > 0,
-    2000,
-    25,
-  );
-  metrics.timings.statusBarFirstPaintMs = statusBarAppeared ? Date.now() - planClickAt : null;
-
-  // First tool narration subtitle
-  const firstNarrationAt = await waitFor(async () => {
-    const sub = await page.locator('.subtitle-text').innerText().catch(() => '');
-    // The ▸ preview echo, or a tool narration like "Searching flights…"
-    return sub && (sub.includes('▸') || sub.toLowerCase().includes('searching') || sub.toLowerCase().includes('looking') || sub.toLowerCase().includes('routing'));
-  }, 5000, 50);
-  metrics.timings.firstSubtitleMs = firstNarrationAt ? Date.now() - planClickAt : null;
+  // Fire the click via a page-level dispatch so we capture the EXACT
+  // moment the click handler started, bypassing Playwright's
+  // actionability wait. Measure send-to-statusBar timing purely in
+  // the page's clock via window.performance.now().
+  const timings1 = await page.evaluate(() => {
+    return new Promise((resolve) => {
+      const btn = document.querySelector('[data-testid="trip-plan-btn"]');
+      if (!btn) return resolve({ error: 'no button' });
+      const t0 = performance.now();
+      const t0Wall = Date.now();
+      btn.click();
+      const tClick = performance.now();
+      // Poll for .agent-status-bar AND .subtitle-text visibility
+      let tStatus = null;
+      let tSubtitle = null;
+      const start = performance.now();
+      const interval = setInterval(() => {
+        if (tStatus == null) {
+          const el = document.querySelector('.agent-status-bar');
+          if (el) tStatus = performance.now();
+        }
+        if (tSubtitle == null) {
+          const sub = document.querySelector('.subtitle-text');
+          if (sub && sub.innerText && (sub.innerText.includes('▸') || sub.innerText.length > 2)) {
+            tSubtitle = performance.now();
+          }
+        }
+        if ((tStatus != null && tSubtitle != null) || performance.now() - start > 5000) {
+          clearInterval(interval);
+          resolve({ t0, t0Wall, tClick, tStatus, tSubtitle });
+        }
+      }, 5);
+    });
+  });
+  planClickAt = timings1?.t0Wall || Date.now();
+  metrics.timings.clickReturnMs = timings1 ? timings1.tClick - timings1.t0 : null;
+  metrics.timings.statusBarFirstPaintMs = timings1?.tStatus != null ? timings1.tStatus - timings1.t0 : null;
+  metrics.timings.firstSubtitleMs = timings1?.tSubtitle != null ? timings1.tSubtitle - timings1.t0 : null;
 
   // Turn 1 completion
   const turn1Ok = await waitFor(async () => {
@@ -286,11 +307,12 @@ async function main() {
 
   // Summary table
   console.log('\n=== Summary (all runs) ===');
-  const header = ['#', 'globe', 'planBtn', 'statusBar', 'subtitle', 'firstTool', 'turn1', 'turn2', 'days', 'avg/day'];
+  const header = ['#', 'globe', 'planBtn', 'clickRet', 'statusBar', 'subtitle', 'firstTool', 'turn1', 'turn2', 'days', 'avg/day'];
   const rows = runs.map((r, i) => [
     i + 1,
     fmt(r.timings.globeMountMs),
     fmt(r.timings.buttonEnabledMs),
+    fmt(r.timings.clickReturnMs),
     fmt(r.timings.statusBarFirstPaintMs),
     fmt(r.timings.firstSubtitleMs),
     fmt(r.timings.firstToolStartMs),
