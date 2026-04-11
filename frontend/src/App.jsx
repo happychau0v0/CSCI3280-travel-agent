@@ -6,6 +6,7 @@ import ChatPopover from "./components/ChatPopover";
 import AgentStatusBar from "./components/AgentStatusBar";
 import HistoryOverlay from "./components/HistoryOverlay";
 import SettingsOverlay, { loadTts, loadTheme, applyTheme, loadCurrency } from "./components/SettingsOverlay";
+import HelpOverlay from "./components/HelpOverlay";
 import PanelHome from "./components/panels/PanelHome";
 import PanelFlights from "./components/panels/PanelFlights";
 import PanelHotels from "./components/panels/PanelHotels";
@@ -124,6 +125,7 @@ function App() {
   // dedicated tabs in the round-8.5 redesign.
   const [historyOpen, setHistoryOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   // Agent status state used by the AgentStatusBar — addresses the
   // round-7 "feels unresponsive" complaint with overlapping indicators.
   const [agentState, setAgentState] = useState("idle"); // idle|working|done|error
@@ -346,7 +348,8 @@ function App() {
     },
     onUndo: handleUndoPick,
     onRedo: handleRedoPick,
-    enabled: !historyOpen && !settingsOpen,
+    onOpenHelp: () => setHelpOpen(true),
+    enabled: !historyOpen && !settingsOpen && !helpOpen,
   });
 
   // Persist messages + itinerary
@@ -373,6 +376,7 @@ function App() {
       pendingInputRequest,
       historyOpen,
       settingsOpen,
+      helpOpen,
       chatPopoverOpen,
       muted,
       messages,
@@ -949,6 +953,8 @@ function App() {
         onToggleMute={() => setMuted((m) => !m)}
         onClearAll={handleClearAll}
       />
+
+      <HelpOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
 
       {/* Bottom-center subtitle bar with auto-TTS */}
       <Subtitle text={subtitles.current} />

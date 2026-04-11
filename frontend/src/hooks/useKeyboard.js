@@ -44,6 +44,7 @@ export function useKeyboard({
   onOpenSettings,
   onUndo,
   onRedo,
+  onOpenHelp,
   enabled = true,
 }) {
   useEffect(() => {
@@ -151,6 +152,12 @@ export function useKeyboard({
           }
           break;
 
+        case "?":
+          // Round 14 — keyboard help overlay
+          e.preventDefault();
+          onOpenHelp?.();
+          break;
+
         case "h":
         case "H":
           if (!e.metaKey && !e.ctrlKey) {
@@ -211,5 +218,6 @@ export function useKeyboard({
     onOpenSettings,
     onUndo,
     onRedo,
+    onOpenHelp,
   ]);
 }
