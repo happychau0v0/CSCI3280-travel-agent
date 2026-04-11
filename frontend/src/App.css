@@ -951,6 +951,58 @@
   font-size: 14px;
 }
 
+/* Round 15 — DAYS forecast strip (row of tiny weather badges) */
+.day-forecast-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+}
+
+.day-forecast-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.day-forecast-cell:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.day-forecast-cell.active {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.day-forecast-num {
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+.day-forecast-cell.active .day-forecast-num {
+  color: var(--accent);
+}
+
+.day-forecast-icon {
+  font-size: 13px;
+}
+
+.day-forecast-temp {
+  letter-spacing: 0.04em;
+}
+
 /* Round 14 — keyboard help overlay */
 .help-overlay-backdrop {
   position: fixed;

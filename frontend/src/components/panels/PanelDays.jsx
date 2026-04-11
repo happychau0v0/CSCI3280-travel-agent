@@ -230,7 +230,7 @@ export default function PanelDays({
 
   return (
     <section className="panel panel-grid panel-days" aria-label="Days">
-      {/* TOP band — day summary */}
+      {/* TOP band — day summary + R15 forecast strip */}
       <header className="panel-grid-top-band home-summary-top">
         <div className="home-card-label">
           📅 DAY {selected?.day} · {selected?.theme || "—"}
@@ -253,6 +253,30 @@ export default function PanelDays({
           <strong>{activities.length}</strong>
           <span className="home-summary-meta"> stops</span>
         </div>
+        {days.some((d) => d.weather) && (
+          <div className="day-forecast-strip" data-testid="day-forecast-strip">
+            {days.map((d, i) => (
+              <button
+                key={`forecast-${i}`}
+                type="button"
+                className={`day-forecast-cell${i === selectedIdx ? " active" : ""}`}
+                onClick={() => onSelect?.(i)}
+                data-testid={`day-forecast-${i}`}
+                title={`${d.theme || ""} · ${d.weather?.condition || ""}`}
+              >
+                <span className="day-forecast-num">D{d.day}</span>
+                <span className="day-forecast-icon">
+                  {d.weather ? weatherIcon(d.weather) : "—"}
+                </span>
+                {d.weather?.temp_c != null && (
+                  <span className="day-forecast-temp">
+                    {Math.round(d.weather.temp_c)}°
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
       {/* LEFT — day list */}
