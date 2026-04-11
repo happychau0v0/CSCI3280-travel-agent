@@ -28,6 +28,29 @@ function weatherIcon(weather) {
   return WEATHER_ICONS[key] || "🌡️";
 }
 
+// Round 18 — heuristic check: is the weather likely to make outdoor
+// activities unpleasant? Returns "rainy" | "snowy" | "stormy" | null.
+function badOutdoorWeather(weather) {
+  if (!weather) return null;
+  const key = (weather.icon || weather.condition || "").toLowerCase();
+  if (/rain/.test(key)) return "rainy";
+  if (/snow/.test(key)) return "snowy";
+  if (/storm|thunder/.test(key)) return "stormy";
+  return null;
+}
+
+// Activities that sound outdoor-heavy by name. Rough keyword match;
+// the LLM doesn't tag indoor vs outdoor so we infer from the name.
+function isLikelyOutdoor(activity) {
+  const name = (activity.name || "").toLowerCase();
+  const desc = (activity.description || "").toLowerCase();
+  const blob = `${name} ${desc}`;
+  if (/museum|gallery|market|mall|cafe|restaurant|bar|lounge|cinema|theater|theatre|spa|shop|store|indoor/.test(blob)) {
+    return false;
+  }
+  return /park|garden|temple|shrine|beach|hike|trail|tower|bridge|square|plaza|outdoor|viewpoint|waterfall|mountain|lake|river|cruise|walk/.test(blob);
+}
+
 function ActivityRow({
   activity,
   index,
@@ -367,8 +390,29 @@ export default function PanelDays({
         <DayMiniMap activities={activities} airport={airportPin} />
       </div>
 
-      {/* RIGHT — activity timeline + R17 phrasebook */}
+      {/* RIGHT — activity timeline + R17 phrasebook + R18 weather hint */}
       <aside className="panel-grid-right panel-grid-scroll day-detail-card">
+        {(() => {
+          const bad = badOutdoorWeather(selected?.weather);
+          if (!bad) return null;
+          const outdoors = (activities || []).filter(isLikelyOutdoor);
+          if (outdoors.length === 0) return null;
+          return (
+            <div
+              className="day-weather-hint"
+              data-testid="day-weather-hint"
+              role="note"
+            >
+              <strong>⚠ {bad.toUpperCase()} FORECAST</strong>
+              <p>
+                {outdoors.length} outdoor activit{outdoors.length === 1 ? "y" : "ies"}{" "}
+                on this day ({outdoors.map((a) => a.name).slice(0, 2).join(", ")}
+                {outdoors.length > 2 && ", …"}). Consider the REPLACE button to
+                swap for an indoor alternative, or plan for an umbrella.
+              </p>
+            </div>
+          );
+        })()}
         {itinerary?.phrasebook && (
           <div className="day-phrasebook" data-testid="day-phrasebook">
             <div className="day-phrasebook-header">
