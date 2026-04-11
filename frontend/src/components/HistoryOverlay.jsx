@@ -94,8 +94,15 @@ export default function HistoryOverlay({ open, messages = [], onClose, onEditTur
         scrollRef.current?.scrollBy({ top: scrollRef.current.clientHeight * 0.85, behavior: "smooth" });
       } else if (e.key === "e" || e.key === "E") {
         e.preventDefault();
+        // Only user turns are editable — the user shouldn't be able
+        // to "edit" an agent reply (that would fork the conversation
+        // at a nonsense point). Pressing E on an agent turn is a
+        // no-op. Arrow-navigation still works on agent turns so the
+        // user can read them.
         const turn = messages[activeIdx];
-        if (turn) onEditTurn?.(activeIdx, turn.content);
+        if (turn && turn.role === "user") {
+          onEditTurn?.(activeIdx, turn.content);
+        }
       }
     };
     document.addEventListener("keydown", handler);
@@ -152,7 +159,7 @@ export default function HistoryOverlay({ open, messages = [], onClose, onEditTur
                 >
                   <header className="history-badge">
                     <span className="history-badge-name">{isUser ? "YOU" : "AGENT"}</span>
-                    {isActive && (
+                    {isActive && isUser && (
                       <span className="history-edit-hint">
                         <kbd>E</kbd> edit & rerun
                       </span>

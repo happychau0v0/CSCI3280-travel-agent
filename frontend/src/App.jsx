@@ -328,7 +328,10 @@ function App() {
       setCurrentTool(null);
       subtitles.clear();
       const preview = text.length > 60 ? text.slice(0, 57) + "…" : text;
-      subtitles.push(`▸ ${preview}`);
+      // Echo the user's own message as a visible subtitle but DO NOT
+      // read it back via TTS (R9-A2). `spoken: false` displays the
+      // line without triggering speechSynthesis.speak().
+      subtitles.push(`▸ ${preview}`, { spoken: false });
       cues.tick();
 
       try {
@@ -354,10 +357,11 @@ function App() {
               cues.select();
             } else if (type === "request_input") {
               // The LLM is asking for a single structured value via
-              // the TRIP form. Switch to TRIP, focus the field, and
-              // surface the prompt as a subtitle so it's spoken.
+              // an inline form row on HOME. Flag the pending request
+              // (PanelHome's effect focuses the matching row), ensure
+              // we're on HOME, and speak the prompt as a subtitle.
               setPendingInputRequest(payload);
-              menu.setPanel("TRIP");
+              if (menu.state.panel !== "HOME") menu.setPanel("HOME");
               if (payload?.prompt) subtitles.push(payload.prompt);
               cues.select();
             }
