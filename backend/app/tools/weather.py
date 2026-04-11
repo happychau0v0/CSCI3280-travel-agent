@@ -73,16 +73,38 @@ async def get_weather(city: str, date: str | None = None) -> dict:
             "location.longitude": lng,
         }
 
-        # Current conditions
-        current_resp = await client.get(WEATHER_CURRENT_URL, params=params)
-        current_resp.raise_for_status()
-        current = current_resp.json()
+        # Current conditions — Google Weather API is in preview and
+        # occasionally returns 404 for specific lat/lng pairs (ocean
+        # tiles, disputed territories, etc.). Catch and degrade
+        # gracefully so the tool still returns SOMETHING useful
+        # instead of crashing the whole chat stream.
+        try:
+            current_resp = await client.get(WEATHER_CURRENT_URL, params=params)
+            current_resp.raise_for_status()
+            current = current_resp.json()
+        except httpx.HTTPStatusError as e:
+            return {
+                "temp": None,
+                "condition": f"Weather unavailable for {city} ({e.response.status_code})",
+                "humidity": None,
+                "forecast": [],
+            }
+        except httpx.RequestError as e:
+            return {
+                "temp": None,
+                "condition": f"Weather request failed: {type(e).__name__}",
+                "humidity": None,
+                "forecast": [],
+            }
 
-        # 5-day forecast
-        forecast_params = {**params, "days": 5}
-        forecast_resp = await client.get(WEATHER_FORECAST_URL, params=forecast_params)
-        forecast_resp.raise_for_status()
-        forecast_data = forecast_resp.json()
+        # 5-day forecast — same defensive handling
+        try:
+            forecast_params = {**params, "days": 5}
+            forecast_resp = await client.get(WEATHER_FORECAST_URL, params=forecast_params)
+            forecast_resp.raise_for_status()
+            forecast_data = forecast_resp.json()
+        except (httpx.HTTPStatusError, httpx.RequestError):
+            forecast_data = {"forecastDays": []}
 
     forecast = []
     for day in forecast_data.get("forecastDays", []):
