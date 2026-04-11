@@ -1,8 +1,14 @@
 import { photoSrc } from "../../api/client";
+import PhotoGallery from "../PhotoGallery";
 
 /**
- * HOTELS panel — left list of hotel options, right detail with photo,
- * rating, address, and Google Maps link for the selected one.
+ * HOTELS panel — shares the .panel-grid layout with HOME/FLIGHTS/DAYS.
+ * Left column: vertical list of hotels with a small thumbnail.
+ * Center: reserved for the globe (background) — hotel pins live on
+ *         the globe via App.jsx's points memo.
+ * Right column: detail card for the focused hotel — photo gallery,
+ *         rating, price, address, PICK & REPLAN button, Maps link.
+ * Top band: summary "HOTELS · N near {destination}".
  */
 
 const PRICE_LEVEL_LABELS = {
@@ -18,8 +24,8 @@ export default function PanelHotels({ itinerary, listIndex, onSelect, onPick }) 
 
   if (hotels.length === 0) {
     return (
-      <section className="panel panel-list" aria-label="Hotels">
-        <div className="panel-empty">
+      <section className="panel panel-grid panel-hotels" aria-label="Hotels">
+        <div className="panel-grid-empty">
           <h2>NO HOTELS YET</h2>
           <p>Press T and ask the agent to find accommodation.</p>
         </div>
@@ -27,17 +33,17 @@ export default function PanelHotels({ itinerary, listIndex, onSelect, onPick }) 
     );
   }
 
-  const selectedIdx = Math.min(listIndex, hotels.length - 1);
+  const selectedIdx = Math.min(Math.max(0, listIndex), hotels.length - 1);
   const selected = hotels[selectedIdx];
-  // The "picked" hotel matches by place_id (preferred) or name. Picking
-  // a hotel triggers an auto-replan via onPick.
   const picked = itinerary?.selected_hotel;
   const pickedIdx = picked
     ? hotels.findIndex(
-        (h) => (picked.place_id && h.place_id === picked.place_id) || h.name === picked.name,
+        (h) =>
+          (picked.place_id && h.place_id === picked.place_id) ||
+          h.name === picked.name,
       )
     : -1;
-  const photo = photoSrc(selected?.photo_url);
+
   const priceLabel = PRICE_LEVEL_LABELS[selected?.price_level] || "";
   const mapsUrl = selected?.place_id
     ? `https://www.google.com/maps/place/?q=place_id:${selected.place_id}`
@@ -45,62 +51,99 @@ export default function PanelHotels({ itinerary, listIndex, onSelect, onPick }) 
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selected.name)}`
       : null;
 
+  // Prefer the new photos[] gallery from round 9; fall back to the
+  // single photo_url for older itineraries.
+  const gallery =
+    selected?.photos?.length > 0
+      ? selected.photos
+      : selected?.photo_url
+        ? [selected.photo_url]
+        : [];
+
   return (
-    <section className="panel panel-list" aria-label="Hotels">
-      <ul className="panel-list-items">
-        {hotels.map((h, i) => (
-          <li
-            key={h.place_id || i}
-            className={
-              `panel-list-item${i === selectedIdx ? " active" : ""}` +
-              (i === pickedIdx ? " picked" : "")
-            }
-            onClick={() => onSelect?.(i)}
-          >
-            <span className="panel-list-label">
-              {h.rating ? `★ ${h.rating.toFixed(1)}` : ""}
-              {PRICE_LEVEL_LABELS[h.price_level] && ` · ${PRICE_LEVEL_LABELS[h.price_level]}`}
-              {i === pickedIdx && <span className="panel-list-picked-tag"> ✓ PICKED</span>}
-            </span>
-            <span className="panel-list-value">{h.name}</span>
-          </li>
-        ))}
-      </ul>
-      <div className="panel-detail">
+    <section className="panel panel-grid panel-hotels" aria-label="Hotels">
+      {/* TOP band — summary */}
+      <header className="panel-grid-top-band home-summary-top">
+        <div className="home-card-label">
+          🏨 HOTELS · {hotels.length} near {itinerary?.destination || "destination"}
+        </div>
+        <div className="home-summary-line">
+          {pickedIdx >= 0 ? (
+            <>
+              picked <strong>{hotels[pickedIdx].name}</strong>
+            </>
+          ) : (
+            <span className="home-summary-meta">Click PICK & REPLAN to lock in a hotel</span>
+          )}
+        </div>
+      </header>
+
+      {/* LEFT — hotels list with thumbnails */}
+      <div className="panel-grid-left panel-grid-scroll">
+        <ul className="panel-list-items">
+          {hotels.map((h, i) => {
+            const thumbSrc = photoSrc(h.photos?.[0] || h.photo_url);
+            return (
+              <li
+                key={h.place_id || i}
+                className={
+                  `panel-list-item hotel-option-row` +
+                  (i === selectedIdx ? " active" : "") +
+                  (i === pickedIdx ? " picked" : "")
+                }
+                onClick={() => onSelect?.(i)}
+                data-testid={`hotel-option-${i}`}
+              >
+                {thumbSrc && (
+                  <img
+                    src={thumbSrc}
+                    alt=""
+                    className="hotel-option-thumb"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                )}
+                <div className="hotel-option-body">
+                  <div className="hotel-option-name">
+                    {h.name}
+                    {i === pickedIdx && (
+                      <span className="panel-list-picked-tag"> ✓ PICKED</span>
+                    )}
+                  </div>
+                  <div className="hotel-option-meta">
+                    {h.rating != null && <>★ {h.rating.toFixed(1)}</>}
+                    {PRICE_LEVEL_LABELS[h.price_level] && (
+                      <> · {PRICE_LEVEL_LABELS[h.price_level]}</>
+                    )}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      {/* RIGHT — detail card */}
+      <aside className="panel-grid-right panel-grid-scroll hotel-detail-card">
         {selected && (
           <>
-            {photo && (
-              <img
-                src={photo}
-                alt={selected.name}
-                style={{
-                  width: "100%",
-                  height: 200,
-                  objectFit: "cover",
-                  marginBottom: 16,
-                  border: "1px solid var(--border)",
-                }}
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                }}
-              />
-            )}
-            <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text-h)", marginBottom: 4 }}>
-              {selected.name}
-            </div>
-            <div style={{ fontSize: 13, color: "var(--text)", marginBottom: 12 }}>
+            <PhotoGallery photos={gallery} altPrefix={selected.name} />
+            <div className="hotel-detail-name">{selected.name}</div>
+            <div className="hotel-detail-meta">
               {selected.rating != null && (
                 <span style={{ color: "#fbbf24", marginRight: 8 }}>
                   ★ {selected.rating.toFixed(1)}
                 </span>
               )}
               {priceLabel && (
-                <span style={{ color: "var(--accent)", marginRight: 8 }}>{priceLabel}</span>
+                <span style={{ color: "var(--accent)", marginRight: 8 }}>
+                  {priceLabel}
+                </span>
               )}
             </div>
-            <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 16 }}>
-              {selected.address}
-            </div>
+            <div className="hotel-detail-address">{selected.address}</div>
+
             <button
               type="button"
               className="trip-plan-btn"
@@ -124,7 +167,7 @@ export default function PanelHotels({ itinerary, listIndex, onSelect, onPick }) 
             )}
           </>
         )}
-      </div>
+      </aside>
     </section>
   );
 }

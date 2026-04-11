@@ -60,6 +60,344 @@
   pointer-events: none;
 }
 
+.panel-grid-left {
+  grid-column: 1;
+  grid-row: 2;
+  pointer-events: auto;
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  min-height: 0;
+}
+
+.panel-grid-right {
+  grid-column: 3;
+  grid-row: 2;
+  pointer-events: auto;
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  min-height: 0;
+  padding: 14px 18px;
+  position: relative;
+}
+
+.panel-grid-right::before,
+.panel-grid-right::after {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--accent);
+}
+
+.panel-grid-right::before {
+  top: -1px;
+  left: -1px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.panel-grid-right::after {
+  bottom: -1px;
+  right: -1px;
+  border-left: none;
+  border-top: none;
+}
+
+.panel-grid-scroll {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.panel-grid-top-band {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.panel-grid-bottom-band {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.panel-grid-empty {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  pointer-events: auto;
+  margin: auto;
+  text-align: center;
+  color: var(--text);
+  padding: 40px;
+  border: 1px dashed var(--border);
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  max-width: 480px;
+}
+
+.panel-grid-empty h2 {
+  font-size: 14px;
+  letter-spacing: 0.16em;
+  color: var(--text-h);
+  margin-bottom: 8px;
+}
+
+/* Flight option row — extra meta line below the label/value */
+.flight-option-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.flight-option-row .panel-list-label {
+  flex: 1 1 100%;
+}
+
+.flight-option-row .panel-list-value {
+  flex: 0 0 auto;
+  margin-right: auto;
+}
+
+.flight-option-meta {
+  flex: 1 0 100%;
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  font-family: var(--mono);
+}
+
+.flight-detail-card {
+  font-family: var(--mono);
+}
+
+.flight-detail-airline {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin-bottom: 4px;
+  line-height: 1.1;
+}
+
+.flight-detail-price {
+  font-size: 22px;
+  color: var(--accent);
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.flight-detail-price-range {
+  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Hotel option row with thumb */
+.hotel-option-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+}
+
+.hotel-option-thumb {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.hotel-option-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.hotel-option-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-h);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hotel-option-meta {
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  margin-top: 3px;
+}
+
+.hotel-detail-card {
+  font-family: var(--mono);
+}
+
+.hotel-detail-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin: 12px 0 4px;
+  line-height: 1.15;
+}
+
+.hotel-detail-meta {
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.hotel-detail-address {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+/* Day option row */
+.day-option-meta {
+  display: block;
+  flex: 1 0 100%;
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  margin-top: 3px;
+}
+
+.panel-day-map-center {
+  grid-column: 2;
+  grid-row: 2;
+  pointer-events: auto;
+  background: var(--bg-glass);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  min-height: 0;
+}
+
+.panel-day-map-center > * {
+  width: 100%;
+  height: 100%;
+}
+
+.day-detail-card {
+  font-family: var(--mono);
+}
+
+.activity.activity-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 16px rgba(0, 217, 255, 0.25);
+}
+
+.transport.expanded {
+  color: var(--text-h);
+}
+
+.transport-steps {
+  margin: 6px 0 0 18px;
+  padding: 0;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* Photo gallery */
+.photo-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.photo-gallery-empty {
+  padding: 28px 0;
+  text-align: center;
+}
+
+.photo-gallery-placeholder {
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.photo-gallery-hero {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.3);
+  cursor: zoom-in;
+  overflow: hidden;
+}
+
+.photo-gallery-hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.photo-gallery-thumbs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.photo-gallery-thumb {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.photo-gallery-thumb.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
+}
+
+.photo-gallery-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.photo-gallery-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+
+.photo-gallery-lightbox img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+}
+
+.photo-gallery-lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--text-h);
+  border: 1px solid var(--border);
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+  cursor: pointer;
+}
+
 /* PanelHome dashboard — 4 corner cards with the globe in the center */
 .panel-home {
   /* Inherits .panel-grid via both classes on the section. No extra
@@ -2764,8 +3102,13 @@ select.panel-input {
 }
 
 .activity-photo {
+  /* Legacy class — the new PhotoGallery component supersedes this
+   * for round 9. Kept for any external consumers that still render
+   * a single photo with the old class. 4:3 aspect replaces the
+   * stretched 16:9 banner. */
   width: 100%;
-  height: 120px;
+  aspect-ratio: 4 / 3;
+  height: auto;
   object-fit: cover;
   border-radius: 6px;
   display: block;

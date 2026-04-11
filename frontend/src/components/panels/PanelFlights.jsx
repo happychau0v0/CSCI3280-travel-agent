@@ -1,7 +1,11 @@
 /**
- * FLIGHTS panel — left list of flight options, right detail for the
- * selected one. Reads itinerary.flight.options and respects listIndex
- * for the active item (driven by ↑/↓ via useKeyboard).
+ * FLIGHTS panel — shares the .panel-grid layout with HOME/HOTELS/DAYS.
+ * Left column: vertical list of flight options with airline + price.
+ * Center: reserved for the globe (background behind the grid) — the
+ * flight's arc is drawn by App.jsx's arcs memo.
+ * Right column: detail card for the focused option with big airline,
+ * price, duration, PICK button, Google Flights link.
+ * Top band: summary "HKG → NRT · N options".
  */
 
 function formatHKD(n) {
@@ -30,55 +34,33 @@ export default function PanelFlights({ itinerary, listIndex, onSelect, onPick })
 
   if (!flight || options.length === 0) {
     return (
-      <section className="panel panel-list" aria-label="Flights">
-        <div className="panel-empty">
+      <section className="panel panel-grid panel-flights" aria-label="Flights">
+        <div className="panel-grid-empty">
           <h2>NO FLIGHTS YET</h2>
-          <p>Press T and ask the agent to plan a trip with flights.</p>
+          <p>Fill the HOME form and press PLAN to fetch flights.</p>
         </div>
       </section>
     );
   }
 
-  const selectedIdx = Math.min(listIndex, options.length - 1);
+  const selectedIdx = Math.min(Math.max(0, listIndex), options.length - 1);
   const selected = options[selectedIdx];
   const isLive = flight.source === "fast-flights";
-  // The "picked" flight is the one currently saved on the itinerary
-  // (set by clicking PICK below). It survives across reloads via the
-  // existing localStorage persistence in App.jsx.
   const picked = itinerary?.selected_flight;
-  const pickedIdx = picked ? options.findIndex((o) => o === picked || o.label === picked.label) : -1;
+  const pickedIdx = picked
+    ? options.findIndex(
+        (o) =>
+          o === picked ||
+          (o.label === picked.label && o.airline === picked.airline),
+      )
+    : -1;
 
   return (
-    <section className="panel panel-list" aria-label="Flights">
-      <ul className="panel-list-items">
-        {options.map((opt, i) => (
-          <li
-            key={i}
-            className={
-              `panel-list-item${i === selectedIdx ? " active" : ""}` +
-              (i === pickedIdx ? " picked" : "")
-            }
-            onClick={() => onSelect?.(i)}
-          >
-            <span className="panel-list-label">
-              {opt.label || stopsLabel(opt.stops)}
-              {i === pickedIdx && <span className="panel-list-picked-tag"> ✓ PICKED</span>}
-            </span>
-            <span className="panel-list-value">
-              {formatHKD(opt.price_low)}
-              {opt.price_high && opt.price_high !== opt.price_low && (
-                <span style={{ color: "var(--text-dim)" }}>
-                  {" "}
-                  – {formatHKD(opt.price_high)}
-                </span>
-              )}
-            </span>
-          </li>
-        ))}
-      </ul>
-      <div className="panel-detail">
-        <div className="panel-detail-label">
-          {flight.from_iata} → {flight.to_iata}
+    <section className="panel panel-grid panel-flights" aria-label="Flights">
+      {/* TOP band — route summary */}
+      <header className="panel-grid-top-band home-summary-top">
+        <div className="home-card-label">
+          ✈ FLIGHT · {flight.from_iata} → {flight.to_iata}
           <span
             className={`flight-source-badge ${isLive ? "live" : "estimate"}`}
             style={{ marginLeft: 8 }}
@@ -86,34 +68,105 @@ export default function PanelFlights({ itinerary, listIndex, onSelect, onPick })
             {isLive ? "LIVE" : "ESTIMATE"}
           </span>
         </div>
+        <div className="home-summary-line">
+          <strong>{options.length}</strong>
+          <span className="home-summary-meta"> options</span>
+          {pickedIdx >= 0 && (
+            <span className="home-summary-meta">
+              {" "}· picked <strong>{options[pickedIdx].airline}</strong>
+            </span>
+          )}
+        </div>
+      </header>
 
+      {/* LEFT — options list */}
+      <div className="panel-grid-left panel-grid-scroll">
+        <ul className="panel-list-items">
+          {options.map((opt, i) => (
+            <li
+              key={i}
+              className={
+                `panel-list-item flight-option-row` +
+                (i === selectedIdx ? " active" : "") +
+                (i === pickedIdx ? " picked" : "")
+              }
+              onClick={() => onSelect?.(i)}
+              data-testid={`flight-option-${i}`}
+            >
+              <span className="panel-list-label">
+                {opt.label || stopsLabel(opt.stops)}
+                {i === pickedIdx && (
+                  <span className="panel-list-picked-tag"> ✓ PICKED</span>
+                )}
+              </span>
+              <span className="panel-list-value">
+                {opt.airline && (
+                  <span style={{ color: "var(--text-dim)", marginRight: 6 }}>
+                    {opt.airline}
+                  </span>
+                )}
+                {formatHKD(opt.price_low)}
+              </span>
+              <span className="flight-option-meta">
+                {opt.duration_min ? formatDuration(opt.duration_min) : "—"}
+                {opt.departure_time && opt.arrival_time && (
+                  <>
+                    {" · "}
+                    {opt.departure_time} → {opt.arrival_time}
+                  </>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* RIGHT — detail card for the focused option */}
+      <aside className="panel-grid-right panel-grid-scroll flight-detail-card">
         {selected && (
           <>
-            <div style={{ fontSize: 28, fontWeight: 700, color: "var(--text-h)", marginBottom: 4 }}>
+            <div className="flight-detail-airline">
               {selected.airline || selected.label || stopsLabel(selected.stops)}
             </div>
-            <div style={{ fontSize: 22, color: "var(--accent)", fontWeight: 700, marginBottom: 16 }}>
+            <div className="flight-detail-price">
               {formatHKD(selected.price_low)}
-              {selected.price_high && selected.price_high !== selected.price_low && (
-                <span style={{ color: "var(--text-dim)", fontSize: 16 }}>
-                  {" "}
-                  – {formatHKD(selected.price_high)}
-                </span>
-              )}
+              {selected.price_high &&
+                selected.price_high !== selected.price_low && (
+                  <span className="flight-detail-price-range">
+                    {" "}– {formatHKD(selected.price_high)}
+                  </span>
+                )}
             </div>
+
             <div className="flight-stats">
               <div className="flight-stat">
-                <div className="flight-stat-value">{formatDuration(selected.duration_min)}</div>
+                <div className="flight-stat-value">
+                  {formatDuration(selected.duration_min)}
+                </div>
                 <div className="flight-stat-label">duration</div>
               </div>
               <div className="flight-stat">
-                <div className="flight-stat-value">{stopsLabel(selected.stops)}</div>
+                <div className="flight-stat-value">
+                  {stopsLabel(selected.stops)}
+                </div>
                 <div className="flight-stat-label">stops</div>
               </div>
-              <div className="flight-stat">
-                <div className="flight-stat-value">{flight.distance_km || "—"} km</div>
-                <div className="flight-stat-label">distance</div>
-              </div>
+              {selected.departure_time && (
+                <div className="flight-stat">
+                  <div className="flight-stat-value">
+                    {selected.departure_time}
+                  </div>
+                  <div className="flight-stat-label">depart</div>
+                </div>
+              )}
+              {selected.arrival_time && (
+                <div className="flight-stat">
+                  <div className="flight-stat-value">
+                    {selected.arrival_time}
+                  </div>
+                  <div className="flight-stat-label">arrive</div>
+                </div>
+              )}
             </div>
 
             <button
@@ -140,7 +193,18 @@ export default function PanelFlights({ itinerary, listIndex, onSelect, onPick })
             )}
           </>
         )}
-      </div>
+      </aside>
+
+      {/* BOTTOM band — stops detail when >0 stops */}
+      {selected && selected.stops > 0 && (
+        <footer className="panel-grid-bottom-band home-summary-top">
+          <div className="home-card-label">STOPS DETAIL</div>
+          <div className="home-summary-line">
+            {selected.stops} {selected.stops === 1 ? "stop" : "stops"} · total{" "}
+            <strong>{formatDuration(selected.duration_min)}</strong>
+          </div>
+        </footer>
+      )}
     </section>
   );
 }
