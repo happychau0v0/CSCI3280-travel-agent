@@ -1551,17 +1551,21 @@ const FAKE_MESSAGES = [
         `out-of-order days: ${outOfOrderDays.map((d) => d.day).join(',')}`,
       );
 
-      // Activity durations, when present, should be between 15 and 240 min
+      // Activity durations, when present, should be between 15 and
+      // 240 min — EXCEPT for hotel bookends where 0 is expected
+      // (the bookend is a pass-through marker, not a real stop).
+      const hotelName2 = real?.selected_hotel?.name || real?.hotels?.[0]?.name;
       const weirdDurations = [];
       for (const d of days) {
         for (const a of d.activities || []) {
+          if (a.name === hotelName2) continue; // skip hotel bookends
           if (a.duration_min != null && (a.duration_min < 15 || a.duration_min > 240)) {
             weirdDurations.push(`day ${d.day}: ${a.name} (${a.duration_min}min)`);
           }
         }
       }
       record(
-        '13.8.6e Activity durations within 15-240 min',
+        '13.8.6e Non-hotel activity durations within 15-240 min',
         weirdDurations.length === 0,
         weirdDurations.slice(0, 3).join('; '),
       );
@@ -1580,12 +1584,16 @@ const FAKE_MESSAGES = [
         `dup days: ${dupDays.join(',')}`,
       );
 
-      // Reply text should be short (system prompt asks for ≤25 words)
+      // Reply text should be short BUT NOT empty. The system prompt
+      // asks for a 2-4 sentence spoken summary AFTER the JSON block.
+      // 0 words means the LLM skipped the summary entirely — the user
+      // hears nothing. Require ≥5 words and ≤100 words.
       const lastAssistant = (await debugState(page))?.messages?.filter((m) => m.role === 'assistant').pop();
-      const replyWords = (lastAssistant?.content || '').split(/```json[\s\S]*?```/)[0].trim().split(/\s+/).filter(Boolean).length;
+      const cleaned = (lastAssistant?.content || '').replace(/```json[\s\S]*?```/g, ' ').trim();
+      const replyWords = cleaned.split(/\s+/).filter(Boolean).length;
       record(
-        '13.8.6g Spoken summary is short (<100 words)',
-        replyWords < 100,
+        '13.8.6g Spoken summary is 5-100 words',
+        replyWords >= 5 && replyWords <= 100,
         `${replyWords} words`,
       );
 
