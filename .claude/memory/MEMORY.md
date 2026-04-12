@@ -1,0 +1,5 @@
+- [Playwright walkthrough before shipping](feedback_playwright_walkthrough.md) — mocked tests miss CSS/layout/LLM bugs; always browse the real app before declaring a round complete
+- [LLM copies example structure](feedback_llm_example_driven.md) — if the prompt example shows 2 flights, the LLM emits 2; always expand examples to match desired minimum
+- [Google Places pageSize defaults to 1](feedback_pagesize_default.md) — always set pageSize unconditionally; gating on optional params collapsed all plans to 1 item
+- [Merge partial live data with estimator](feedback_partial_live_data.md) — require ≥3 live results before using exclusively; merge partial with fallback so users always have options
+- [Architecture across 20+ rounds](project_architecture_rounds.md) — round-by-round summary of what was built and why; check before adding "new" features
