@@ -552,9 +552,17 @@ async def search_flights(
     # Try to build options from live data; fall back to estimator if we
     # couldn't get any usable flights from fast-flights.
     live_options = _options_from_live(live)
-    if live_options:
+    if len(live_options) >= 3:
         options = live_options
         source = "fast-flights"
+    elif live_options:
+        # Partial live data: merge real flights with estimator padding
+        # so the user sees live pricing AND has enough to compare.
+        estimator = _build_options(distance_km, date)
+        live_airlines = {o.get("airline") for o in live_options}
+        padding = [e for e in estimator if e.get("airline") not in live_airlines]
+        options = live_options + padding
+        source = "fast-flights+estimator"
     else:
         options = _build_options(distance_km, date)
         source = "estimator"

@@ -362,6 +362,17 @@ async def test_search_flights_uses_live_data_when_available():
             "arrival": "12:30",
             "is_best": True,
         },
+        {
+            "airline": "ANA",
+            "price_str": "HK$2,500",
+            "price_num": 2500,
+            "duration_str": "4 hr 15 min",
+            "duration_min": 255,
+            "stops": 0,
+            "departure": "14:00",
+            "arrival": "18:15",
+            "is_best": False,
+        },
     ]
     with patch("app.tools.flights._try_fast_flights", return_value=fake_live):
         result = await flights.search_flights("Hong Kong", "Tokyo", "2026-05-15")
