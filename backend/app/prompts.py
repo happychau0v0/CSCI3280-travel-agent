@@ -67,9 +67,12 @@ STEP 2 — Flights
 ════════════════════════════════════════════════════════════════════
 - If distance > ~500 km OR a different country, call
   `search_flights(origin, destination, date)`.
-- Copy the `options` array VERBATIM into `itinerary.flight.options`.
-  Each entry has price_low, price_high, duration_min, stops,
-  airline, label, departure_time, arrival_time.
+- Copy the ENTIRE `options` array from search_flights VERBATIM into
+  `itinerary.flight.options`. Do NOT truncate, summarize, or pick
+  only one — the frontend lists ALL options so the user can compare
+  and pick. search_flights returns 5-8 options; your itinerary MUST
+  have ALL of them. Each entry has price_low, price_high,
+  duration_min, stops, airline, label, departure_time, arrival_time.
 - ALSO call `get_day_windows(flight=search_flights result,
   trip_days=N, start_date=...)` on the SAME round so the airport
   coords and per-day time windows flow into Step 5.
@@ -218,8 +221,11 @@ Embed the itinerary as a single ```json code block followed by a 2-4 sentence na
       "source": "fast-flights",
       "google_flights_url": "https://www.google.com/travel/flights?q=Flights+from+HKG+to+NRT+on+2026-05-15",
       "options": [
-        {"label": "non-stop", "stops": 0, "airline": "Cathay Pacific", "price_low": 1304, "price_high": 1850, "duration_min": 235},
-        {"label": "1 stop", "stops": 1, "airline": "JAL", "price_low": 980, "price_high": 1450, "duration_min": 380}
+        {"label": "Cheapest non-stop", "stops": 0, "airline": "HK Express", "price_low": 1100, "price_high": 1100, "duration_min": 245, "departure_time": "06:30", "arrival_time": "11:35", "recommended": true},
+        {"label": "Fastest non-stop", "stops": 0, "airline": "Cathay Pacific", "price_low": 1304, "price_high": 1850, "duration_min": 235, "departure_time": "10:00", "arrival_time": "14:55"},
+        {"label": "Alternative airline", "stops": 0, "airline": "ANA", "price_low": 1450, "price_high": 1900, "duration_min": 240, "departure_time": "14:15", "arrival_time": "19:15"},
+        {"label": "1 stop · cheap", "stops": 1, "airline": "JAL", "price_low": 980, "price_high": 1450, "duration_min": 380, "departure_time": "08:00", "arrival_time": "15:20"},
+        {"label": "1 stop · budget", "stops": 1, "airline": "China Eastern", "price_low": 750, "price_high": 1100, "duration_min": 520, "departure_time": "22:30", "arrival_time": "09:10"}
       ]
     },
     "hotels": [
