@@ -342,7 +342,7 @@ export default function PanelHome({
       >
         <div className="home-card-label">📍 LIVE</div>
         <div className="home-card-value">
-          {userLocation?.city || "Locating…"}
+          {userLocation?.city || userLocation?.formatted || "GPS unavailable"}
         </div>
         <div className="home-card-sub">
           {agentState === "working"

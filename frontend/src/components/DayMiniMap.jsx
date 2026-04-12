@@ -92,7 +92,11 @@ export default function DayMiniMap({ activities, airport = null }) {
     airport && airport.lat != null && airport.lng != null;
 
   if (points.length === 0 && !hasAirport) {
-    return null;
+    return (
+      <div className="day-mini-map day-mini-map-empty">
+        <span>No coordinates for this day — map unavailable</span>
+      </div>
+    );
   }
 
   // Custom numbered marker — small cyan disc with the visit order

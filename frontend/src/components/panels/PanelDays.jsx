@@ -328,6 +328,19 @@ export default function PanelDays({
           {" · "}
           <strong>{activities.length}</strong>
           <span className="home-summary-meta"> stops</span>
+          {(() => {
+            const noCoords = activities.filter(
+              (a) => a.lat == null && a.lng == null &&
+              !(hotelName && a.name === hotelName) &&
+              !/airport/i.test(a.name || "")
+            ).length;
+            if (noCoords === 0) return null;
+            return (
+              <span className="day-coord-warning" title="Some activities lack coordinates — map may be incomplete">
+                {" "}⚠ {noCoords} missing coords
+              </span>
+            );
+          })()}
           <span className="day-expand-controls">
             <button
               type="button"

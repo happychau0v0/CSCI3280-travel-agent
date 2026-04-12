@@ -29,12 +29,24 @@ function stopsLabel(stops) {
   return `${stops} stops`;
 }
 
-/** Always-visible depart→arrive string with em-dash fallbacks so the
- * row layout stays consistent even when fast-flights omits one side. */
+/** Always-visible depart→arrive string with em-dash fallbacks.
+ * Appends "+1" when the arrival appears to be the next day
+ * (arrival time numerically earlier than departure, which happens
+ * on long-haul overnight flights). */
 function formatTimeRange(opt) {
   const dep = opt?.departure_time || "—";
   const arr = opt?.arrival_time || "—";
-  return `${dep} → ${arr}`;
+  let suffix = "";
+  if (dep !== "—" && arr !== "—" && opt?.duration_min > 0) {
+    const [dh, dm] = dep.split(":").map(Number);
+    const [ah, am] = arr.split(":").map(Number);
+    const depMin = dh * 60 + dm;
+    const arrMin = ah * 60 + am;
+    if (arrMin <= depMin && opt.duration_min > 120) {
+      suffix = "+1";
+    }
+  }
+  return `${dep} → ${arr}${suffix}`;
 }
 
 export default function PanelFlights({ itinerary, listIndex, currency = "HKD", onSelect, onPick }) {
