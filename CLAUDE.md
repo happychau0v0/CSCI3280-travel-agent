@@ -90,6 +90,56 @@ These plugins are enabled and should be used during development:
 - `frontend/src/components/` — ChatWindow, VoiceRecorder, AudioPlayer, ItineraryCard, MapView
 - `frontend/src/api/client.js` — backend API client
 
+## Mandatory Playwright Walkthrough (Before Declaring Any Round Complete)
+
+Every implementation round MUST end with a real-browser walkthrough using the Playwright MCP plugin BEFORE the final commit. This is NOT optional — mocked tests verify code correctness, but only a real browser session catches the bugs users actually hit.
+
+### The Walkthrough Checklist
+
+1. **Navigate to `http://localhost:5173`** using `browser_navigate`
+2. **Screenshot the PLAN panel** at both 1440×900 AND 1024×600 viewports
+   - Verify: all 8 form rows visible, START PLANNING button not clipped below fold
+   - Verify: PLAN HISTORY card renders in right column
+   - Verify: NEXT TRIP summary shows destination after a plan exists
+3. **Fill the form and click START PLANNING** — wait for agent idle
+   - Verify: status bar shows "AGENT WORKING" during loading
+   - Verify: panel auto-navigates to FLIGHTS after done (not HOTELS)
+4. **Screenshot FLIGHTS panel**
+   - Verify: ≥3 flight options listed with visible departure→arrival times
+   - Verify: prices show in the user's selected currency
+   - Verify: PICK button is clickable, text not truncated
+5. **Click PICK → auto-advance to HOTELS**
+   - Verify: Leaflet map renders with hotel pins + airport pin
+   - Verify: hotel names NOT truncated in the left column
+   - Verify: filter chips (PRICE / RATING) are functional
+   - Verify: photo gallery loads on the right detail card
+6. **Click a hotel PICK → advance to DAYS**
+   - Verify: DayMiniMap renders with numbered pins + polylines
+   - Verify: Day 1 first activity is the arrival airport
+   - Verify: each activity row has REPLACE/REMOVE/★ buttons
+   - Verify: forecast strip renders if weather data exists
+7. **Test overlays**: press `?` (help), `P` (print), `L` (checklist), `S` (settings), `H` (history), `F` (favorites)
+   - Verify: each opens and Esc closes it
+8. **Check console** via `browser_evaluate` for uncaught errors
+9. **Test at small viewport** (1024×600) — nothing should overflow or become inaccessible
+
+### What This Catches That Mocked Tests Don't
+
+- CSS overflow / clipping at real viewport sizes
+- Text truncation in flex containers
+- Leaflet map rendering failures (tile loading, pin placement)
+- Globe zoom animation timing issues
+- LLM output format mismatches (example-driven truncation)
+- Real fast-flights data edge cases (partial results, missing fields)
+- Geolocation failures in headless browsers
+- Cross-component state leaks between panels
+
+### When to Run
+
+- After EVERY implementation round, before the final test commit
+- After ANY change to: App.css grid layout, PanelHome form fields, prompts.py OUTPUT FORMAT example, flights.py option pipeline, DayMiniMap/HotelsMap
+- Before declaring a PR ship-ready
+
 ## Commit Discipline
 
 - **Commit in focused chunks** — one concern per commit, never bundle unrelated changes
