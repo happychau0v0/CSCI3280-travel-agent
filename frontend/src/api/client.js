@@ -1,4 +1,23 @@
-export const API_BASE = "http://localhost:8000";
+// Derive the backend URL from the current page so it follows whatever
+// hostname the user loaded the frontend from (localhost, a Tailscale
+// IP, a LAN IP, etc). In the browser, `localhost` always resolves to
+// the user's own machine — a remote user over Tailscale would try to
+// hit their own laptop which has no backend, and see a network error.
+//
+// Override with VITE_API_BASE when hosting the frontend and backend
+// on separate origins (e.g. deploying to a cloud host).
+function resolveApiBase() {
+  // Build-time override wins if set.
+  const envBase = import.meta.env?.VITE_API_BASE;
+  if (envBase) return envBase.replace(/\/$/, "");
+  if (typeof window === "undefined") return "http://localhost:8000";
+  // Use the hostname the frontend was loaded from, and the configured
+  // backend port (8000 by default; override via VITE_API_PORT).
+  const port = import.meta.env?.VITE_API_PORT || "8000";
+  return `${window.location.protocol}//${window.location.hostname}:${port}`;
+}
+
+export const API_BASE = resolveApiBase();
 
 /**
  * Build an absolute URL for a relative photo path returned from the backend

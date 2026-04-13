@@ -1,3 +1,5 @@
+import { API_BASE } from "../api/client";
+
 /**
  * Top-of-page error banner with a friendly message and dismiss button.
  */
@@ -11,8 +13,7 @@ export default function ErrorBanner({ error, onDismiss }) {
   } else if (error.status === 500) {
     message = `Server error: ${message}. Check the backend logs.`;
   } else if (error.message?.includes("Failed to fetch")) {
-    message =
-      "Cannot reach the backend at http://localhost:8000. Is uvicorn running?";
+    message = `Cannot reach the backend at ${API_BASE}. Is uvicorn running and reachable from this host?`;
   }
 
   return (
