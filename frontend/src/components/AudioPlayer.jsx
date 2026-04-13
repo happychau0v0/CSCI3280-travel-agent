@@ -80,8 +80,8 @@ export default function AudioPlayer({ text }) {
   const speakBrowser = (spoken) => {
     if (!window.speechSynthesis) return;
     const utterance = new SpeechSynthesisUtterance(spoken);
-    utterance.rate = 1.1;
-    utterance.pitch = 1.2;
+    utterance.rate = 1.0;
+    utterance.pitch = 0.0;
     // Use best available voice
     const best = pickBestVoice(voicesRef.current);
     if (best) utterance.voice = best;
