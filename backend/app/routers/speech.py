@@ -1,11 +1,14 @@
 """Text-to-speech endpoint.
 
-Uses Google Cloud Text-to-Speech API (Neural2 voices) for natural-sounding
-output. The same GOOGLE_MAPS_API_KEY is used — it works if the Cloud TTS API
-is enabled on the same GCP project. Falls back gracefully with 503 so the
-frontend can degrade to browser SpeechSynthesis.
+Uses OpenRouter's gpt-4o-audio-preview model via streaming chat completions
+to generate natural-sounding speech. The same OPENROUTER_API_KEY used for
+the main LLM is reused — no extra key needed.
+
+Falls back gracefully with 503 so the frontend degrades to browser
+SpeechSynthesis if the key is missing or the model is unavailable.
 """
 import base64
+import json
 import logging
 import re
 
@@ -14,22 +17,10 @@ from fastapi import APIRouter
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from app.config import GOOGLE_MAPS_API_KEY, check_key
+from app.config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, check_key
 
 router = APIRouter(prefix="/speech", tags=["speech"])
 logger = logging.getLogger(__name__)
-
-# OpenAI voice alias → Google Neural2 voice name.
-# Neural2 voices are trained on human speech and sound very natural.
-_VOICE_MAP = {
-    "nova":    "en-US-Neural2-H",   # warm female
-    "shimmer": "en-US-Neural2-E",   # bright female
-    "alloy":   "en-US-Neural2-D",   # neutral male
-    "echo":    "en-US-Neural2-A",   # deep male
-    "onyx":    "en-US-Neural2-J",   # authoritative male
-    "fable":   "en-GB-Neural2-B",   # British female
-}
-_DEFAULT_VOICE = "en-US-Neural2-H"
 
 
 def _clean(text: str) -> str:
@@ -50,63 +41,89 @@ class TTSRequest(BaseModel):
 
 @router.post("/tts")
 async def text_to_speech(req: TTSRequest):
-    """Convert text to speech via Google Cloud Text-to-Speech (Neural2).
+    """Convert text to speech via OpenRouter gpt-4o-audio-preview.
 
-    Returns an MP3 audio blob. Falls back to 503 if the API key is not
-    configured or if TTS API is not enabled, so the frontend can degrade
-    gracefully to browser SpeechSynthesis.
+    Uses streaming chat completions with modalities=["text","audio"]. Each
+    SSE chunk carries a base64 audio fragment in choices[0].delta.audio.data;
+    fragments are concatenated and decoded to MP3 bytes.
+
+    Returns an MP3 audio blob, or 503 so the frontend falls back to browser
+    SpeechSynthesis.
     """
-    if not check_key(GOOGLE_MAPS_API_KEY):
+    if not check_key(OPENROUTER_API_KEY):
         return Response(
             content=b"",
             status_code=503,
             media_type="text/plain",
-            headers={"X-TTS-Error": "GOOGLE_MAPS_API_KEY not configured"},
+            headers={"X-TTS-Error": "OPENROUTER_API_KEY not configured"},
         )
 
     spoken = _clean(req.text)
     if not spoken:
         return Response(content=b"", status_code=204)
 
-    google_voice = _VOICE_MAP.get(req.voice or "nova", _DEFAULT_VOICE)
-    language_code = google_voice[:5]  # e.g. "en-US" or "en-GB"
-
     payload = {
-        "input": {"text": spoken},
-        "voice": {"languageCode": language_code, "name": google_voice},
-        "audioConfig": {
-            "audioEncoding": "MP3",
-            "speakingRate": 1.05,
-            "pitch": 0.0,
-            "effectsProfileId": ["headphone-class-device"],
-        },
+        "model": "openai/gpt-4o-audio-preview",
+        "messages": [{"role": "user", "content": spoken}],
+        "modalities": ["text", "audio"],
+        "audio": {"voice": req.voice or "nova", "format": "mp3"},
+        "stream": True,
     }
 
+    audio_chunks: list[str] = []
     try:
         # trust_env=False prevents httpx from routing through a local SOCKS
         # proxy (Clash, Shadowsocks) that would crash with "socksio not installed".
-        async with httpx.AsyncClient(trust_env=False, timeout=12.0) as client:
-            resp = await client.post(
-                "https://texttospeech.googleapis.com/v1/text:synthesize",
-                params={"key": GOOGLE_MAPS_API_KEY},
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            async with client.stream(
+                "POST",
+                f"{OPENROUTER_BASE_URL}/chat/completions",
                 json=payload,
-            )
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+            ) as resp:
+                if resp.status_code != 200:
+                    body = await resp.aread()
+                    logger.warning(
+                        "OpenRouter TTS %d: %s", resp.status_code, body[:200]
+                    )
+                    return Response(
+                        content=body,
+                        status_code=503,
+                        media_type="text/plain",
+                        headers={"X-TTS-Error": f"OpenRouter {resp.status_code}"},
+                    )
 
-        if resp.status_code != 200:
-            logger.warning(
-                "Google TTS returned %d: %s", resp.status_code, resp.text[:200]
-            )
+                async for line in resp.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    raw = line[6:]
+                    if raw == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(raw)
+                        audio = chunk["choices"][0]["delta"].get("audio", {})
+                        if audio.get("data"):
+                            audio_chunks.append(audio["data"])
+                    except (json.JSONDecodeError, KeyError, IndexError):
+                        continue
+
+        if not audio_chunks:
+            logger.warning("TTS: no audio chunks received from OpenRouter")
             return Response(
-                content=resp.text.encode(),
+                content=b"No audio data returned",
                 status_code=503,
                 media_type="text/plain",
-                headers={"X-TTS-Error": f"Google TTS {resp.status_code}"},
+                headers={"X-TTS-Error": "empty audio stream"},
             )
 
-        audio_b64 = resp.json()["audioContent"]
-        audio_bytes = base64.b64decode(audio_b64)
-        logger.info("TTS (%s) generated %d bytes for %d chars",
-                    google_voice, len(audio_bytes), len(spoken))
+        audio_bytes = base64.b64decode("".join(audio_chunks))
+        logger.info(
+            "TTS (gpt-4o-audio, %s) %d bytes for %d chars",
+            req.voice, len(audio_bytes), len(spoken),
+        )
         return Response(content=audio_bytes, media_type="audio/mpeg")
 
     except Exception as e:
