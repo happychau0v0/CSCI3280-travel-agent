@@ -142,7 +142,7 @@ export function useSubtitleQueue({
         window.speechSynthesis.cancel();
         const utter = new SpeechSynthesisUtterance(text);
         utter.rate = rateRef.current || 1.15;
-        utter.pitch = 1.0;
+        utter.pitch = 1.2; // slightly elevated for a warmer, more enthusiastic tone
         const voice = findVoice(voiceNameRef.current);
         if (voice) utter.voice = voice;
         // Fire-and-forget — we DON'T hook onend/onerror because on

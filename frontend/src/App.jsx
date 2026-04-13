@@ -704,7 +704,10 @@ function App() {
                 // Push a friendly narration so the user sees progress
                 // in the subtitle bar in addition to the status banner.
                 const label = TOOL_NARRATIONS[tool];
-                if (label) subtitles.push(label);
+                // Display tool status in subtitles but don't speak it —
+                // reading "Checking the weather…" on every tool call is
+                // distracting mid-sentence narration.
+                if (label) subtitles.push(label, { spoken: false });
               }
             } else if (type === "tool_end") {
               // Record per-tool elapsed time for the benchmark display

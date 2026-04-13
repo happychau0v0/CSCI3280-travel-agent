@@ -76,8 +76,8 @@ async def text_to_speech(req: TTSRequest):
         "voice": {"languageCode": language_code, "name": google_voice},
         "audioConfig": {
             "audioEncoding": "MP3",
-            "speakingRate": 1.05,
-            "pitch": 0.0,
+            "speakingRate": 1.1,   # slightly faster, more energetic
+            "pitch": 2.0,          # +2 semitones — warmer, more animated
             "effectsProfileId": ["headphone-class-device"],
         },
     }
