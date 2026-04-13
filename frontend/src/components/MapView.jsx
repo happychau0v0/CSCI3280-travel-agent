@@ -15,6 +15,7 @@ import {
   splitArcAtAntimeridian,
   isAirportOutlier,
   decodePolyline,
+  computeBounds,
 } from "./mapUtils";
 
 /**
@@ -529,6 +530,20 @@ const MapView = forwardRef(function MapView(props, ref) {
     };
     if (reducedMotion) map.jumpTo(opts); else map.flyTo(opts);
   }, [selectedHotelIdx, loaded, mode, hotels, reducedMotion]);
+
+  // MIG4 — Fit map to day activities when switching days or entering DAYS mode
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded || mode !== "days") return;
+    const pts = (activities || []).filter((a) => a.lat != null && a.lng != null);
+    if (pts.length < 2) return;
+    const bounds = computeBounds(pts.map((a) => [a.lat, a.lng]));
+    if (!bounds) return;
+    map.fitBounds(
+      [[bounds.minLng, bounds.minLat], [bounds.maxLng, bounds.maxLat]],
+      { padding: 80, duration: reducedMotion ? 0 : 1400, essential: true },
+    );
+  }, [activities, loaded, mode, reducedMotion]);
 
   // Airport badge (DOM overlay) when airport is distant
   const airportBadge = useMemo(() => {
