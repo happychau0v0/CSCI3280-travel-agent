@@ -544,6 +544,7 @@ function App() {
       // the destination. null on HOME/FLIGHTS, {lat, lng, altitude}
       // otherwise.
       globeFocus,
+      mapFocus,
       planHistory,
       undoCount,
       redoCount,
@@ -918,6 +919,20 @@ function App() {
     return null;
   }, [menu.state.panel, currentItinerary]);
 
+  // MIG5 — MapLibre focus uses zoom (not altitude). Separate from globeFocus
+  // so GlobeView (legacy) and MapView each get the right coordinate format.
+  const mapFocus = useMemo(() => {
+    const dest = currentItinerary?.flight;
+    if (dest?.to_lat == null || dest?.to_lng == null) return null;
+    if (menu.state.panel === "HOTELS") {
+      return { lat: dest.to_lat, lng: dest.to_lng, zoom: 12 };
+    }
+    if (menu.state.panel === "DAYS") {
+      return { lat: dest.to_lat, lng: dest.to_lng, zoom: 13 };
+    }
+    return null;
+  }, [menu.state.panel, currentItinerary]);
+
   // MIG3 — Imperative panel-switch flyTo for MapLibre.
   // Uses the ref (set by useImperativeHandle) with a window.__mapViewHandle
   // fallback for the lazy-load race: the first render fires this effect before
@@ -1011,7 +1026,7 @@ function App() {
                   }
                 : null
             }
-            focus={globeFocus}
+            focus={mapFocus}
           />
         ) : (
           <GlobeView
