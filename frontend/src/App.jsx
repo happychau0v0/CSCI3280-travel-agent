@@ -31,6 +31,21 @@ import "./App.css";
 
 // Lazy-load the globe so the Three.js bundle doesn't block first paint.
 const GlobeView = lazy(() => import("./components/GlobeView"));
+// Phase 1: Experimental MapLibre-based unified map view (feature-flagged).
+// Enabled via URL `?map=maplibre` OR localStorage `useMapLibre=true`.
+const MapView = lazy(() => import("./components/MapView"));
+
+function useMapLibreFlag() {
+  if (typeof window === "undefined") return false;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("map") === "maplibre") return true;
+    if (params.get("map") === "legacy") return false;
+    return localStorage.getItem("useMapLibre") === "true";
+  } catch {
+    return false;
+  }
+}
 
 const STATE_KEY = "travel-chat-state";
 const TRIP_DATES_KEY = "travel-trip-dates";
@@ -143,6 +158,10 @@ function buildHistoryEntry(itinerary, messages) {
 
 function App() {
   const initial = loadState();
+  // Feature flag — set `?map=maplibre` in URL to enable the new MapLibre
+  // unified map view. Default is legacy (react-globe.gl + react-leaflet).
+  const useMapLibre = useMapLibreFlag();
+  const mapViewRef = useRef(null);
   const [messages, setMessages] = useState(initial.messages);
   const [currentItinerary, setCurrentItinerary] = useState(initial.itinerary);
   const [planHistory, setPlanHistory] = useState(() => loadPlanHistory());
@@ -899,6 +918,41 @@ function App() {
     return null;
   }, [menu.state.panel, currentItinerary]);
 
+  // MIG3 — Imperative panel-switch flyTo for MapLibre.
+  // Uses the ref (set by useImperativeHandle) with a window.__mapViewHandle
+  // fallback for the lazy-load race: the first render fires this effect before
+  // MapView has mounted and set the ref, so we retry after a short delay.
+  useEffect(() => {
+    if (!useMapLibre) return;
+    const dest = currentItinerary?.flight;
+
+    const doFly = () => {
+      // Prefer the React ref; fall back to the window handle (set in useImperativeHandle)
+      const handle = mapViewRef.current ?? window.__mapViewHandle;
+      if (!handle) return false;
+      if (!dest?.to_lat || !dest?.to_lng) {
+        if (menu.state.panel === "HOME" || menu.state.panel === "FLIGHTS") {
+          handle.resetToGlobe();
+        }
+        return true;
+      }
+      if (menu.state.panel === "HOTELS") {
+        handle.flyTo({ lat: dest.to_lat, lng: dest.to_lng, zoom: 12 });
+      } else if (menu.state.panel === "DAYS") {
+        handle.flyTo({ lat: dest.to_lat, lng: dest.to_lng, zoom: 13 });
+      } else if (menu.state.panel === "HOME" || menu.state.panel === "FLIGHTS") {
+        handle.resetToGlobe();
+      }
+      return true;
+    };
+
+    // Try immediately; if handle not available yet (lazy-load), retry after map boots.
+    if (!doFly()) {
+      const t = setTimeout(doFly, 800);
+      return () => clearTimeout(t);
+    }
+  }, [menu.state.panel, useMapLibre, currentItinerary]);
+
   // F2b: Globe fade-out timeline. When user is on HOTELS/DAYS, set
   // data-landed="true" on the globe canvas after a short delay so the
   // CSS opacity transition kicks in. The Leaflet map fading in
@@ -927,15 +981,47 @@ function App() {
         <ErrorBanner error={error} onDismiss={() => setError(null)} />
       )}
 
-      {/* Background globe */}
+      {/* Background map — MapLibre (?map=maplibre) OR legacy globe */}
       <Suspense fallback={<div className="globe-loading">Loading globe…</div>}>
-        <GlobeView
-          userLocation={userLocation}
-          arcs={arcs}
-          points={points}
-          drawerOpen={false}
-          focus={globeFocus}
-        />
+        {useMapLibre ? (
+          <MapView
+            ref={mapViewRef}
+            mode={
+              menu.state.panel === "HOTELS" ? "hotels"
+              : menu.state.panel === "DAYS" ? "days"
+              : "globe"
+            }
+            userLocation={userLocation}
+            arcs={arcs}
+            points={points}
+            hotels={currentItinerary?.hotels || []}
+            selectedHotelIdx={menu.state.listIndex}
+            activities={
+              currentItinerary?.days?.[
+                menu.state.panel === "DAYS" ? menu.state.listIndex : 0
+              ]?.activities || []
+            }
+            activeActivityIdx={-1}
+            airport={
+              currentItinerary?.flight?.to_lat != null
+                ? {
+                    lat: currentItinerary.flight.to_lat,
+                    lng: currentItinerary.flight.to_lng,
+                    iata: currentItinerary.flight.to_iata,
+                  }
+                : null
+            }
+            focus={globeFocus}
+          />
+        ) : (
+          <GlobeView
+            userLocation={userLocation}
+            arcs={arcs}
+            points={points}
+            drawerOpen={false}
+            focus={globeFocus}
+          />
+        )}
       </Suspense>
 
       {/* Prominent agent-working banner — pinned below the tab strip
@@ -1035,6 +1121,7 @@ function App() {
             onSelect={selectListItem}
             autoReplan={autoReplan}
             onToggleAutoReplan={toggleAutoReplan}
+            useMapLibre={useMapLibre}
             onPick={(i) => {
               const hotel = currentItinerary?.hotels?.[i];
               if (!hotel) return;
@@ -1187,6 +1274,7 @@ function App() {
               });
               cues.tick?.();
             }}
+            useMapLibre={useMapLibre}
             favoriteKeys={favoriteKeys}
             onToggleFavorite={(dayIdx, actIdx) => {
               // Round 19 — toggle a favorite entry keyed by place_id

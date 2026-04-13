@@ -1,5 +1,52 @@
 /* AI Travel Agent — globe-first layout */
 
+/* ─── MapLibre unified map view ─────────────────────────── */
+/* Feature-flagged replacement for react-globe.gl + react-leaflet.
+ * The .map-view-root is a fixed background layer at z-index 0,
+ * same position as the old .globe-canvas. MapLibre handles both
+ * globe and Mercator rendering via shader-interpolated projection. */
+.map-view-root {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  /* Map captures pointer events so user can pan/zoom; panels (z-index 30+)
+   * still receive their own clicks because they're above. */
+  pointer-events: auto;
+}
+.map-view-root.fade-on-panel {
+  /* When a panel covers center, the map fades back so it doesn't fight visually */
+  opacity: 0.85;
+  transition: opacity 400ms ease-out;
+}
+.map-canvas {
+  width: 100%;
+  height: 100%;
+}
+.map-canvas .maplibregl-ctrl-attrib {
+  background: rgba(2, 6, 13, 0.6);
+  color: var(--text-dim);
+  font-size: 9px;
+  opacity: 0.5;
+}
+.map-airport-badge {
+  position: fixed;
+  bottom: 80px;
+  right: 24px;
+  z-index: 50;
+}
+
+/* When MapLibre is active on HOTELS/DAYS panels, the center column
+ * is kept as a placeholder but transparent so the background map shows through. */
+.panel-grid-center.maplibre-passthrough {
+  background: transparent;
+  border-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  animation: none;
+  pointer-events: none;
+}
+
+
 /* ─── Global keyboard focus indicator ─────────────────────── */
 /* Cyan glow matching NieR aesthetic. Uses :focus-visible so it
  * only shows for keyboard users, not mouse clicks. */

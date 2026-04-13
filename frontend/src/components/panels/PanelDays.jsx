@@ -307,6 +307,7 @@ export default function PanelDays({
   onRemoveDay,
   favoriteKeys = new Set(),
   onToggleFavorite,
+  useMapLibre = false,
 }) {
   const days = itinerary?.days || [];
   const hotelName =
@@ -531,11 +532,13 @@ export default function PanelDays({
         </ul>
       </div>
 
-      {/* CENTER — mini-map of the selected day. The map renders in
-       *  the center grid cell with pointer-events auto so the user
-       *  can interact with it. */}
-      <div className="panel-grid-center panel-day-map-center" data-testid="day-map-center">
-        <DayMiniMap activities={activities} airport={airportPin} activeActivityIdx={activeActivityIdx} />
+      {/* CENTER — mini-map of the selected day.
+       * When MapLibre is active the background MapView handles this;
+       * we render an empty transparent cell so the background shows through. */}
+      <div className={`panel-grid-center panel-day-map-center${useMapLibre ? " maplibre-passthrough" : ""}`} data-testid="day-map-center">
+        {!useMapLibre && (
+          <DayMiniMap activities={activities} airport={airportPin} activeActivityIdx={activeActivityIdx} />
+        )}
       </div>
 
       {/* RIGHT — activity timeline + R17 phrasebook + R18 weather hint */}

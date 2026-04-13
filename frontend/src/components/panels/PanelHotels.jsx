@@ -59,6 +59,7 @@ export default function PanelHotels({
   onPick,
   autoReplan = true,
   onToggleAutoReplan,
+  useMapLibre = false,
 }) {
   const hotelsRaw = itinerary?.hotels || [];
   const [priceFilter, setPriceFilter] = useState("any");
@@ -188,13 +189,17 @@ export default function PanelHotels({
         </div>
       </header>
 
-      {/* CENTER — Leaflet map with hotel pins + airport reference */}
-      <div className="panel-grid-center">
-        <HotelsMap
-          hotels={hotels}
-          airport={airportPin}
-          selectedIdx={selectedIdx}
-        />
+      {/* CENTER — map with hotel pins + airport reference.
+       * When MapLibre is active the background MapView handles this;
+       * we render an empty transparent cell so the background shows through. */}
+      <div className={`panel-grid-center${useMapLibre ? " maplibre-passthrough" : ""}`}>
+        {!useMapLibre && (
+          <HotelsMap
+            hotels={hotels}
+            airport={airportPin}
+            selectedIdx={selectedIdx}
+          />
+        )}
       </div>
 
       {/* LEFT — hotels list with thumbnails */}
