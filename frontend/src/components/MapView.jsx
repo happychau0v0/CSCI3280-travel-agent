@@ -74,7 +74,7 @@ const MapView = forwardRef(function MapView(props, ref) {
         resetToGlobe: () => {
           const map = mapRef.current;
           if (!map) return;
-          const opts = { center: [0, 20], zoom: 1.5, duration: reducedMotion ? 0 : 1800 };
+          const opts = { center: [10, 10], zoom: 1.2, pitch: 22, duration: reducedMotion ? 0 : 1800 };
           if (reducedMotion) map.jumpTo(opts); else map.flyTo(opts);
         },
         getMap: () => mapRef.current,
@@ -131,13 +131,15 @@ const MapView = forwardRef(function MapView(props, ref) {
           source: "fibonacci-dots",
           // Dots fade out as we zoom in past the globe view
           paint: {
+            // COBE-style: fine dots that shrink as you zoom toward the city
             "circle-radius": [
               "interpolate",
               ["linear"],
               ["zoom"],
-              0, 2.4,
-              2, 2.8,
-              4, 2.0,
+              0, 1.7,
+              1.2, 2.0,
+              3, 2.4,
+              5, 1.6,
               6, 0,
             ],
             "circle-color": "#00d9ff",
@@ -145,12 +147,12 @@ const MapView = forwardRef(function MapView(props, ref) {
               "interpolate",
               ["linear"],
               ["zoom"],
-              0, 1.0,
-              3, 0.95,
-              5, 0.4,
+              0, 0.85,
+              2, 0.90,
+              5, 0.35,
               6, 0,
             ],
-            "circle-blur": 0.15,
+            "circle-blur": 0.25,
           },
         },
         {
@@ -185,8 +187,10 @@ const MapView = forwardRef(function MapView(props, ref) {
     const map = new maplibregl.Map({
       container: containerRef.current,
       style,
-      center: [0, 20],
-      zoom: 0,  // zoom 0 = full globe visible
+      center: [10, 10],       // Atlantic/Africa — balanced starting view
+      zoom: 1.2,              // Larger globe (zoom 0 was too small)
+      pitch: 22,              // ~Earth's axial tilt — makes rotation look 3D like COBE
+      bearing: 0,
       renderWorldCopies: false,
       attributionControl: false,
       fadeDuration: 300,
@@ -506,7 +510,7 @@ const MapView = forwardRef(function MapView(props, ref) {
     const map = mapRef.current;
     if (!map || !loaded) return;
     if (mode === "globe" && !focus) {
-      const opts = { center: [0, 20], zoom: 1.5, duration: reducedMotion ? 0 : 1800 };
+      const opts = { center: [10, 10], zoom: 1.2, pitch: 22, duration: reducedMotion ? 0 : 1800 };
       if (reducedMotion) map.jumpTo(opts); else map.flyTo(opts);
     }
   }, [mode, loaded, focus, reducedMotion]);
