@@ -6,7 +6,7 @@ load_dotenv()
 
 # LLM via OpenRouter (OpenAI SDK compatible)
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-LLM_MODEL = os.getenv("LLM_MODEL", "google/gemini-3.1-flash-lite-preview")
+LLM_MODEL = os.getenv("LLM_MODEL", "x-ai/grok-4.20")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 # Google Maps Platform — single key for Places, Routes, Weather, Geocoding, Time Zone

@@ -56,7 +56,7 @@ async def get_weather(city: str, date: str | None = None) -> dict:
     if not check_key(GOOGLE_MAPS_API_KEY):
         raise ToolUnavailableError("GOOGLE_MAPS_API_KEY not configured")
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(timeout=15.0, proxy=None) as client:
         coords = await _geocode_city(client, city)
         if not coords:
             return {

@@ -8,7 +8,7 @@ Multimodal AI travel planning agent for CSCI3280 final project. Users speak or t
 
 | Layer | Technology |
 |-------|-----------|
-| LLM | OpenRouter API (OpenAI SDK compatible) — `google/gemini-3.1-flash-lite-preview` default, swap via `LLM_MODEL` env var |
+| LLM | OpenRouter API (OpenAI SDK compatible) — `x-ai/grok-4.20` default, swap via `LLM_MODEL` env var |
 | STT | Browser Web Speech API (MVP) → OpenAI Whisper (upgrade) |
 | TTS | Browser SpeechSynthesis API (MVP) → OpenAI TTS (upgrade) |
 | Location & Weather | Google Maps Platform — Places (New), Routes, Weather, Geocoding, Time Zone (one API key) |

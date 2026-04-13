@@ -41,7 +41,7 @@ async def geocode_city(query: str) -> dict:
         "result_type": "locality|administrative_area_level_1|country",
     }
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(timeout=15.0, proxy=None) as client:
         resp = await client.get(GEOCODE_URL, params=params)
         resp.raise_for_status()
         data = resp.json()
@@ -88,7 +88,7 @@ async def reverse_geocode(lat: float, lng: float) -> dict:
         "result_type": "locality|administrative_area_level_1|country",
     }
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(timeout=15.0, proxy=None) as client:
         resp = await client.get(GEOCODE_URL, params=params)
         resp.raise_for_status()
         data = resp.json()

@@ -15,6 +15,8 @@ from app.tools import (
 )
 from app.tools.errors import ToolUnavailableError
 
+import os
+
 __all__ = ["TOOL_DEFINITIONS", "TOOL_DISPATCH", "ToolUnavailableError"]
 
 
@@ -358,3 +360,12 @@ TOOL_DISPATCH: dict = {
     "get_phrasebook": phrasebook.get_phrasebook,
     "web_search": search.web_search,
 }
+
+# Integration testing: when MOCK_TOOLS=1 is set, replace all tool
+# implementations with deterministic fixture-returning stubs. This lets
+# Playwright integration tests exercise the REAL SSE pipeline, JSON
+# extraction, and state transitions without needing API keys.
+if os.getenv("MOCK_TOOLS"):
+    from app.tools.mock_dispatch import MOCK_DISPATCH
+
+    TOOL_DISPATCH.update(MOCK_DISPATCH)

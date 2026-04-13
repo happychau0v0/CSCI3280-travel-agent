@@ -5,6 +5,7 @@ httpx
 python-dotenv
 pydantic
 fast-flights
+json-repair
 ruff
 pytest
 pytest-asyncio

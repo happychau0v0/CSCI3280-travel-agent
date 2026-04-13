@@ -92,7 +92,7 @@ async def search_places(
         "X-Goog-FieldMask": SEARCH_FIELD_MASK,
     }
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(timeout=15.0, proxy=None) as client:
         resp = await client.post(PLACES_SEARCH_URL, json=body, headers=headers)
         resp.raise_for_status()
         data = resp.json()
@@ -101,7 +101,7 @@ async def search_places(
     for place in data.get("places", []):
         photos = place.get("photos") or []
         location = place.get("location") or {}
-        photo_urls = [_photo_url(p["name"]) for p in photos[:5] if p.get("name")]
+        photo_urls = [_photo_url(p["name"]) for p in photos[:10] if p.get("name")]
         results.append(
             {
                 "place_id": place.get("id", ""),
@@ -132,7 +132,7 @@ async def get_place_details(place_id: str) -> dict:
     }
     url = PLACES_DETAILS_URL.format(place_id=place_id)
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(timeout=15.0, proxy=None) as client:
         resp = await client.get(url, headers=headers)
         resp.raise_for_status()
         data = resp.json()
