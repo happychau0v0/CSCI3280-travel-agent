@@ -66,6 +66,30 @@ export function useKeyboard({
         target.blur();
       }
 
+      // In "detail" scope, the user has explicitly Tabbed into the
+      // right pane to use browser-native focus. Don't hijack Tab,
+      // arrows, Space, or number keys — let the browser handle them.
+      // Esc still works to return to list scope (handled below).
+      if (state.scope === "detail") {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setScope("list");
+          return;
+        }
+        // Allow Tab to cycle from detail→tabs (forward) or detail→list (back)
+        if (e.key === "Tab") {
+          e.preventDefault();
+          setScope(e.shiftKey ? "list" : "tabs");
+          return;
+        }
+        // Allow chat/help/overlays even in detail scope
+        const allowedInDetail = ["t", "T", "?", "h", "H", "s", "S", "m", "M"];
+        if (!allowedInDetail.includes(e.key) && !e.metaKey && !e.ctrlKey) {
+          return;
+        }
+        // Falls through to switch below for allowed keys
+      }
+
       // Number keys → jump to tab N (clamped to PANELS length)
       const num = parseInt(e.key, 10);
       if (!Number.isNaN(num) && num >= 1 && num <= PANELS.length) {
@@ -114,10 +138,17 @@ export function useKeyboard({
           break;
 
         case "Tab":
-          // Toggle scope tabs ↔ list. Only meaningful on list panels.
+          // Cycle scope: tabs → list → detail → tabs.
+          // - "tabs": ←/→ moves between panels
+          // - "list": ↑/↓ moves through left list, Space picks
+          // - "detail": browser-native Tab moves through right pane
+          //             (PICK button, photo gallery, links, etc.)
           if (PANELS_WITH_LIST.has(state.panel)) {
             e.preventDefault();
-            setScope(state.scope === "tabs" ? "list" : "tabs");
+            const next = state.scope === "tabs" ? "list"
+                       : state.scope === "list" ? "detail"
+                       : "tabs";
+            setScope(next);
           }
           break;
 

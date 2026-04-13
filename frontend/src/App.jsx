@@ -37,6 +37,7 @@ const TRIP_DATES_KEY = "travel-trip-dates";
 const PLAN_HISTORY_KEY = "travel-plan-history";
 const PLAN_HISTORY_MAX = 20;
 const FAVORITES_KEY = "travel-favorites";
+const AUTO_REPLAN_KEY = "travel-auto-replan";
 
 // Subtitle-line narration for each tool the LLM can call. Pushed onto
 // the subtitle queue when a tool_start event arrives so the user sees
@@ -151,6 +152,24 @@ function App() {
   const [preferences, setPreferences] = useState(null);
   const [error, setError] = useState(null);
   const [muted, setMuted] = useState(false);
+  // Auto-replan toggle: when ON (default), picking a hotel triggers
+  // an LLM day-replan. When OFF, the pick is purely local — useful
+  // for users who want to manually plan their days.
+  const [autoReplan, setAutoReplan] = useState(() => {
+    try {
+      const raw = localStorage.getItem(AUTO_REPLAN_KEY);
+      return raw === null ? true : raw === "true";
+    } catch {
+      return true;
+    }
+  });
+  const toggleAutoReplan = useCallback(() => {
+    setAutoReplan((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(AUTO_REPLAN_KEY, String(next)); } catch {}
+      return next;
+    });
+  }, []);
   const [chatPopoverOpen, setChatPopoverOpen] = useState(false);
   const [chatPopoverInitial, setChatPopoverInitial] = useState("");
   // Overlay state — HISTORY (H key) and SETTINGS (S key) replace the
@@ -880,6 +899,24 @@ function App() {
     return null;
   }, [menu.state.panel, currentItinerary]);
 
+  // F2b: Globe fade-out timeline. When user is on HOTELS/DAYS, set
+  // data-landed="true" on the globe canvas after a short delay so the
+  // CSS opacity transition kicks in. The Leaflet map fading in
+  // simultaneously creates a "landed on the map" effect.
+  useEffect(() => {
+    const isMapPanel = menu.state.panel === "HOTELS" || menu.state.panel === "DAYS";
+    const canvas = document.querySelector(".globe-canvas");
+    if (!canvas) return;
+    if (isMapPanel) {
+      const t = setTimeout(() => {
+        canvas.setAttribute("data-landed", "true");
+      }, 1500);
+      return () => clearTimeout(t);
+    } else {
+      canvas.setAttribute("data-landed", "false");
+    }
+  }, [menu.state.panel]);
+
   return (
     <div className="app">
       {/* Only show the top-level error banner when the AgentStatusBar
@@ -981,6 +1018,14 @@ function App() {
               ].filter(Boolean).join(", ");
               handleSend(`Selected flight: ${label}. Now find hotels.`);
             }}
+            onSkipFlight={() => {
+              pushPickSnapshot();
+              setCurrentItinerary({ ...currentItinerary, selected_flight: null, flight: null });
+              cues.chime();
+              handleSend(
+                "No flight needed — using ground transport. Now find hotels near the destination.",
+              );
+            }}
           />
         )}
         {menu.state.panel === "HOTELS" && (
@@ -988,21 +1033,28 @@ function App() {
             itinerary={currentItinerary}
             listIndex={menu.state.listIndex}
             onSelect={selectListItem}
+            autoReplan={autoReplan}
+            onToggleAutoReplan={toggleAutoReplan}
             onPick={(i) => {
               const hotel = currentItinerary?.hotels?.[i];
               if (!hotel) return;
               pushPickSnapshot();
-              // Stamp the hotel pick locally, then fire Turn 3 so
-              // the LLM builds the day-by-day plan around this hotel.
+              // Stamp the hotel pick locally
               setCurrentItinerary({
                 ...currentItinerary,
                 selected_hotel: hotel,
               });
               cues.chime();
-              const prompt =
-                `Set "${hotel.name}" as the base hotel. ` +
-                `Plan the day-by-day itinerary with activities, meals, and directions.`;
-              handleSend(prompt);
+              if (autoReplan) {
+                // Fire Turn 3 so the LLM builds days around this hotel
+                const prompt =
+                  `Set "${hotel.name}" as the base hotel. ` +
+                  `Plan the day-by-day itinerary with activities, meals, and directions.`;
+                handleSend(prompt);
+              } else {
+                // Manual mode — just advance to DAYS panel
+                setPanelWithCue("DAYS");
+              }
             }}
           />
         )}
@@ -1070,6 +1122,70 @@ function App() {
                 days[dayIdx] = { ...day, activities: acts };
                 return { ...prev, days };
               });
+            }}
+            onEditActivityField={(dayIdx, actIdx, field, value) => {
+              // Manual edit — purely local, no LLM call.
+              setCurrentItinerary((prev) => {
+                if (!prev?.days?.[dayIdx]?.activities) return prev;
+                const day = prev.days[dayIdx];
+                const acts = day.activities.map((a, i) =>
+                  i === actIdx ? { ...a, [field]: value, source: a.source || "manual" } : a,
+                );
+                const days = [...prev.days];
+                days[dayIdx] = { ...day, activities: acts };
+                return { ...prev, days };
+              });
+              cues.tick?.();
+            }}
+            onAddActivity={(dayIdx, newAct) => {
+              // Manual add — inserts at correct position by time.
+              setCurrentItinerary((prev) => {
+                if (!prev?.days?.[dayIdx]) return prev;
+                const day = prev.days[dayIdx];
+                const acts = [...(day.activities || []), newAct];
+                // Sort by time for natural ordering
+                acts.sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+                const days = [...prev.days];
+                days[dayIdx] = { ...day, activities: acts };
+                return { ...prev, days };
+              });
+              cues.chime?.();
+            }}
+            onAddDay={() => {
+              // Append a new empty day.
+              setCurrentItinerary((prev) => {
+                if (!prev) return prev;
+                const days = prev.days || [];
+                const lastDay = days[days.length - 1];
+                const nextDayNum = (lastDay?.day || 0) + 1;
+                let nextDate = "";
+                if (lastDay?.date) {
+                  try {
+                    const d = new Date(lastDay.date);
+                    d.setDate(d.getDate() + 1);
+                    nextDate = d.toISOString().slice(0, 10);
+                  } catch { /* ignore */ }
+                }
+                const newDay = {
+                  day: nextDayNum,
+                  date: nextDate,
+                  theme: "Custom Day",
+                  activities: [],
+                  source: "manual",
+                };
+                return { ...prev, days: [...days, newDay] };
+              });
+              cues.chime?.();
+            }}
+            onRemoveDay={(dayIdx) => {
+              setCurrentItinerary((prev) => {
+                if (!prev?.days || prev.days.length <= 1) return prev;
+                const days = prev.days.filter((_, i) => i !== dayIdx);
+                // Renumber days to keep them sequential
+                const renumbered = days.map((d, i) => ({ ...d, day: i + 1 }));
+                return { ...prev, days: renumbered };
+              });
+              cues.tick?.();
             }}
             favoriteKeys={favoriteKeys}
             onToggleFavorite={(dayIdx, actIdx) => {

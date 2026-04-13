@@ -1,5 +1,24 @@
 /* AI Travel Agent — globe-first layout */
 
+/* ─── Global keyboard focus indicator ─────────────────────── */
+/* Cyan glow matching NieR aesthetic. Uses :focus-visible so it
+ * only shows for keyboard users, not mouse clicks. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[tabindex="0"]:focus-visible,
+li[tabindex]:focus-visible {
+  outline: 1px solid #5eead4;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(94, 234, 212, 0.25);
+  border-radius: 2px;
+  z-index: 10;
+  position: relative;
+}
+
 /* ─── Round 7 panels ─────────────────────────────────────── */
 
 .panel {
@@ -301,6 +320,156 @@
   color: var(--accent);
   font-weight: 700;
   margin-bottom: 4px;
+}
+
+.flight-skip-btn {
+  margin-top: 8px;
+  padding: 8px 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px dashed var(--border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.flight-skip-btn:hover {
+  color: var(--text-h);
+  border-color: var(--accent);
+}
+
+/* ─── Inline activity edit + add ─────────────────────────── */
+.activity-time-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+}
+.activity-time-btn:not(:disabled):hover {
+  color: #5eead4;
+}
+.activity-name-editable {
+  cursor: pointer;
+  border-bottom: 1px dotted transparent;
+  transition: border-color 0.15s ease;
+}
+.activity-name-editable:hover {
+  border-bottom-color: rgba(94, 234, 212, 0.4);
+}
+.activity-edit-input {
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--text-h);
+  border: 1px solid var(--accent);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 3px 6px;
+  border-radius: 2px;
+  min-width: 60px;
+}
+
+.day-add-activity-btn {
+  display: block;
+  width: 100%;
+  margin: 8px 0;
+  padding: 10px 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px dashed var(--border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.day-add-activity-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(94, 234, 212, 0.05);
+}
+.day-add-activity-form {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0;
+  padding: 8px;
+  background: rgba(94, 234, 212, 0.05);
+  border: 1px solid rgba(94, 234, 212, 0.3);
+  border-radius: 2px;
+  align-items: center;
+}
+.day-add-activity-form input[type="text"] {
+  flex: 1;
+}
+.day-add-activity-save,
+.day-add-activity-cancel {
+  padding: 4px 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid;
+}
+.day-add-activity-save {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.day-add-activity-cancel {
+  color: var(--text-dim);
+  background: transparent;
+  border-color: var(--border);
+}
+
+/* Add/Remove day controls */
+.day-list-row {
+  position: relative;
+}
+.day-remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.day-list-row:hover .day-remove-btn,
+.day-remove-btn:focus-visible {
+  opacity: 1;
+}
+.day-remove-btn:hover {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+.day-add-row {
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+.day-add-btn {
+  width: 100%;
+  padding: 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px dashed var(--border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.day-add-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 .flight-detail-price-range {
@@ -3477,6 +3646,12 @@ body.subtitle-large .subtitle {
   border-color: rgba(0, 217, 255, 0.5);
 }
 
+.hint.hint-scope-detail .hint-key {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.15);
+  border-color: rgba(251, 191, 36, 0.5);
+}
+
 /* Heavier outline on active list item when scope=list, so the user
  * has clear feedback that arrow keys are now under list control. */
 .scope-list .panel-list-item.active {
@@ -3513,6 +3688,20 @@ body.subtitle-large .subtitle {
   position: fixed;
   inset: 0;
   z-index: 0;
+  transition: opacity 500ms ease-out;
+}
+
+/* When user is on HOTELS or DAYS, fade the globe out so the Leaflet
+ * map appears to "land" on the destination instead of overlapping
+ * with the still-visible globe behind it. */
+.globe-canvas[data-landed="true"] {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .globe-canvas {
+    transition: none;
+  }
 }
 
 .globe-canvas canvas {
@@ -4489,6 +4678,36 @@ body.subtitle-large .subtitle {
   border-color: rgba(0, 217, 255, 0.3);
   box-shadow: none;
   opacity: 0.5;
+}
+
+.day-mini-pin.airport.airport-distant {
+  opacity: 0.5;
+  box-shadow: none;
+}
+
+.day-mini-airport-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  z-index: 600;
+  padding: 6px 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #5eead4;
+  background: rgba(0, 12, 24, 0.85);
+  border: 1px solid rgba(94, 234, 212, 0.5);
+  border-radius: 3px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all 0.15s ease;
+}
+.day-mini-airport-badge:hover {
+  background: rgba(94, 234, 212, 0.15);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .day-mini-pin.airport {

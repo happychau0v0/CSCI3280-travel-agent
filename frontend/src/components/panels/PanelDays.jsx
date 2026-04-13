@@ -70,8 +70,13 @@ function ActivityRow({
   onReplace,
   onNoteChange,
   onToggleFavorite,
+  onEditField,
 }) {
   const [expandedLocal, setExpandedLocal] = useState(false);
+  const [editingTime, setEditingTime] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [timeDraft, setTimeDraft] = useState(activity.time || "");
+  const [nameDraft, setNameDraft] = useState(activity.name || "");
   // Round 15 — when expandOverride is non-null (from expand/collapse
   // all button), use it and ignore local toggle state.
   const expanded = expandOverride != null ? expandOverride : expandedLocal;
@@ -111,12 +116,86 @@ function ActivityRow({
       data-testid={`activity-row-${index}`}
     >
       <div className="activity-row">
-        <span className="activity-time">{activity.time}</span>
+        {editingTime && onEditField ? (
+          <input
+            type="time"
+            className="activity-edit-input"
+            value={timeDraft}
+            autoFocus
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => setTimeDraft(e.target.value)}
+            onBlur={() => {
+              if (timeDraft && timeDraft !== activity.time) {
+                onEditField(index, "time", timeDraft);
+              }
+              setEditingTime(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.target.blur();
+              if (e.key === "Escape") {
+                setTimeDraft(activity.time || "");
+                setEditingTime(false);
+              }
+            }}
+            data-testid={`activity-time-input-${index}`}
+          />
+        ) : (
+          <button
+            type="button"
+            className="activity-time activity-time-btn"
+            onClick={(e) => {
+              if (!onEditField || isHotel || isAirport) return;
+              e.stopPropagation();
+              setTimeDraft(activity.time || "");
+              setEditingTime(true);
+            }}
+            disabled={!onEditField || isHotel || isAirport}
+            data-testid={`activity-time-${index}`}
+          >
+            {activity.time}
+          </button>
+        )}
         <div className="activity-info">
           <strong>
             {isHotel && <span className="activity-hotel-tag">🏨 HOTEL </span>}
             {isAirport && <span className="activity-hotel-tag">✈ AIRPORT </span>}
-            {activity.name}
+            {editingName && onEditField ? (
+              <input
+                type="text"
+                className="activity-edit-input"
+                value={nameDraft}
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onBlur={() => {
+                  if (nameDraft.trim() && nameDraft !== activity.name) {
+                    onEditField(index, "name", nameDraft.trim());
+                  }
+                  setEditingName(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.target.blur();
+                  if (e.key === "Escape") {
+                    setNameDraft(activity.name || "");
+                    setEditingName(false);
+                  }
+                }}
+                data-testid={`activity-name-input-${index}`}
+              />
+            ) : (
+              <span
+                className={onEditField && !isHotel && !isAirport ? "activity-name-editable" : ""}
+                onClick={(e) => {
+                  if (!onEditField || isHotel || isAirport) return;
+                  e.stopPropagation();
+                  setNameDraft(activity.name || "");
+                  setEditingName(true);
+                }}
+                title={onEditField && !isHotel && !isAirport ? "Click to edit name" : undefined}
+              >
+                {activity.name}
+              </span>
+            )}
             {isDraggable && onToggleFavorite && (
               <button
                 type="button"
@@ -222,6 +301,10 @@ export default function PanelDays({
   onRemoveActivity,
   onReplaceActivity,
   onSetActivityNote,
+  onEditActivityField,
+  onAddActivity,
+  onAddDay,
+  onRemoveDay,
   favoriteKeys = new Set(),
   onToggleFavorite,
 }) {
@@ -229,6 +312,10 @@ export default function PanelDays({
   const hotelName =
     itinerary?.selected_hotel?.name || itinerary?.hotels?.[0]?.name || null;
   const [activeActivityIdx, setActiveActivityIdx] = useState(-1);
+  // Add Activity inline form state
+  const [addingActivity, setAddingActivity] = useState(false);
+  const [addTime, setAddTime] = useState("");
+  const [addName, setAddName] = useState("");
   // Round 13 — drag state for activity reordering within a day.
   const [dragFromIdx, setDragFromIdx] = useState(-1);
   const [dragOverIdx, setDragOverIdx] = useState(-1);
@@ -393,7 +480,7 @@ export default function PanelDays({
             <li
               key={day.day}
               className={
-                `panel-list-item` + (i === selectedIdx ? " active" : "")
+                `panel-list-item day-list-row` + (i === selectedIdx ? " active" : "")
               }
               onClick={() => {
                 onSelect?.(i);
@@ -410,8 +497,37 @@ export default function PanelDays({
                 {(day.activities || []).length} stops
                 {day.weather?.icon && <> · {weatherIcon(day.weather)}</>}
               </span>
+              {onRemoveDay && days.length > 1 && (
+                <button
+                  type="button"
+                  className="day-remove-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (window.confirm(`Remove Day ${day.day} and its ${(day.activities || []).length} activities?`)) {
+                      onRemoveDay(i);
+                    }
+                  }}
+                  aria-label={`Remove day ${day.day}`}
+                  title="Remove this day"
+                  data-testid={`day-remove-${i}`}
+                >
+                  ×
+                </button>
+              )}
             </li>
           ))}
+          {onAddDay && (
+            <li className="panel-list-item day-add-row">
+              <button
+                type="button"
+                className="day-add-btn"
+                onClick={onAddDay}
+                data-testid="day-add-btn"
+              >
+                + ADD DAY
+              </button>
+            </li>
+          )}
         </ul>
       </div>
 
@@ -472,6 +588,7 @@ export default function PanelDays({
               onRemove={onRemoveActivity ? (idx) => onRemoveActivity(selectedIdx, idx) : null}
               onReplace={onReplaceActivity ? (idx) => onReplaceActivity(selectedIdx, idx) : null}
               onNoteChange={onSetActivityNote ? (idx, note) => onSetActivityNote(selectedIdx, idx, note) : null}
+              onEditField={onEditActivityField ? (idx, field, value) => onEditActivityField(selectedIdx, idx, field, value) : null}
               isFavorite={favoriteKeys.has(act.place_id || act.name)}
               onToggleFavorite={
                 onToggleFavorite ? (idx) => onToggleFavorite(selectedIdx, idx) : null
@@ -479,6 +596,88 @@ export default function PanelDays({
             />
           ))}
         </ol>
+        {/* Add Activity inline ghost row */}
+        {onAddActivity && (
+          addingActivity ? (
+            <div className="day-add-activity-form" data-testid="day-add-activity-form">
+              <input
+                type="time"
+                className="activity-edit-input"
+                value={addTime}
+                autoFocus
+                onChange={(e) => setAddTime(e.target.value)}
+                placeholder="Time"
+                data-testid="add-activity-time-input"
+              />
+              <input
+                type="text"
+                className="activity-edit-input"
+                value={addName}
+                onChange={(e) => setAddName(e.target.value)}
+                placeholder="What are you doing?"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && addName.trim()) {
+                    onAddActivity(selectedIdx, {
+                      time: addTime || "12:00",
+                      name: addName.trim(),
+                      address: "",
+                      duration_min: 60,
+                      source: "manual",
+                    });
+                    setAddTime("");
+                    setAddName("");
+                    setAddingActivity(false);
+                  }
+                  if (e.key === "Escape") {
+                    setAddTime("");
+                    setAddName("");
+                    setAddingActivity(false);
+                  }
+                }}
+                data-testid="add-activity-name-input"
+              />
+              <button
+                type="button"
+                className="day-add-activity-save"
+                onClick={() => {
+                  if (!addName.trim()) return;
+                  onAddActivity(selectedIdx, {
+                    time: addTime || "12:00",
+                    name: addName.trim(),
+                    address: "",
+                    duration_min: 60,
+                    source: "manual",
+                  });
+                  setAddTime("");
+                  setAddName("");
+                  setAddingActivity(false);
+                }}
+              >
+                ADD
+              </button>
+              <button
+                type="button"
+                className="day-add-activity-cancel"
+                onClick={() => {
+                  setAddTime("");
+                  setAddName("");
+                  setAddingActivity(false);
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="day-add-activity-btn"
+              onClick={() => setAddingActivity(true)}
+              data-testid="day-add-activity-btn"
+            >
+              + ADD ACTIVITY
+            </button>
+          )
+        )}
         {itinerary?.phrasebook && (
           <details className="day-phrasebook" data-testid="day-phrasebook">
             <summary className="day-phrasebook-header">

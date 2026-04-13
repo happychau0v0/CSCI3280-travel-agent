@@ -52,7 +52,14 @@ const RATING_FILTERS = [
   { key: "great", label: "4.5+", match: (h) => typeof h.rating === "number" && h.rating >= 4.5 },
 ];
 
-export default function PanelHotels({ itinerary, listIndex, onSelect, onPick }) {
+export default function PanelHotels({
+  itinerary,
+  listIndex,
+  onSelect,
+  onPick,
+  autoReplan = true,
+  onToggleAutoReplan,
+}) {
   const hotelsRaw = itinerary?.hotels || [];
   const [priceFilter, setPriceFilter] = useState("any");
   const [ratingFilter, setRatingFilter] = useState("any");
@@ -133,11 +140,14 @@ export default function PanelHotels({ itinerary, listIndex, onSelect, onPick }) 
           )}
         </div>
         <div className="hotel-filters" data-testid="hotel-filters">
-          <span className="hotel-filter-label">PRICE</span>
+          <span className="hotel-filter-label" id="price-filter-label">PRICE</span>
+          <div role="radiogroup" aria-labelledby="price-filter-label" style={{ display: "contents" }}>
           {PRICE_FILTERS.map((f) => (
             <button
               key={f.key}
               type="button"
+              role="radio"
+              aria-checked={priceFilter === f.key}
               className={`hotel-filter-chip${priceFilter === f.key ? " active" : ""}`}
               onClick={() => setPriceFilter(f.key)}
               data-testid={`hotel-filter-price-${f.key}`}
@@ -145,13 +155,17 @@ export default function PanelHotels({ itinerary, listIndex, onSelect, onPick }) 
               {f.label}
             </button>
           ))}
-          <span className="hotel-filter-label" style={{ marginLeft: 10 }}>
+          </div>
+          <span className="hotel-filter-label" style={{ marginLeft: 10 }} id="rating-filter-label">
             RATING
           </span>
+          <div role="radiogroup" aria-labelledby="rating-filter-label" style={{ display: "contents" }}>
           {RATING_FILTERS.map((f) => (
             <button
               key={f.key}
               type="button"
+              role="radio"
+              aria-checked={ratingFilter === f.key}
               className={`hotel-filter-chip${ratingFilter === f.key ? " active" : ""}`}
               onClick={() => setRatingFilter(f.key)}
               data-testid={`hotel-filter-rating-${f.key}`}
@@ -159,6 +173,18 @@ export default function PanelHotels({ itinerary, listIndex, onSelect, onPick }) 
               {f.label}
             </button>
           ))}
+          </div>
+          <button
+            type="button"
+            className={`hotel-filter-chip auto-replan-toggle${autoReplan ? " active" : ""}`}
+            onClick={onToggleAutoReplan}
+            aria-pressed={autoReplan}
+            title="When ON, picking a hotel triggers an LLM day-replan. When OFF, picks are local only."
+            style={{ marginLeft: 12 }}
+            data-testid="hotel-auto-replan-toggle"
+          >
+            ⚙ AUTO-REPLAN: {autoReplan ? "ON" : "OFF"}
+          </button>
         </div>
       </header>
 

@@ -88,7 +88,21 @@ export default function FooterHints({
     hints = HINT_SETS[panel] || HINT_SETS.HOME;
   }
 
-  const scopeLabel = scope === "list" ? "LIST" : "TABS";
+  const scopeLabel = scope === "list" ? "LIST"
+                   : scope === "detail" ? "DETAIL"
+                   : "TABS";
+
+  // In detail scope, override the hint set with a minimal one that
+  // tells the user how to get back. Browser Tab owns focus.
+  if (scope === "detail" && !overlay) {
+    hints = [
+      { key: "Tab", label: "Next" },
+      { key: "Shift+Tab", label: "Prev" },
+      { key: "Enter", label: "Activate" },
+      { key: "Esc", label: "Back" },
+      { key: "T", label: "Speak" },
+    ];
+  }
 
   return (
     <div className="footer-hints" aria-label="Keyboard hints">

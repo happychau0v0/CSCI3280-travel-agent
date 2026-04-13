@@ -45,8 +45,47 @@ function decodePolyline(encoded) {
   return points;
 }
 
-/** Auto-fit the map to all markers + polylines whenever they change.
- * Round 11 — flyToBounds gives a smooth zoom-in after mount. */
+/** Haversine distance in km between two [lat, lng] pairs. */
+function haversineKm(a, b) {
+  const R = 6371;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(b[0] - a[0]);
+  const dLng = toRad(b[1] - a[1]);
+  const lat1 = toRad(a[0]);
+  const lat2 = toRad(b[0]);
+  const x =
+    Math.sin(dLat / 2) ** 2 +
+    Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+
+/** Compute a centroid of [[lat,lng], ...] points. */
+function centroid(pts) {
+  if (!pts.length) return null;
+  const sumLat = pts.reduce((s, p) => s + p[0], 0);
+  const sumLng = pts.reduce((s, p) => s + p[1], 0);
+  return [sumLat / pts.length, sumLng / pts.length];
+}
+
+/** Decide whether the airport is an "outlier" — far from the cluster of
+ * activity coords. If so, the map should fit only to activities, and the
+ * airport gets a small corner badge with a flyTo button instead.
+ * Returns { airportIsOutlier, distanceKm }. */
+function isAirportOutlier(activityPoints, airportPoint) {
+  if (!airportPoint || activityPoints.length === 0) {
+    return { airportIsOutlier: false, distanceKm: 0 };
+  }
+  const c = centroid(activityPoints);
+  if (!c) return { airportIsOutlier: false, distanceKm: 0 };
+  const distFromCentroid = haversineKm(airportPoint, c);
+  // If airport is >20km from city activity centroid, treat as outlier
+  return { airportIsOutlier: distFromCentroid > 20, distanceKm: distFromCentroid };
+}
+
+/** Auto-fit the map to provided bounds points whenever they change.
+ * Round 11 — flyToBounds gives a smooth zoom-in after mount.
+ * Round 23 — accepts a `focusPoints` subset so we can exclude
+ * far-away airports from the fit. */
 function FitBounds({ points }) {
   const map = useMap();
   useEffect(() => {
@@ -60,6 +99,27 @@ function FitBounds({ points }) {
     });
   }, [points, map]);
   return null;
+}
+
+/** A small corner button that flies the map to a specific point. */
+function AirportBadge({ airport, distanceKm }) {
+  const map = useMap();
+  if (!airport || !airport.lat || !airport.lng) return null;
+  return (
+    <button
+      type="button"
+      className="day-mini-airport-badge"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        map.flyTo([airport.lat, airport.lng], 13, { duration: 0.8 });
+      }}
+      data-testid="day-mini-airport-badge"
+      title={`Fly to ${airport.iata || "airport"} (${Math.round(distanceKm)} km away)`}
+    >
+      ✈ {airport.iata || "AIRPORT"} · {Math.round(distanceKm)}km ↗
+    </button>
+  );
 }
 
 /**
@@ -126,19 +186,26 @@ export default function DayMiniMap({ activities, airport = null, activeActivityI
     });
   };
 
+  // Decide if airport is far from the activity cluster
+  const activityPoints = points.map((p) => [p.lat, p.lng]);
+  const { airportIsOutlier, distanceKm } = hasAirport
+    ? isAirportOutlier(activityPoints, [airport.lat, airport.lng])
+    : { airportIsOutlier: false, distanceKm: 0 };
+
   const airportIcon = L.divIcon({
     className: "day-mini-marker",
-    html: '<div class="day-mini-pin airport">✈</div>',
+    html: `<div class="day-mini-pin airport${airportIsOutlier ? " airport-distant" : ""}">✈</div>`,
     iconSize: [28, 28],
     iconAnchor: [14, 14],
   });
 
-  // All points used for fitBounds: markers + polyline vertices + airport
+  // Bounds: include activities + polyline vertices.
+  // Only include the airport if it's NOT an outlier (fits in the city view).
   const allPoints = [
-    ...points.map((p) => [p.lat, p.lng]),
+    ...activityPoints,
     ...polylines.flat(),
   ];
-  if (hasAirport) allPoints.push([airport.lat, airport.lng]);
+  if (hasAirport && !airportIsOutlier) allPoints.push([airport.lat, airport.lng]);
 
   const centerPoint = points.length
     ? [points[0].lat, points[0].lng]
@@ -199,6 +266,9 @@ export default function DayMiniMap({ activities, airport = null, activeActivityI
           );
         })}
         <FitBounds points={allPoints} />
+        {hasAirport && airportIsOutlier && (
+          <AirportBadge airport={airport} distanceKm={distanceKm} />
+        )}
       </MapContainer>
     </div>
   );

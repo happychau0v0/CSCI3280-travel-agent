@@ -49,7 +49,14 @@ function formatTimeRange(opt) {
   return `${dep} → ${arr}${suffix}`;
 }
 
-export default function PanelFlights({ itinerary, listIndex, currency = "HKD", onSelect, onPick }) {
+export default function PanelFlights({
+  itinerary,
+  listIndex,
+  currency = "HKD",
+  onSelect,
+  onPick,
+  onSkipFlight,
+}) {
   const formatPrice = (n) => formatDisplayPrice(n, currency);
   const flight = itinerary?.flight;
   const options = flight?.options || [];
@@ -216,6 +223,17 @@ export default function PanelFlights({ itinerary, listIndex, currency = "HKD", o
               >
                 View live prices on Google Flights ↗
               </a>
+            )}
+            {onSkipFlight && (
+              <button
+                type="button"
+                className="flight-skip-btn"
+                onClick={onSkipFlight}
+                data-testid="flight-skip-btn"
+                title="Skip flight selection — useful for short trips with ground transport"
+              >
+                Skip — no flight needed
+              </button>
             )}
           </>
         )}

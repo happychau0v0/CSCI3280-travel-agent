@@ -33,6 +33,38 @@ function FitBounds({ points }) {
   return null;
 }
 
+function haversineKm(a, b) {
+  const R = 6371;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(b[0] - a[0]);
+  const dLng = toRad(b[1] - a[1]);
+  const lat1 = toRad(a[0]);
+  const lat2 = toRad(b[0]);
+  const x =
+    Math.sin(dLat / 2) ** 2 +
+    Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+
+function AirportBadge({ airport, distanceKm }) {
+  const map = useMap();
+  if (!airport || !airport.lat || !airport.lng) return null;
+  return (
+    <button
+      type="button"
+      className="day-mini-airport-badge"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        map.flyTo([airport.lat, airport.lng], 13, { duration: 0.8 });
+      }}
+      title={`Fly to ${airport.iata || "airport"} (${Math.round(distanceKm)} km away)`}
+    >
+      ✈ {airport.iata || "AIRPORT"} · {Math.round(distanceKm)}km ↗
+    </button>
+  );
+}
+
 function hotelIcon(n, active) {
   return L.divIcon({
     className: "day-mini-marker",
@@ -42,19 +74,19 @@ function hotelIcon(n, active) {
   });
 }
 
-function airportIcon() {
+function airportIcon(distant) {
   return L.divIcon({
     className: "day-mini-marker",
-    html: '<div class="day-mini-pin airport">✈</div>',
+    html: `<div class="day-mini-pin airport${distant ? " airport-distant" : ""}">✈</div>`,
     iconSize: [28, 28],
     iconAnchor: [14, 14],
   });
 }
 
 export default function HotelsMap({ hotels, airport = null, selectedIdx = 0 }) {
-  const { markers, bounds } = useMemo(() => {
+  const { markers, bounds, airportIsOutlier, distanceKm } = useMemo(() => {
     const markers = [];
-    const bounds = [];
+    const hotelCoords = [];
     (hotels || []).forEach((h, i) => {
       if (h.lat == null || h.lng == null) return;
       markers.push({
@@ -65,12 +97,20 @@ export default function HotelsMap({ hotels, airport = null, selectedIdx = 0 }) {
         active: i === selectedIdx,
         name: h.name,
       });
-      bounds.push([h.lat, h.lng]);
+      hotelCoords.push([h.lat, h.lng]);
     });
-    if (airport?.lat != null && airport?.lng != null) {
-      bounds.push([airport.lat, airport.lng]);
+    let outlier = false;
+    let dist = 0;
+    const bounds = [...hotelCoords];
+    if (airport?.lat != null && airport?.lng != null && hotelCoords.length > 0) {
+      const sumLat = hotelCoords.reduce((s, p) => s + p[0], 0);
+      const sumLng = hotelCoords.reduce((s, p) => s + p[1], 0);
+      const centroid = [sumLat / hotelCoords.length, sumLng / hotelCoords.length];
+      dist = haversineKm([airport.lat, airport.lng], centroid);
+      outlier = dist > 20;
+      if (!outlier) bounds.push([airport.lat, airport.lng]);
     }
-    return { markers, bounds };
+    return { markers, bounds, airportIsOutlier: outlier, distanceKm: dist };
   }, [hotels, airport, selectedIdx]);
 
   if (markers.length === 0) {
@@ -108,10 +148,13 @@ export default function HotelsMap({ hotels, airport = null, selectedIdx = 0 }) {
           <Marker
             key={`airport-${airport.iata || "x"}`}
             position={[airport.lat, airport.lng]}
-            icon={airportIcon()}
+            icon={airportIcon(airportIsOutlier)}
           />
         )}
         <FitBounds points={bounds} />
+        {airportIsOutlier && (
+          <AirportBadge airport={airport} distanceKm={distanceKm} />
+        )}
       </MapContainer>
     </div>
   );
