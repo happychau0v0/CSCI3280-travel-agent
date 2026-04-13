@@ -887,14 +887,29 @@ li[tabindex]:focus-visible {
   animation: field-pulse 1.4s ease-in-out infinite;
 }
 
+/* Row expands when it contains an LLM input-request prompt */
+.panel-list-item.home-form-row:has(.home-form-prompt) {
+  flex-wrap: wrap;
+  height: auto;
+  min-height: 28px;
+  align-items: flex-start;
+  padding-top: 5px;
+  padding-bottom: 6px;
+}
+
 .home-form-prompt {
   flex: 1 0 100%;
-  margin-top: 6px;
+  margin-top: 4px;
   padding: 6px 10px;
   background: rgba(94, 234, 212, 0.08);
   border-left: 2px solid #5eead4;
   font-size: 11px;
   color: var(--text-h);
+  /* Clamp to 4 lines so very long suggestions don't blow out the layout */
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .home-form-resolve-btn {
