@@ -23,6 +23,10 @@ const TOOL_LABELS = {
   geocode_city: "Geocoding city",
   navigate_menu: "Navigating menu",
   request_input: "Awaiting your input",
+  get_day_windows: "Calculating day windows",
+  get_phrasebook: "Building phrasebook",
+  toggle_setting: "Applying setting",
+  submit_trip_form: "Submitting form",
   web_search: "Searching the web",
 };
 
@@ -31,12 +35,19 @@ function friendlyTool(tool) {
   return TOOL_LABELS[tool] || tool.replace(/_/g, " ");
 }
 
+function formatMs(ms) {
+  if (ms == null) return "";
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
 export default function AgentStatusBar({
   state = "idle",
   currentTool = null,
   startedAt = null,
   errorMessage = null,
   onDismissError,
+  toolTimings = [],
 }) {
   const [elapsed, setElapsed] = useState(0);
 
@@ -75,18 +86,40 @@ export default function AgentStatusBar({
   }
 
   if (state === "done") {
+    // Aggregate parallel tool calls by name (take max if called twice)
+    const timingMap = {};
+    for (const { name, elapsed_ms } of toolTimings) {
+      if (elapsed_ms == null) continue;
+      timingMap[name] = Math.max(timingMap[name] ?? 0, elapsed_ms);
+    }
+    const sorted = Object.entries(timingMap).sort((a, b) => b[1] - a[1]);
+    const totalMs = toolTimings.reduce((s, t) => s + (t.elapsed_ms ?? 0), 0);
+
     return (
       <div className="agent-status-bar status-done" role="status">
         <span className="status-icon">✓</span>
         <div className="status-content">
-          <div className="status-heading">READY</div>
-          <div className="status-detail">Trip ready · check the panels</div>
+          <div className="status-heading">
+            READY
+            {sorted.length > 0 && (
+              <span className="status-tool"> · {sorted.length} tool{sorted.length > 1 ? "s" : ""} · {formatMs(totalMs)}</span>
+            )}
+          </div>
+          {sorted.length > 0 && (
+            <div className="status-timings">
+              {sorted.map(([name, ms]) => (
+                <span key={name} className={`status-timing-chip${ms > 10000 ? " timing-slow" : ms > 3000 ? " timing-warn" : ""}`}>
+                  {friendlyTool(name)} {formatMs(ms)}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
-  // working
+  // working — show current tool with a live per-tool timer
   return (
     <div className="agent-status-bar status-working" role="status">
       <span className="status-icon">◢</span>
@@ -100,6 +133,15 @@ export default function AgentStatusBar({
         <div className="status-progress">
           <div className="status-progress-sweep" />
         </div>
+        {toolTimings.length > 0 && (
+          <div className="status-timings">
+            {toolTimings.slice(-4).map(({ name, elapsed_ms }, i) => (
+              <span key={i} className={`status-timing-chip${elapsed_ms > 10000 ? " timing-slow" : elapsed_ms > 3000 ? " timing-warn" : ""}`}>
+                {friendlyTool(name)} {elapsed_ms != null ? formatMs(elapsed_ms) : "…"}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       <div className="status-elapsed">{elapsed}s</div>
     </div>

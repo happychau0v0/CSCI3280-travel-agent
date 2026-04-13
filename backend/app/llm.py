@@ -236,6 +236,7 @@ async def _run_loop(
                 fn_args = {}
 
             tool_calls_made.append(fn_name)
+            t0 = asyncio.get_event_loop().time()
             logger.info("Tool call: %s(%s)", fn_name, fn_args)
 
             if on_event is not None:
@@ -269,8 +270,10 @@ async def _run_loop(
                     logger.exception("Tool %s failed", fn_name)
                     tool_result = {"error": f"Tool execution failed: {e}"}
 
+            elapsed_ms = int((asyncio.get_event_loop().time() - t0) * 1000)
+            logger.info("Tool done: %s — %dms", fn_name, elapsed_ms)
             if on_event is not None:
-                await on_event("tool_end", {"name": fn_name})
+                await on_event("tool_end", {"name": fn_name, "elapsed_ms": elapsed_ms})
 
             return {
                 "role": "tool",

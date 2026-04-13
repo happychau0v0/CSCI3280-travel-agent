@@ -3066,6 +3066,40 @@ li[tabindex]:focus-visible {
   text-align: right;
 }
 
+/* Per-tool timing chips — shown during "working" (live) and "done" (summary) */
+.status-timings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+
+.status-timing-chip {
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  padding: 1px 6px;
+  border: 1px solid rgba(0, 217, 255, 0.3);
+  color: rgba(0, 217, 255, 0.7);
+  border-radius: 2px;
+  white-space: nowrap;
+  background: rgba(0, 217, 255, 0.05);
+}
+
+/* Warn: 3–10 s */
+.status-timing-chip.timing-warn {
+  border-color: rgba(251, 191, 36, 0.5);
+  color: rgba(251, 191, 36, 0.9);
+  background: rgba(251, 191, 36, 0.07);
+}
+
+/* Slow: > 10 s — red flag */
+.status-timing-chip.timing-slow {
+  border-color: rgba(239, 68, 68, 0.6);
+  color: rgba(239, 68, 68, 0.95);
+  background: rgba(239, 68, 68, 0.08);
+  font-weight: 600;
+}
+
 .status-dismiss {
   background: transparent;
   border: 1px solid var(--border);

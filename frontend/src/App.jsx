@@ -204,6 +204,8 @@ function App() {
   const [agentState, setAgentState] = useState("idle"); // idle|working|done|error
   const [currentTool, setCurrentTool] = useState(null);
   const [requestStartedAt, setRequestStartedAt] = useState(null);
+  // Per-tool timing log — [{name, elapsed_ms}] — reset each request
+  const [toolTimings, setToolTimings] = useState([]);
   const [pendingInputRequest, _setPendingInputRequest] = useState(null);
   // OBJ3 — LLM can pre-fill the trip form and auto-trigger planning
   const [pendingFormPrefill, setPendingFormPrefill] = useState(null);
@@ -675,6 +677,7 @@ function App() {
       setRequestStartedAt(startedAt);
       setAgentState("working");
       setCurrentTool(null);
+      setToolTimings([]);
       subtitles.clear();
       const preview = text.length > 60 ? text.slice(0, 57) + "…" : text;
       // Echo the user's own message as a visible subtitle but DO NOT
@@ -700,6 +703,14 @@ function App() {
                 // in the subtitle bar in addition to the status banner.
                 const label = TOOL_NARRATIONS[tool];
                 if (label) subtitles.push(label);
+              }
+            } else if (type === "tool_end") {
+              // Record per-tool elapsed time for the benchmark display
+              if (payload?.name) {
+                setToolTimings((prev) => [
+                  ...prev,
+                  { name: payload.name, elapsed_ms: payload.elapsed_ms ?? null },
+                ]);
               }
             } else if (type === "navigate") {
               // Round 11 — buffer instead of applying immediately.
@@ -1116,6 +1127,7 @@ function App() {
           setError(null);
           setAgentState("idle");
         }}
+        toolTimings={toolTimings}
       />
 
       {/* NieR-style menu shell */}

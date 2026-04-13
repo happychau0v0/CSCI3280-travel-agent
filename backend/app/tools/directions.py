@@ -80,7 +80,7 @@ async def get_directions(
         "X-Goog-FieldMask": ROUTES_FIELD_MASK,
     }
 
-    async with httpx.AsyncClient(timeout=15.0, proxy=None) as client:
+    async with httpx.AsyncClient(timeout=15.0, trust_env=False) as client:
         resp = await client.post(ROUTES_URL, json=body, headers=headers)
         resp.raise_for_status()
         data = resp.json()
