@@ -65,9 +65,10 @@ export function useGeolocation() {
   }, []);
 
   const requestPermission = useCallback(async () => {
-    if (!navigator.geolocation) {
-      // No GPS API — likely a non-HTTPS origin (e.g. Tailscale IP).
-      // Fall back to IP-based geolocation so the LIVE card still works.
+    // On non-secure contexts (plain HTTP on non-localhost, e.g. Tailscale IPs),
+    // browsers block GPS entirely. window.isSecureContext is false in that case.
+    // Skip straight to IP geolocation — no point trying navigator.geolocation.
+    if (!window.isSecureContext || !navigator.geolocation) {
       setStatus("requesting");
       const ipLoc = await tryIpGeolocation();
       if (ipLoc) {
@@ -76,7 +77,7 @@ export function useGeolocation() {
         return ipLoc;
       }
       setStatus("unavailable");
-      setError(new Error("Geolocation is not supported in this browser."));
+      setError(new Error("Geolocation unavailable on this origin."));
       return null;
     }
 
@@ -114,17 +115,14 @@ export function useGeolocation() {
       setStatus("granted");
       return loc;
     } catch (err) {
-      // 1 = permission denied, 2 = position unavailable, 3 = timeout.
-      // For denied/unavailable, try IP fallback so Tailscale users aren't stuck.
-      const code = err?.code;
-      if (code === 1 || code === 2) {
-        const ipLoc = await tryIpGeolocation();
-        if (ipLoc) {
-          persist(ipLoc);
-          setStatus("granted");
-          return ipLoc;
-        }
+      // GPS failed — always try IP fallback before giving up.
+      const ipLoc = await tryIpGeolocation();
+      if (ipLoc) {
+        persist(ipLoc);
+        setStatus("granted");
+        return ipLoc;
       }
+      const code = err?.code;
       if (code === 1) setStatus("denied");
       else setStatus("unavailable");
       setError(err);
@@ -143,13 +141,26 @@ export function useGeolocation() {
     [persist],
   );
 
-  // On mount: if the browser already remembers a permission grant for this
-  // origin, fire the request silently. Otherwise stay idle until the user
-  // clicks the "Locate me" affordance.
+  // On mount: auto-locate using the best available method.
+  // - Non-secure origin (Tailscale IP, plain HTTP): go straight to IP geolocation
+  //   without waiting for a user gesture — GPS will never work here anyway.
+  // - Secure origin: check if the user already granted GPS permission and
+  //   silently re-request it; otherwise wait for an explicit user gesture.
   useEffect(() => {
     if (location) return; // already have a cached location
-    if (!navigator.permissions) return;
 
+    if (!window.isSecureContext) {
+      // Non-HTTPS, non-localhost: use IP geolocation immediately.
+      let cancelled = false;
+      tryIpGeolocation().then((ipLoc) => {
+        if (cancelled || !ipLoc) return;
+        persist(ipLoc);
+        setStatus("granted");
+      });
+      return () => { cancelled = true; };
+    }
+
+    if (!navigator.permissions) return;
     let cancelled = false;
     (async () => {
       try {
@@ -165,7 +176,7 @@ export function useGeolocation() {
     return () => {
       cancelled = true;
     };
-  }, [location, requestPermission]);
+  }, [location, requestPermission, persist]);
 
   return { location, status, error, requestPermission, setManual };
 }
