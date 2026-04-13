@@ -181,7 +181,7 @@ export function useSubtitleQueue({
     if (!pausedRef.current) {
       safetyTimerRef.current = setTimeout(() => advance(), displayMs);
     }
-  }, [setCurrentBoth, findVoice]);
+  }, [setCurrentBoth, pickVoice]);
 
   const pause = useCallback(() => {
     pausedRef.current = true;
