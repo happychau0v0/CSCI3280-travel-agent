@@ -1,0 +1,57 @@
+{
+  "places": [
+    {
+      "id": "ChIJN1t_tDeuEmsRUsoyG83frY4",
+      "displayName": {"text": "Park Hyatt Tokyo"},
+      "formattedAddress": "3-7-1-2 Nishi Shinjuku, Shinjuku City, Tokyo 163-1055",
+      "rating": 4.7,
+      "photos": [{"name": "places/ChIJN1t_tDeuEmsRUsoyG83frY4/photos/AelY_Ct6"}],
+      "priceLevel": "PRICE_LEVEL_VERY_EXPENSIVE",
+      "location": {"latitude": 35.6855, "longitude": 139.6907}
+    },
+    {
+      "id": "ChIJE9on3F2NGGAR9DVO1A1N0PY",
+      "displayName": {"text": "Hotel Gracery Shinjuku"},
+      "formattedAddress": "1-19-1 Kabukicho, Shinjuku City, Tokyo 160-8466",
+      "rating": 4.3,
+      "photos": [{"name": "places/ChIJE9on3F2NGGAR9DVO1A1N0PY/photos/AelY_CuA"}],
+      "priceLevel": "PRICE_LEVEL_MODERATE",
+      "location": {"latitude": 35.6942, "longitude": 139.7015}
+    },
+    {
+      "id": "ChIJ_sparse_no_photos",
+      "displayName": {"text": "Budget Inn Ikebukuro"},
+      "formattedAddress": "2-5-1 Ikebukuro, Toshima City, Tokyo",
+      "location": {"latitude": 35.7295, "longitude": 139.7109}
+    },
+    {
+      "id": "ChIJ_sparse_no_rating",
+      "displayName": {"text": "New Hotel Opening"},
+      "formattedAddress": "1-1 Shibuya, Shibuya City, Tokyo",
+      "photos": [{"name": "places/ChIJ_sparse_no_rating/photos/AelY_Cx1"}],
+      "location": {"latitude": 35.6580, "longitude": 139.7016}
+    },
+    {
+      "id": "ChIJ_no_location",
+      "displayName": {"text": "Capsule Hotel Ginza"},
+      "formattedAddress": "5-10-1 Ginza, Chuo City, Tokyo"
+    },
+    {
+      "id": "ChIJ_empty_photos",
+      "displayName": {"text": "APA Hotel Asakusa"},
+      "formattedAddress": "1-25-8 Asakusa, Taito City, Tokyo",
+      "rating": 3.8,
+      "photos": [],
+      "priceLevel": "PRICE_LEVEL_INEXPENSIVE",
+      "location": {"latitude": 35.7118, "longitude": 139.7982}
+    },
+    {
+      "id": "ChIJ_photo_no_name",
+      "displayName": {"text": "Sakura Hotel Jimbocho"},
+      "formattedAddress": "2-21-4 Kanda Jimbocho, Chiyoda City, Tokyo",
+      "rating": 3.5,
+      "photos": [{"authorAttributions": [{"displayName": "Traveler"}]}],
+      "location": {"latitude": 35.6960, "longitude": 139.7571}
+    }
+  ]
+}

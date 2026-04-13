@@ -1,0 +1,5 @@
+Here's a short itinerary.
+
+```json
+{"itinerary": {"title": "1 Day Walk", "destination": "Tokyo", "origin": "Tokyo", "days": [{"day": 1, "date": "2026-05-15", "theme": "Walking", "activities": [{"time": "10:00", "name": "Shibuya to Harajuku", "address": "Shibuya, Tokyo", "duration_min": 30, "description": "Walk from Shibuya Crossing to Harajuku", "transport_to_next": {"mode": "WALK", "duration": "12 min", "distance": "0.9 km", "polyline": "|Ar@zAkD\Bf@_Bt@yC~DfH`A`B|@zA"}}]}]}}
+```
