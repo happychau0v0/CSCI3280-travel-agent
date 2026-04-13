@@ -419,7 +419,7 @@ export default function PanelDays({
        *  the center grid cell with pointer-events auto so the user
        *  can interact with it. */}
       <div className="panel-grid-center panel-day-map-center" data-testid="day-map-center">
-        <DayMiniMap activities={activities} airport={airportPin} />
+        <DayMiniMap activities={activities} airport={airportPin} activeActivityIdx={activeActivityIdx} />
       </div>
 
       {/* RIGHT — activity timeline + R17 phrasebook + R18 weather hint */}
@@ -452,24 +452,6 @@ export default function PanelDays({
             </div>
           );
         })()}
-        {itinerary?.phrasebook && (
-          <div className="day-phrasebook" data-testid="day-phrasebook">
-            <div className="day-phrasebook-header">
-              ◢ {itinerary.phrasebook.language?.toUpperCase() || "PHRASEBOOK"}
-            </div>
-            <ul className="day-phrasebook-list">
-              {(itinerary.phrasebook.phrases || []).slice(0, 10).map((p, i) => (
-                <li key={p.key || i} className="day-phrasebook-row">
-                  <span className="day-phrasebook-en">{p.english}</span>
-                  <span className="day-phrasebook-rom">{p.romanized}</span>
-                  {p.native && p.native !== p.romanized && (
-                    <span className="day-phrasebook-native">{p.native}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
         <ol className="activities">
           {activities.map((act, i) => (
             <ActivityRow
@@ -497,6 +479,24 @@ export default function PanelDays({
             />
           ))}
         </ol>
+        {itinerary?.phrasebook && (
+          <details className="day-phrasebook" data-testid="day-phrasebook">
+            <summary className="day-phrasebook-header">
+              🗣 {itinerary.phrasebook.language?.toUpperCase() || "PHRASEBOOK"}
+            </summary>
+            <ul className="day-phrasebook-list">
+              {(itinerary.phrasebook.phrases || []).slice(0, 10).map((p, i) => (
+                <li key={p.key || i} className="day-phrasebook-row">
+                  <span className="day-phrasebook-en">{p.english}</span>
+                  <span className="day-phrasebook-rom">{p.romanized}</span>
+                  {p.native && p.native !== p.romanized && (
+                    <span className="day-phrasebook-native">{p.native}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </aside>
     </section>
   );

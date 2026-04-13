@@ -61,6 +61,10 @@ export function useKeyboard({
         tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable;
       // Allow Esc to escape inputs but block everything else
       if (isTypingField && e.key !== "Escape") return;
+      // Blur the input on Escape so keyboard shortcuts become active again
+      if (isTypingField && e.key === "Escape") {
+        target.blur();
+      }
 
       // Number keys → jump to tab N (clamped to PANELS length)
       const num = parseInt(e.key, 10);

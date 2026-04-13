@@ -534,6 +534,11 @@ export default function PanelHome({
         >
           {isLoading ? "PLANNING…" : planLabel}
         </button>
+        {!isLoading && !form.destination?.trim() && (
+          <div className="trip-plan-hint" data-testid="trip-plan-hint">
+            ↑ Type a destination above to get started
+          </div>
+        )}
       </div>
 
       {/* RIGHT — plan history (Round 11 — replaced the NEXT STEPS

@@ -24,6 +24,14 @@ const PRICE_LEVEL_LABELS = {
   PRICE_LEVEL_VERY_EXPENSIVE: "$$$$",
 };
 
+const PRICE_LEVEL_ESTIMATES = {
+  PRICE_LEVEL_FREE: "Free",
+  PRICE_LEVEL_INEXPENSIVE: "~HK$400-800/night",
+  PRICE_LEVEL_MODERATE: "~HK$800-1,500/night",
+  PRICE_LEVEL_EXPENSIVE: "~HK$1,500-3,000/night",
+  PRICE_LEVEL_VERY_EXPENSIVE: "~HK$3,000+/night",
+};
+
 const PRICE_LEVEL_RANK = {
   PRICE_LEVEL_FREE: 0,
   PRICE_LEVEL_INEXPENSIVE: 1,
@@ -227,6 +235,11 @@ export default function PanelHotels({ itinerary, listIndex, onSelect, onPick }) 
                 </span>
               )}
             </div>
+            {selected.price_level && PRICE_LEVEL_ESTIMATES[selected.price_level] && (
+              <div className="hotel-detail-estimate">
+                {PRICE_LEVEL_ESTIMATES[selected.price_level]}
+              </div>
+            )}
             <div className="hotel-detail-address">{selected.address}</div>
 
             <button
@@ -237,7 +250,7 @@ export default function PanelHotels({ itinerary, listIndex, onSelect, onPick }) 
               data-testid="hotel-pick-btn"
               style={{ marginTop: 16, marginBottom: 12 }}
             >
-              {selectedIdx === pickedIdx ? "✓ PICKED · REPLANNING…" : "PICK & REPLAN DAYS →"}
+              {selectedIdx === pickedIdx ? "✓ PICKED" : "PICK & PLAN DAYS →"}
             </button>
 
             {mapsUrl && (

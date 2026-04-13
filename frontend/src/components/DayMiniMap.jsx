@@ -71,7 +71,7 @@ function FitBounds({ points }) {
  *   airport: {lat, lng, iata, label} | null — reference pin for
  *            Day 1 (arrival) / last day (departure). Round 10.
  */
-export default function DayMiniMap({ activities, airport = null }) {
+export default function DayMiniMap({ activities, airport = null, activeActivityIdx = -1 }) {
   const { points, polylines } = useMemo(() => {
     const pts = [];
     const lines = [];
@@ -99,14 +99,32 @@ export default function DayMiniMap({ activities, airport = null }) {
     );
   }
 
-  // Custom numbered marker — small cyan disc with the visit order
-  const numberedIcon = (n) =>
-    L.divIcon({
+  // Custom numbered marker — active pin is large amber, others are small dim dots
+  const numberedIcon = (n, isActive, isNext) => {
+    if (isActive) {
+      return L.divIcon({
+        className: "day-mini-marker",
+        html: `<div class="day-mini-pin active">${n}</div>`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+      });
+    }
+    if (isNext) {
+      return L.divIcon({
+        className: "day-mini-marker",
+        html: `<div class="day-mini-pin">${n}</div>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+      });
+    }
+    // Dim dot for inactive pins
+    return L.divIcon({
       className: "day-mini-marker",
-      html: `<div class="day-mini-pin">${n}</div>`,
-      iconSize: [22, 22],
-      iconAnchor: [11, 11],
+      html: `<div class="day-mini-pin dim">${n}</div>`,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7],
     });
+  };
 
   const airportIcon = L.divIcon({
     className: "day-mini-marker",
@@ -147,20 +165,39 @@ export default function DayMiniMap({ activities, airport = null }) {
             icon={airportIcon}
           />
         )}
-        {points.map((p) => (
-          <Marker
-            key={`${p.idx}-${p.lat}-${p.lng}`}
-            position={[p.lat, p.lng]}
-            icon={numberedIcon(p.idx)}
-          />
-        ))}
-        {polylines.map((line, i) => (
-          <Polyline
-            key={i}
-            positions={line}
-            pathOptions={{ color: "#00d9ff", weight: 3, opacity: 0.85 }}
-          />
-        ))}
+        {points.map((p) => {
+          // p.idx is 1-based; activeActivityIdx is 0-based index into activities[]
+          const isActive = activeActivityIdx >= 0 && p.idx === activeActivityIdx + 1;
+          const isNext = activeActivityIdx >= 0 && p.idx === activeActivityIdx + 2;
+          return (
+            <Marker
+              key={`${p.idx}-${p.lat}-${p.lng}`}
+              position={[p.lat, p.lng]}
+              icon={numberedIcon(p.idx, isActive, isNext)}
+            />
+          );
+        })}
+        {polylines.map((line, i) => {
+          // Only show the active segment's polyline prominently;
+          // other segments are dim
+          const isActiveLine = activeActivityIdx >= 0 && i === activeActivityIdx;
+          if (activeActivityIdx >= 0 && !isActiveLine) {
+            return (
+              <Polyline
+                key={i}
+                positions={line}
+                pathOptions={{ color: "#00d9ff", weight: 1, opacity: 0.2 }}
+              />
+            );
+          }
+          return (
+            <Polyline
+              key={i}
+              positions={line}
+              pathOptions={{ color: "#00d9ff", weight: 4, opacity: 0.9 }}
+            />
+          );
+        })}
         <FitBounds points={allPoints} />
       </MapContainer>
     </div>

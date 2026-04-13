@@ -151,9 +151,40 @@ export default function PanelFlights({ itinerary, listIndex, currency = "HKD", o
       <aside className="panel-grid-right panel-grid-scroll flight-detail-card">
         {selected && (
           <>
-            <div className="flight-detail-airline">
-              {selected.airline || selected.label || stopsLabel(selected.stops)}
+            {/* Route header */}
+            <div className="flight-route-header">
+              <span>{flight.from_city || flight.from_iata}</span>
+              <span className="flight-route-arrow"> → </span>
+              <span>{flight.to_city || flight.to_iata}</span>
             </div>
+            <div className="flight-route-meta">
+              {flight.date || "—"} · {formatDuration(selected.duration_min)} · {stopsLabel(selected.stops)}
+            </div>
+
+            {/* Timeline: departure → arrival */}
+            <div className="flight-timeline">
+              <div className="flight-timeline-row">
+                <div className="flight-timeline-time">{selected.departure_time || "—"}</div>
+                <div className="flight-timeline-dot" />
+                <div className="flight-timeline-info">
+                  {flight.from_iata} {flight.from_name || `${flight.from_city} Airport`}
+                </div>
+              </div>
+              <div className="flight-timeline-line">
+                <div className="flight-timeline-airline">
+                  {selected.airline || "—"} · {selected.seat_class_label || "Economy"}
+                </div>
+              </div>
+              <div className="flight-timeline-row">
+                <div className="flight-timeline-time">{selected.arrival_time || "—"}</div>
+                <div className="flight-timeline-dot" />
+                <div className="flight-timeline-info">
+                  {flight.to_iata} {flight.to_name || `${flight.to_city} Airport`}
+                </div>
+              </div>
+            </div>
+
+            {/* Price */}
             <div className="flight-detail-price">
               {formatPrice(selected.price_low)}
               {selected.price_high &&
@@ -164,33 +195,6 @@ export default function PanelFlights({ itinerary, listIndex, currency = "HKD", o
                 )}
             </div>
 
-            <div className="flight-stats">
-              <div className="flight-stat">
-                <div className="flight-stat-value">
-                  {formatDuration(selected.duration_min)}
-                </div>
-                <div className="flight-stat-label">duration</div>
-              </div>
-              <div className="flight-stat">
-                <div className="flight-stat-value">
-                  {stopsLabel(selected.stops)}
-                </div>
-                <div className="flight-stat-label">stops</div>
-              </div>
-              <div className="flight-stat">
-                <div className="flight-stat-value">
-                  {selected.departure_time || "—"}
-                </div>
-                <div className="flight-stat-label">depart</div>
-              </div>
-              <div className="flight-stat">
-                <div className="flight-stat-value">
-                  {selected.arrival_time || "—"}
-                </div>
-                <div className="flight-stat-label">arrive</div>
-              </div>
-            </div>
-
             <button
               type="button"
               className="trip-plan-btn"
@@ -199,7 +203,7 @@ export default function PanelFlights({ itinerary, listIndex, currency = "HKD", o
               data-testid="flight-pick-btn"
               style={{ marginTop: 16 }}
             >
-              {selectedIdx === pickedIdx ? "✓ PICKED" : "PICK THIS FLIGHT →"}
+              {selectedIdx === pickedIdx ? "✓ PICKED" : "PICK & FIND HOTELS →"}
             </button>
 
             {flight.google_flights_url && (

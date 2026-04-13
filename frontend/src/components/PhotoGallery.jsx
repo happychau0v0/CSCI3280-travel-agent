@@ -22,12 +22,19 @@ import { photoSrc } from "../api/client";
  */
 export default function PhotoGallery({
   photos = [],
-  maxCount = 5,
+  maxCount = 10,
   altPrefix = "",
 }) {
   const validPhotos = (photos || []).filter(Boolean).slice(0, maxCount);
   const [activeIdx, setActiveIdx] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  // Reset to first photo when the photo set changes (e.g. user clicks
+  // a different hotel). Without this, activeIdx stays stale and the
+  // hero shows the wrong image or a broken URL.
+  useEffect(() => {
+    setActiveIdx(0);
+  }, [validPhotos.length, validPhotos[0]]);
 
   // Round 20 — arrow key navigation while the lightbox is open.
   useEffect(() => {
