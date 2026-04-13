@@ -34,7 +34,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
+from pathlib import Path
 from typing import AsyncIterator, Awaitable, Callable
 
 from openai import AsyncOpenAI
@@ -51,6 +53,15 @@ logger = logging.getLogger(__name__)
 # calling tools without producing a final reply.
 MAX_TOOL_ROUNDS = 20
 
+# Proxy env vars that Clash/Shadowsocks/V2Ray set. The OpenAI SDK uses
+# httpx internally, which will try to route through these proxies and
+# fail with "socksio not installed" on most installs. Strip them before
+# creating the client, same as flights.py does for Google Flights.
+_PROXY_ENV_VARS = (
+    "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
+    "ALL_PROXY", "all_proxy",
+)
+
 _client: AsyncOpenAI | None = None
 
 
@@ -62,10 +73,20 @@ def _get_client() -> AsyncOpenAI:
             raise RuntimeError(
                 "OPENROUTER_API_KEY not configured. Add it to .env to enable the LLM."
             )
+        # Clear proxy env vars so httpx doesn't try to route through a
+        # local SOCKS proxy (Clash, Shadowsocks, V2Ray). These proxies
+        # cause "socksio not installed" crashes on most machines.
+        saved = {}
+        for key in _PROXY_ENV_VARS:
+            val = os.environ.pop(key, None)
+            if val is not None:
+                saved[key] = val
         _client = AsyncOpenAI(
             api_key=OPENROUTER_API_KEY,
             base_url=OPENROUTER_BASE_URL,
         )
+        # Restore env vars so other code (e.g. user scripts) isn't affected.
+        os.environ.update(saved)
     return _client
 
 
@@ -256,7 +277,24 @@ async def _run_loop(
     else:
         logger.warning("Hit MAX_TOOL_ROUNDS=%d without final reply", MAX_TOOL_ROUNDS)
 
+    # Debug: dump raw LLM text when DUMP_LLM=1 so we can record golden
+    # fixtures for schema validation tests (P1 of the testing plan).
+    import os
+
+    if os.getenv("DUMP_LLM"):
+        dump_dir = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "llm_outputs"
+        dump_dir.mkdir(parents=True, exist_ok=True)
+        dump_file = dump_dir / f"dump_{len(tool_calls_made)}tools.txt"
+        dump_file.write_text(last_text)
+        logger.info("Dumped LLM output to %s", dump_file)
+
     itinerary = _extract_itinerary(last_text)
+    if itinerary:
+        itin_keys = list(itinerary.keys())
+        day_count = len(itinerary.get("days", []))
+        logger.info("Extracted itinerary keys=%s, days=%d", itin_keys, day_count)
+    else:
+        logger.warning("_extract_itinerary returned None (text length=%d)", len(last_text))
 
     return {
         "reply": last_text,
@@ -350,30 +388,63 @@ async def chat_stream(
 
 
 _JSON_FENCE_RE = re.compile(r"```json\s*(.*?)```", re.DOTALL)
-_INVALID_ESCAPE_RE = re.compile(r'\\(?!["\\/bfnrtu])')
-
-
 def _sanitize_json(text: str) -> str:
-    """Escape lone backslashes that aren't valid JSON escapes.
+    """Escape ALL backslashes inside JSON string literals.
 
-    Google's encoded polyline format (the result of get_directions) is a
-    string of ASCII characters in the range 0x3F-0x7E that frequently
-    contains backslashes. When the LLM copies a polyline value verbatim
-    into a JSON string literal, those backslashes become invalid escape
-    sequences (e.g. ``\\A``, ``\\z``) that strict JSON parsers reject.
+    Google's encoded polyline format contains backslashes that are NOT
+    meant to be JSON escape sequences — they're literal chars in the
+    polyline encoding. When the LLM copies them into a JSON string,
+    they become invalid (e.g. ``\\A``, ``\\z``) OR get silently
+    converted (e.g. ``\\f`` becomes form-feed, corrupting the polyline).
 
-    Example of what the model produces and what this function fixes::
-
-        before: {"polyline": "|Ar@zAkD\\Bf@_Bt@yC..."}
-                                   ^^^ invalid escape
-        after:  {"polyline": "|Ar@zAkD\\\\Bf@_Bt@yC..."}
-                                   ^^^^^ doubled, now a literal "\\B"
-
-    We only touch backslashes that don't begin a valid JSON escape (one of
-    " \\ / b f n r t u). This is a pragmatic fix — a fully strict
-    alternative would be a custom JSON tokenizer.
+    Strategy: walk the text and double EVERY backslash inside a string
+    literal, unless it's followed by a quote (which would otherwise
+    close the string prematurely). This is aggressive but produces
+    valid JSON that round-trips the original polyline bytes literally.
     """
-    return _INVALID_ESCAPE_RE.sub(r"\\\\", text)
+    out = []
+    i = 0
+    in_string = False
+    while i < len(text):
+        ch = text[i]
+        if not in_string:
+            out.append(ch)
+            if ch == '"':
+                in_string = True
+            i += 1
+        else:
+            if ch == '\\' and i + 1 < len(text):
+                next_ch = text[i + 1]
+                if next_ch == '"':
+                    # Escaped quote — keep as is so the string stays open
+                    out.append(ch)
+                    out.append(next_ch)
+                    i += 2
+                elif next_ch == '\\':
+                    # Already-escaped backslash — keep as is (valid JSON)
+                    out.append(ch)
+                    out.append(next_ch)
+                    i += 2
+                else:
+                    # Lone backslash followed by non-escape char —
+                    # double it so JSON treats it as literal
+                    out.append('\\')
+                    out.append('\\')
+                    out.append(next_ch)
+                    i += 2
+            elif ch == '\\':
+                # Trailing backslash at end of text — double it
+                out.append('\\')
+                out.append('\\')
+                i += 1
+            elif ch == '"':
+                out.append(ch)
+                in_string = False
+                i += 1
+            else:
+                out.append(ch)
+                i += 1
+    return ''.join(out)
 
 
 def _balanced_json_object(text: str, start: int) -> str | None:
@@ -424,11 +495,21 @@ def _extract_itinerary(text: str) -> dict | None:
 
     Tries fenced ```json blocks first, then falls back to scanning for any
     `{"itinerary": ...}` object anywhere in the text.
+
+    Uses json-repair as a fallback when strict parsing fails — this handles
+    the Google encoded polyline escape mess that's hard to fix via regex.
     """
     if not text:
         return None
 
+    # Lazy import so tests without the dep still import this module
+    try:
+        import json_repair
+    except ImportError:  # pragma: no cover
+        json_repair = None
+
     def _try_parse(candidate: str) -> dict | None:
+        # Try strict parse first (with our sanitizer)
         for attempt in (candidate, _sanitize_json(candidate)):
             try:
                 data = json.loads(attempt)
@@ -436,6 +517,15 @@ def _extract_itinerary(text: str) -> dict | None:
                 continue
             if isinstance(data, dict) and "itinerary" in data:
                 return data["itinerary"]
+        # Fallback: lenient parse via json-repair. Handles malformed
+        # polyline escapes that our sanitizer can't untangle.
+        if json_repair is not None:
+            try:
+                data = json_repair.loads(candidate)
+                if isinstance(data, dict) and "itinerary" in data:
+                    return data["itinerary"]
+            except Exception:
+                pass
         return None
 
     # 1. Look inside ```json``` code fences

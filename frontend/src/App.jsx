@@ -359,11 +359,41 @@ function App() {
     },
     onActivate: () => {
       cues.select();
-      // Dispatch to the current panel's row activator if it has one.
-      // Settings/HOME form rows register an activateRow handler via
-      // activeRowDispatchRef. Other panels can opt in similarly.
+      const panel = menu.state.panel;
+      const idx = menu.state.listIndex;
+      // Space key activates the current row — pick flight or hotel
+      if (panel === "FLIGHTS") {
+        const opt = currentItinerary?.flight?.options?.[idx];
+        if (opt) {
+          pushPickSnapshot();
+          setCurrentItinerary({ ...currentItinerary, selected_flight: opt });
+          cues.chime();
+          const label = [
+            opt.airline,
+            opt.departure_time && opt.arrival_time
+              ? `${opt.departure_time}→${opt.arrival_time}` : null,
+            opt.price_low ? `HK$${opt.price_low}` : null,
+          ].filter(Boolean).join(", ");
+          handleSend(`Selected flight: ${label}. Now find hotels.`);
+        }
+        return;
+      }
+      if (panel === "HOTELS") {
+        const hotel = currentItinerary?.hotels?.[idx];
+        if (hotel) {
+          pushPickSnapshot();
+          setCurrentItinerary({ ...currentItinerary, selected_hotel: hotel });
+          cues.chime();
+          handleSend(
+            `Set "${hotel.name}" as the base hotel. ` +
+            `Plan the day-by-day itinerary with activities, meals, and directions.`,
+          );
+        }
+        return;
+      }
+      // Fallback: dispatch to panel's row activator (HOME form rows)
       const dispatch = activeRowDispatchRef.current;
-      if (dispatch) dispatch(menu.state.listIndex);
+      if (dispatch) dispatch(idx);
     },
     onBack: () => {
       if (chatPopoverOpen) {
@@ -652,25 +682,34 @@ function App() {
         const assistantMsg = { role: "assistant", content: data.reply };
         setMessages((prev) => [...prev, assistantMsg]);
         if (data.itinerary) {
-          // Merge the new itinerary with the current one so user-driven
-          // selections (selected_flight, selected_hotel) are preserved
-          // across replan round-trips even if the LLM forgets to echo
-          // them in its response. The new itinerary still wins on
-          // every OTHER field.
-          const prevSnapshot = currentItinerary;
-          const mergedItinerary = { ...data.itinerary };
-          if (!mergedItinerary.selected_flight && prevSnapshot?.selected_flight) {
-            mergedItinerary.selected_flight = prevSnapshot.selected_flight;
-          }
-          if (!mergedItinerary.selected_hotel && prevSnapshot?.selected_hotel) {
-            mergedItinerary.selected_hotel = prevSnapshot.selected_hotel;
-          }
-          setCurrentItinerary(mergedItinerary);
+          // Multi-turn additive merge: each LLM turn only emits fields
+          // for its step (Turn 1: flight, Turn 2: hotels, Turn 3: days).
+          // We spread the new data ON TOP of the LATEST state (via
+          // functional updater to avoid stale closure) so earlier
+          // picks are preserved.
+          const newData = data.itinerary;
+
+          setCurrentItinerary((prev) => {
+            const prevSnapshot = prev || {};
+
+            // If LLM returned selected_hotel as a string, resolve it
+            if (newData.selected_hotel && typeof newData.selected_hotel === "string") {
+              const name = newData.selected_hotel;
+              const hotels = newData.hotels || prevSnapshot.hotels || [];
+              const match = hotels.find(
+                (h) => h.name?.toLowerCase() === name.toLowerCase(),
+              );
+              newData.selected_hotel = match || prevSnapshot.selected_hotel || null;
+            }
+
+            return { ...prevSnapshot, ...newData };
+          });
           cues.chime();
-          // Round 11 — persist the finished plan to history so the
-          // user can find it again in the PLAN HISTORY card.
+          // Persist to history. Use currentItinerary spread with newData
+          // as a best-effort snapshot — the functional updater above is
+          // the authoritative state, but this is close enough for history.
           saveCurrentPlanToHistory(
-            mergedItinerary,
+            { ...(currentItinerary || {}), ...data.itinerary },
             [...baseMessages, userMsg, assistantMsg],
           );
         }
@@ -688,8 +727,16 @@ function App() {
           if (pending && pending.panel) {
             menu.navigate(pending);
             cues.select();
-          } else if (data.itinerary?.flight?.options?.length) {
-            menu.setPanel("FLIGHTS");
+          } else if (data.itinerary) {
+            // Fallback: detect which turn just completed by what data
+            // was returned, and navigate to the appropriate panel.
+            if (data.itinerary.days?.length) {
+              menu.setPanel("DAYS");        // Turn 3 or follow-up edit
+            } else if (data.itinerary.hotels?.length) {
+              menu.setPanel("HOTELS");      // Turn 2
+            } else if (data.itinerary.flight?.options?.length) {
+              menu.setPanel("FLIGHTS");     // Turn 1
+            }
             cues.select();
           }
         }
@@ -835,7 +882,13 @@ function App() {
 
   return (
     <div className="app">
-      <ErrorBanner error={error} onDismiss={() => setError(null)} />
+      {/* Only show the top-level error banner when the AgentStatusBar
+       *  ISN'T already rendering the same error. When agentState is
+       *  "error", AgentStatusBar shows a prominent red bar — stacking
+       *  a second banner on top is redundant and confusing (Bug #6). */}
+      {agentState !== "error" && (
+        <ErrorBanner error={error} onDismiss={() => setError(null)} />
+      )}
 
       {/* Background globe */}
       <Suspense fallback={<div className="globe-loading">Loading globe…</div>}>
@@ -914,16 +967,19 @@ function App() {
             onPick={(i) => {
               const opt = currentItinerary?.flight?.options?.[i];
               if (!opt) return;
-              // Round 12 — snapshot previous pick state so Ctrl+Z
-              // can revert this action.
               pushPickSnapshot();
-              // Round 10 — plan is already complete; a flight pick
-              // just stamps the selection locally and advances the
-              // panel to HOTELS so the user can pick accommodation
-              // next. No backend round-trip needed.
+              // Stamp the flight pick locally, then fire Turn 2 so the
+              // LLM searches for hotels near the destination.
               setCurrentItinerary({ ...currentItinerary, selected_flight: opt });
               cues.chime();
-              setPanelWithCue("HOTELS");
+              const label = [
+                opt.airline,
+                opt.departure_time && opt.arrival_time
+                  ? `${opt.departure_time}→${opt.arrival_time}`
+                  : null,
+                opt.price_low ? `HK$${opt.price_low}` : null,
+              ].filter(Boolean).join(", ");
+              handleSend(`Selected flight: ${label}. Now find hotels.`);
             }}
           />
         )}
@@ -935,29 +991,17 @@ function App() {
             onPick={(i) => {
               const hotel = currentItinerary?.hotels?.[i];
               if (!hotel) return;
-              // Round 12 — snapshot previous pick state so Ctrl+Z
-              // can revert this action.
               pushPickSnapshot();
-              // Stamp the pick locally so the detail card and the
-              // .picked class update immediately without waiting
-              // for the agent.
+              // Stamp the hotel pick locally, then fire Turn 3 so
+              // the LLM builds the day-by-day plan around this hotel.
               setCurrentItinerary({
                 ...currentItinerary,
                 selected_hotel: hotel,
               });
               cues.chime();
-              // If the user picked the hotel the LLM already pre-
-              // selected, no replan is needed — just advance to
-              // DAYS. Otherwise fire the replan chat so the LLM
-              // re-emits the days array anchored on the new hotel.
-              const prev = currentItinerary?.selected_hotel?.name;
-              if (prev === hotel.name) {
-                setPanelWithCue("DAYS");
-                return;
-              }
               const prompt =
                 `Set "${hotel.name}" as the base hotel. ` +
-                `Replan every day so each route starts and ends at this hotel.`;
+                `Plan the day-by-day itinerary with activities, meals, and directions.`;
               handleSend(prompt);
             }}
           />
