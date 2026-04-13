@@ -307,20 +307,11 @@ export default function PanelDays({
   onRemoveDay,
   favoriteKeys = new Set(),
   onToggleFavorite,
-  useMapLibre = false,
-  activeActivityIdx: externalActiveIdx = -1,
-  onActivityChange,
 }) {
   const days = itinerary?.days || [];
   const hotelName =
     itinerary?.selected_hotel?.name || itinerary?.hotels?.[0]?.name || null;
-  // OBJ5: use lifted state from App.jsx when useMapLibre is active
-  // so the MapView can show only the active leg's 2 pins.
-  const [localActiveActivityIdx, setLocalActiveActivityIdx] = useState(-1);
-  const activeActivityIdx = useMapLibre ? externalActiveIdx : localActiveActivityIdx;
-  const setActiveActivityIdx = useMapLibre
-    ? (idx) => { setLocalActiveActivityIdx(idx); onActivityChange?.(idx); }
-    : setLocalActiveActivityIdx;
+  const [activeActivityIdx, setActiveActivityIdx] = useState(-1);
   // Add Activity inline form state
   const [addingActivity, setAddingActivity] = useState(false);
   const [addTime, setAddTime] = useState("");
@@ -540,13 +531,9 @@ export default function PanelDays({
         </ul>
       </div>
 
-      {/* CENTER — mini-map of the selected day.
-       * When MapLibre is active the background MapView handles this;
-       * we render an empty transparent cell so the background shows through. */}
-      <div className={`panel-grid-center panel-day-map-center${useMapLibre ? " maplibre-passthrough" : ""}`} data-testid="day-map-center">
-        {!useMapLibre && (
-          <DayMiniMap activities={activities} airport={airportPin} activeActivityIdx={activeActivityIdx} />
-        )}
+      {/* CENTER — mini-map of the selected day */}
+      <div className="panel-grid-center panel-day-map-center" data-testid="day-map-center">
+        <DayMiniMap activities={activities} airport={airportPin} activeActivityIdx={activeActivityIdx} />
       </div>
 
       {/* RIGHT — activity timeline + R17 phrasebook + R18 weather hint */}

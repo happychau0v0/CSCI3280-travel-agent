@@ -17,19 +17,20 @@ import "leaflet/dist/leaflet.css";
 
 function FitBounds({ points }) {
   const map = useMap();
+  // Stable string key so the effect only re-fires when coordinates
+  // actually change — not on every parent re-render (shake fix).
+  const key = points.map((p) => `${p[0].toFixed(4)},${p[1].toFixed(4)}`).join("|");
   useEffect(() => {
     if (!points.length) return;
     const bounds = L.latLngBounds(points);
-    // Round 11 — flyToBounds gives a smooth zoom-in after mount,
-    // which dovetails with the .panel-grid-center scale-in CSS
-    // animation to read as a continuous camera push.
     map.flyToBounds(bounds, {
       padding: [32, 32],
       maxZoom: 14,
       duration: 0.9,
       easeLinearity: 0.25,
     });
-  }, [points, map]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, map]);
   return null;
 }
 
@@ -111,7 +112,10 @@ export default function HotelsMap({ hotels, airport = null, selectedIdx = 0 }) {
       if (!outlier) bounds.push([airport.lat, airport.lng]);
     }
     return { markers, bounds, airportIsOutlier: outlier, distanceKm: dist };
-  }, [hotels, airport, selectedIdx]);
+  // selectedIdx only affects which pin is highlighted — not the bounds.
+  // Removing it from deps prevents FitBounds re-firing on every selection.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hotels, airport]);
 
   if (markers.length === 0) {
     return (

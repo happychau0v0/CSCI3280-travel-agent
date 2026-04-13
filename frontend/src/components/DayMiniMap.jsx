@@ -82,12 +82,22 @@ function isAirportOutlier(activityPoints, airportPoint) {
   return { airportIsOutlier: distFromCentroid > 20, distanceKm: distFromCentroid };
 }
 
-/** Auto-fit the map to provided bounds points whenever they change.
- * Round 11 — flyToBounds gives a smooth zoom-in after mount.
- * Round 23 — accepts a `focusPoints` subset so we can exclude
- * far-away airports from the fit. */
+// Transport mode → polyline color
+const MODE_COLOR = {
+  WALK: "#4ade80",
+  TRANSIT: "#00d9ff",
+  DRIVE: "#fbbf24",
+};
+const MODE_DEFAULT_COLOR = "#00d9ff";
+
+const MODE_ICON = { WALK: "🚶", TRANSIT: "🚇", DRIVE: "🚗" };
+const MODE_LABEL = { WALK: "Walking", TRANSIT: "Transit", DRIVE: "Taxi" };
+
+/** Auto-fit the map to provided bounds points whenever coordinates change.
+ * Uses a stable string key to avoid re-triggering on reference changes. */
 function FitBounds({ points }) {
   const map = useMap();
+  const key = points.map((p) => `${p[0].toFixed(4)},${p[1].toFixed(4)}`).join("|");
   useEffect(() => {
     if (!points.length) return;
     const bounds = L.latLngBounds(points);
@@ -97,11 +107,12 @@ function FitBounds({ points }) {
       duration: 0.9,
       easeLinearity: 0.25,
     });
-  }, [points, map]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, map]);
   return null;
 }
 
-/** A small corner button that flies the map to a specific point. */
+/** A small corner button that flies the map to the airport pin. */
 function AirportBadge({ airport, distanceKm }) {
   const map = useMap();
   if (!airport || !airport.lat || !airport.lng) return null;
@@ -119,6 +130,24 @@ function AirportBadge({ airport, distanceKm }) {
     >
       ✈ {airport.iata || "AIRPORT"} · {Math.round(distanceKm)}km ↗
     </button>
+  );
+}
+
+/** Floating chip showing transport mode + duration for the active leg. */
+function TransportBadge({ activity }) {
+  const transport = activity?.transport_to_next;
+  if (!transport?.mode) return null;
+  const icon = MODE_ICON[transport.mode] || "→";
+  const label = MODE_LABEL[transport.mode] || transport.mode;
+  const color = MODE_COLOR[transport.mode] || MODE_DEFAULT_COLOR;
+  return (
+    <div
+      className="transport-badge"
+      style={{ borderColor: color, color }}
+      data-testid="transport-badge"
+    >
+      {icon} {label}{transport.duration ? ` · ${transport.duration}` : ""}
+    </div>
   );
 }
 
@@ -142,11 +171,24 @@ export default function DayMiniMap({ activities, airport = null, activeActivityI
       }
       if (a.transport_to_next?.polyline) {
         const decoded = decodePolyline(a.transport_to_next.polyline);
-        if (decoded.length > 1) lines.push(decoded);
+        if (decoded.length > 1) {
+          lines.push({ coords: decoded, mode: a.transport_to_next.mode || "TRANSIT" });
+        }
       }
     }
     return { points: pts, polylines: lines };
   }, [activities]);
+
+  // focusPoints: when an activity is selected, zoom to just the active pair.
+  // Must be called before any early return (Rules of Hooks).
+  const focusPoints = useMemo(() => {
+    const actPts = points.map((p) => [p.lat, p.lng]);
+    if (activeActivityIdx < 0 || points.length < 2) return actPts;
+    const a = points.find((p) => p.idx === activeActivityIdx + 1);
+    const b = points.find((p) => p.idx === activeActivityIdx + 2);
+    const pair = [a, b].filter(Boolean).map((p) => [p.lat, p.lng]);
+    return pair.length >= 2 ? pair : actPts;
+  }, [activeActivityIdx, points]);
 
   const hasAirport =
     airport && airport.lat != null && airport.lng != null;
@@ -199,20 +241,16 @@ export default function DayMiniMap({ activities, airport = null, activeActivityI
     iconAnchor: [14, 14],
   });
 
-  // Bounds: include activities + polyline vertices.
-  // Only include the airport if it's NOT an outlier (fits in the city view).
-  const allPoints = [
-    ...activityPoints,
-    ...polylines.flat(),
-  ];
-  if (hasAirport && !airportIsOutlier) allPoints.push([airport.lat, airport.lng]);
-
   const centerPoint = points.length
     ? [points[0].lat, points[0].lng]
     : [airport.lat, airport.lng];
 
+  // Active activity (for TransportBadge)
+  const activeActivity =
+    activeActivityIdx >= 0 ? (activities || [])[activeActivityIdx] : null;
+
   return (
-    <div className="day-mini-map" data-testid="day-mini-map">
+    <div className="day-mini-map" data-testid="day-mini-map" style={{ position: "relative" }}>
       <MapContainer
         center={centerPoint}
         zoom={10}
@@ -245,31 +283,33 @@ export default function DayMiniMap({ activities, airport = null, activeActivityI
           );
         })}
         {polylines.map((line, i) => {
-          // Only show the active segment's polyline prominently;
-          // other segments are dim
           const isActiveLine = activeActivityIdx >= 0 && i === activeActivityIdx;
+          const color = MODE_COLOR[line.mode] || MODE_DEFAULT_COLOR;
           if (activeActivityIdx >= 0 && !isActiveLine) {
             return (
               <Polyline
                 key={i}
-                positions={line}
-                pathOptions={{ color: "#00d9ff", weight: 1, opacity: 0.2 }}
+                positions={line.coords}
+                pathOptions={{ color, weight: 1.5, opacity: 0.25 }}
               />
             );
           }
           return (
             <Polyline
               key={i}
-              positions={line}
-              pathOptions={{ color: "#00d9ff", weight: 4, opacity: 0.9 }}
+              positions={line.coords}
+              pathOptions={{ color, weight: 5, opacity: 1.0 }}
             />
           );
         })}
-        <FitBounds points={allPoints} />
+        <FitBounds points={focusPoints} />
         {hasAirport && airportIsOutlier && (
           <AirportBadge airport={airport} distanceKm={distanceKm} />
         )}
       </MapContainer>
+      {activeActivity?.transport_to_next?.mode && (
+        <TransportBadge activity={activeActivity} />
+      )}
     </div>
   );
 }
