@@ -87,16 +87,31 @@ export function useSubtitleQueue({
     voiceNameRef.current = voiceName;
   }, [voiceName]);
 
-  // Look up a voice by name from speechSynthesis.getVoices(). Returns
-  // null if unsupported or not found, letting the browser pick the
-  // default. The list is sometimes async-loaded (Chrome), so we read
-  // it fresh on every utterance.
-  const findVoice = useCallback((name) => {
-    if (!name) return null;
+  // Pick the best available voice. If the user picked a specific voice in
+  // Settings that name wins; otherwise apply the same priority as AudioPlayer:
+  // Google neural female > Google any > Samantha/Karen/named system > first English.
+  const pickVoice = useCallback((preferredName) => {
     if (typeof window === "undefined" || !window.speechSynthesis) return null;
     try {
       const voices = window.speechSynthesis.getVoices() || [];
-      return voices.find((v) => v.name === name) || null;
+      if (voices.length === 0) return null;
+      // 1. User's explicit choice from Settings
+      if (preferredName) {
+        const exact = voices.find((v) => v.name === preferredName);
+        if (exact) return exact;
+      }
+      // 2. Auto-select best English voice (same logic as AudioPlayer.pickBestVoice)
+      const en = voices.filter((v) => /^en[-_]/i.test(v.lang));
+      if (en.length === 0) return voices[0];
+      const googleNeural = en.find((v) => /Google (US|UK) English Female/i.test(v.name));
+      if (googleNeural) return googleNeural;
+      const googleAny = en.find((v) => /Google/i.test(v.name));
+      if (googleAny) return googleAny;
+      const named = en.find((v) =>
+        /Samantha|Karen|Moira|Tessa|Fiona|Microsoft Zira|Microsoft David/i.test(v.name)
+      );
+      if (named) return named;
+      return en[0];
     } catch {
       return null;
     }
@@ -143,7 +158,7 @@ export function useSubtitleQueue({
         const utter = new SpeechSynthesisUtterance(text);
         utter.rate = rateRef.current || 1.15;
         utter.pitch = 1.0;
-        const voice = findVoice(voiceNameRef.current);
+        const voice = pickVoice(voiceNameRef.current);
         if (voice) utter.voice = voice;
         // Fire-and-forget — we DON'T hook onend/onerror because on
         // some browsers (headless Chromium, voice-less environments)
