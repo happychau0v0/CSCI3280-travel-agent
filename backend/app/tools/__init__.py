@@ -11,6 +11,7 @@ from app.tools import (
     places,
     request_input as request_input_tool,
     search,
+    ui_tools,
     weather,
 )
 from app.tools.errors import ToolUnavailableError
@@ -306,6 +307,85 @@ TOOL_DEFINITIONS: list[dict] = [
     {
         "type": "function",
         "function": {
+            "name": "toggle_setting",
+            "description": (
+                "Change a UI setting in the app. Use this when the user asks to "
+                "turn TTS on/off, change currency, adjust subtitle size, switch "
+                "dark/light theme, or toggle auto-replan. The frontend will apply "
+                "the change immediately without requiring the user to open settings."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "setting": {
+                        "type": "string",
+                        "enum": ["tts_enabled", "theme", "currency", "subtitle_size", "auto_replan"],
+                        "description": "Which setting to change",
+                    },
+                    "value": {
+                        "description": (
+                            "New value. For tts_enabled: true/false. "
+                            "For theme: 'dark' or 'light'. "
+                            "For currency: ISO 4217 code e.g. 'USD', 'HKD', 'JPY'. "
+                            "For subtitle_size: 'small', 'medium', 'large'. "
+                            "For auto_replan: true/false."
+                        ),
+                    },
+                },
+                "required": ["setting", "value"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "submit_trip_form",
+            "description": (
+                "Pre-fill the trip planning form and start the planning flow. "
+                "Use this when the user tells you a destination, dates, or other "
+                "trip details and wants to start planning. This will populate the "
+                "PLAN form fields and trigger 'Start Planning' automatically."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "destination": {
+                        "type": "string",
+                        "description": "Destination city/country, e.g. 'Tokyo, Japan'",
+                    },
+                    "origin": {
+                        "type": "string",
+                        "description": "Origin city, e.g. 'Hong Kong'",
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "description": "ISO date YYYY-MM-DD",
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "description": "ISO date YYYY-MM-DD",
+                    },
+                    "transport": {
+                        "type": "string",
+                        "enum": ["flight", "train", "drive", "any"],
+                        "description": "Preferred transport mode",
+                    },
+                    "party_size": {
+                        "type": "integer",
+                        "description": "Number of travelers",
+                    },
+                    "interests": {
+                        "type": "string",
+                        "description": "Comma-separated interests, e.g. 'food, museums, hiking'",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "web_search",
             "description": (
                 "Fallback web search for general info not covered by other tools. "
@@ -358,6 +438,8 @@ TOOL_DISPATCH: dict = {
     "request_input": request_input_tool.request_input,
     "get_day_windows": day_windows.get_day_windows,
     "get_phrasebook": phrasebook.get_phrasebook,
+    "toggle_setting": ui_tools.toggle_setting,
+    "submit_trip_form": ui_tools.submit_trip_form,
     "web_search": search.web_search,
 }
 

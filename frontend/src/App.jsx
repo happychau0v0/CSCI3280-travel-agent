@@ -205,6 +205,10 @@ function App() {
   const [currentTool, setCurrentTool] = useState(null);
   const [requestStartedAt, setRequestStartedAt] = useState(null);
   const [pendingInputRequest, _setPendingInputRequest] = useState(null);
+  // OBJ3 — LLM can pre-fill the trip form and auto-trigger planning
+  const [pendingFormPrefill, setPendingFormPrefill] = useState(null);
+  // OBJ5 — track which activity is active in DAYS panel for the 2-pin map
+  const [activeActivityIdx, setActiveActivityIdx] = useState(-1);
   // Tracks the in-flight done→idle setTimeout so a new request can
   // cancel it before it overwrites the new "working" state (B6).
   const idleTimerRef = useRef(null);
@@ -714,6 +718,34 @@ function App() {
               if (menu.state.panel !== "HOME") menu.setPanel("HOME");
               if (payload?.prompt) subtitles.push(payload.prompt);
               cues.select();
+            } else if (type === "setting_change") {
+              // OBJ3 — LLM toggled a UI setting directly.
+              const { setting, value } = payload || {};
+              if (setting === "tts_enabled") {
+                // muted is the inverse of tts_enabled
+                setMuted(!value);
+              } else if (setting === "theme") {
+                applyTheme(value);
+                try { localStorage.setItem("travel-theme", value); } catch { /**/ }
+              } else if (setting === "currency") {
+                setCurrency(value);
+                try { localStorage.setItem("travel-currency", value); } catch { /**/ }
+              } else if (setting === "subtitle_size") {
+                applySubtitleSize(value);
+                try { localStorage.setItem("travel-subtitle-size", value); } catch { /**/ }
+              } else if (setting === "auto_replan") {
+                setAutoReplan(value);
+              }
+              subtitles.push(`Setting "${setting}" updated.`);
+            } else if (type === "submit_form") {
+              // OBJ3 — LLM wants to pre-fill the trip form and start planning.
+              // Always switch to HOME so the user sees the form being filled.
+              if (menu.state.panel !== "HOME") menu.setPanel("HOME");
+              const prefill = payload?.prefill || {};
+              if (Object.keys(prefill).length > 0) {
+                setPendingFormPrefill(prefill);
+              }
+              subtitles.push("Filling in your trip details...");
             }
           },
         });
@@ -832,7 +864,9 @@ function App() {
     return () => window.removeEventListener("pointerdown", onFirstGesture);
   }, [userLocation, requestPermission]);
 
-  // Derive globe arcs and points from the current itinerary + user location
+  // Derive globe arcs and points from the current itinerary + user location.
+  // OBJ6: when on FLIGHTS panel, use the selected option's stops count to
+  // show 1 arc (non-stop) or 2 arcs via a visual midpoint (1-stop).
   const { arcs, points } = useMemo(() => {
     const arcs = [];
     const points = [];
@@ -850,14 +884,45 @@ function App() {
 
     const flight = currentItinerary?.flight;
     if (flight?.from_lat != null && flight?.to_lat != null) {
-      arcs.push({
-        startLat: flight.from_lat,
-        startLng: flight.from_lng,
-        endLat: flight.to_lat,
-        endLng: flight.to_lng,
-        color: ["#00d9ff", "#5eead4"],
-        label: `${flight.from_iata} → ${flight.to_iata}`,
-      });
+      // OBJ6: check which flight option is selected (by listIndex on FLIGHTS panel)
+      const options = flight.options || [];
+      const selIdx = menu.state.panel === "FLIGHTS" ? menu.state.listIndex : -1;
+      const selOpt = selIdx >= 0 ? options[selIdx] : null;
+      const stops = selOpt?.stops ?? 0;
+
+      if (stops >= 1) {
+        // Visual midpoint as approximate layover location (geo midpoint)
+        const midLat = (flight.from_lat + flight.to_lat) / 2;
+        const midLng = (flight.from_lng + flight.to_lng) / 2;
+        arcs.push({
+          startLat: flight.from_lat,
+          startLng: flight.from_lng,
+          endLat: midLat,
+          endLng: midLng,
+          color: ["#00d9ff", "#5eead4"],
+          label: `${flight.from_iata} → layover`,
+        });
+        arcs.push({
+          startLat: midLat,
+          startLng: midLng,
+          endLat: flight.to_lat,
+          endLng: flight.to_lng,
+          color: ["#5eead4", "#00d9ff"],
+          label: `layover → ${flight.to_iata}`,
+        });
+        // Layover pin
+        points.push({ lat: midLat, lng: midLng, size: 0.4, color: "#fbbf24", label: "Layover" });
+      } else {
+        // Non-stop: single arc
+        arcs.push({
+          startLat: flight.from_lat,
+          startLng: flight.from_lng,
+          endLat: flight.to_lat,
+          endLng: flight.to_lng,
+          color: ["#00d9ff", "#5eead4"],
+          label: `${flight.from_iata} → ${flight.to_iata}`,
+        });
+      }
       points.push({
         lat: flight.to_lat,
         lng: flight.to_lng,
@@ -895,7 +960,7 @@ function App() {
     }
 
     return { arcs, points };
-  }, [currentItinerary, userLocation]);
+  }, [currentItinerary, userLocation, menu.state.panel, menu.state.listIndex]);
 
   // Round 10 — when the user switches to HOTELS or DAYS, zoom the globe
   // in toward the destination so the subsequent Leaflet map overlay
@@ -1016,7 +1081,7 @@ function App() {
                 menu.state.panel === "DAYS" ? menu.state.listIndex : 0
               ]?.activities || []
             }
-            activeActivityIdx={-1}
+            activeActivityIdx={activeActivityIdx}
             airport={
               currentItinerary?.flight?.to_lat != null
                 ? {
@@ -1094,6 +1159,11 @@ function App() {
               handleSend(`${field}: ${value}`);
             }}
             rowDispatchRef={activeRowDispatchRef}
+            formPrefill={pendingFormPrefill}
+            onFormPrefilled={(prompt) => {
+              setPendingFormPrefill(null);
+              handleSend(prompt);
+            }}
           />
         )}
         {menu.state.panel === "FLIGHTS" && (
@@ -1290,6 +1360,8 @@ function App() {
               cues.tick?.();
             }}
             useMapLibre={useMapLibre}
+            activeActivityIdx={activeActivityIdx}
+            onActivityChange={setActiveActivityIdx}
             favoriteKeys={favoriteKeys}
             onToggleFavorite={(dayIdx, actIdx) => {
               // Round 19 — toggle a favorite entry keyed by place_id

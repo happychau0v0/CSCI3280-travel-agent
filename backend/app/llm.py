@@ -250,6 +250,12 @@ async def _run_loop(
                 # the frontend can switch panels and focus the field.
                 elif fn_name == "request_input":
                     await on_event("request_input", fn_args)
+                # toggle_setting changes a UI setting immediately.
+                elif fn_name == "toggle_setting":
+                    await on_event("setting_change", fn_args)
+                # submit_trip_form pre-fills the PLAN form and triggers planning.
+                elif fn_name == "submit_trip_form":
+                    await on_event("submit_form", fn_args)
 
             fn = TOOL_DISPATCH.get(fn_name)
             if fn is None:

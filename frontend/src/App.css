@@ -2781,9 +2781,17 @@ li[tabindex]:focus-visible {
   padding-right: 4px;
 }
 
-/* The overlay frame also needs bounds so the body flex can size it */
+/* The overlay frame also needs bounds so the body flex can size it.
+   OBJ4: bump to 90vh and add overflow-y:auto so the overlay itself
+   scrolls on small viewports (e.g. 1024×600). */
 .settings-overlay-frame {
-  max-height: 80vh;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.settings-overlay-list,
+.settings-overlay-detail {
+  max-height: none; /* let the parent frame constrain */
 }
 
 /* PanelHistory — legacy scrolling pane (kept for fallback selectors) */

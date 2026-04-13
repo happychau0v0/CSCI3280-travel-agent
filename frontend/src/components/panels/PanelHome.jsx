@@ -234,6 +234,8 @@ export default function PanelHome({
   onPlan,
   onResolveInput,
   rowDispatchRef,
+  formPrefill = null,
+  onFormPrefilled,
 }) {
   const [form, setForm] = useState(() => loadForm());
   // Per-row refs keyed by field key so we can focus a specific input
@@ -274,6 +276,27 @@ export default function PanelHome({
       }
     }
   }, [pendingInputRequest]);
+
+  // OBJ3 — when the LLM calls submit_trip_form, merge prefill into form
+  // state and then call onFormPrefilled with the built prompt so App.jsx
+  // can fire handleSend automatically.
+  useEffect(() => {
+    if (!formPrefill || Object.keys(formPrefill).length === 0) return;
+    const next = { ...form };
+    if (formPrefill.destination) next.destination = formPrefill.destination;
+    if (formPrefill.origin) next.origin = formPrefill.origin;
+    if (formPrefill.start_date) next.start_date = formPrefill.start_date;
+    if (formPrefill.end_date) next.end_date = formPrefill.end_date;
+    if (formPrefill.transport) next.transport = formPrefill.transport;
+    if (formPrefill.party_size) next.party_size = String(formPrefill.party_size);
+    if (formPrefill.interests) next.interests = formPrefill.interests;
+    setForm(next);
+    saveForm(next);
+    // Build the prompt from the merged form and trigger planning
+    const prompt = buildPrompt(next);
+    onFormPrefilled?.(prompt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formPrefill]);
 
   const update = (key) => (e) => {
     const next = { ...form, [key]: e.target.value };

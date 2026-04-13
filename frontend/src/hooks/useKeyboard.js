@@ -123,17 +123,25 @@ export function useKeyboard({
         // ↑/↓ ALWAYS moves the list cursor on a list-bearing panel,
         // regardless of scope. The meaning is unambiguous, so there's
         // no reason to gate it on scope.
+        // OBJ4: only preventDefault when actually moving (not at boundary)
+        // so native scroll kicks in when the cursor can't move further.
         case "ArrowUp":
           if (PANELS_WITH_LIST.has(state.panel) && listSize > 0) {
-            e.preventDefault();
-            setListIndex(Math.max(0, state.listIndex - 1));
+            if (state.listIndex > 0) {
+              e.preventDefault();
+              setListIndex(state.listIndex - 1);
+            }
+            // at top boundary: let native scroll happen (no preventDefault)
           }
           break;
 
         case "ArrowDown":
           if (PANELS_WITH_LIST.has(state.panel) && listSize > 0) {
-            e.preventDefault();
-            setListIndex(Math.min(listSize - 1, state.listIndex + 1));
+            if (state.listIndex < listSize - 1) {
+              e.preventDefault();
+              setListIndex(state.listIndex + 1);
+            }
+            // at bottom boundary: let native scroll happen (no preventDefault)
           }
           break;
 

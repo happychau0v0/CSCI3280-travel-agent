@@ -308,11 +308,19 @@ export default function PanelDays({
   favoriteKeys = new Set(),
   onToggleFavorite,
   useMapLibre = false,
+  activeActivityIdx: externalActiveIdx = -1,
+  onActivityChange,
 }) {
   const days = itinerary?.days || [];
   const hotelName =
     itinerary?.selected_hotel?.name || itinerary?.hotels?.[0]?.name || null;
-  const [activeActivityIdx, setActiveActivityIdx] = useState(-1);
+  // OBJ5: use lifted state from App.jsx when useMapLibre is active
+  // so the MapView can show only the active leg's 2 pins.
+  const [localActiveActivityIdx, setLocalActiveActivityIdx] = useState(-1);
+  const activeActivityIdx = useMapLibre ? externalActiveIdx : localActiveActivityIdx;
+  const setActiveActivityIdx = useMapLibre
+    ? (idx) => { setLocalActiveActivityIdx(idx); onActivityChange?.(idx); }
+    : setLocalActiveActivityIdx;
   // Add Activity inline form state
   const [addingActivity, setAddingActivity] = useState(false);
   const [addTime, setAddTime] = useState("");

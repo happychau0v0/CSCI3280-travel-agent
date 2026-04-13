@@ -280,19 +280,23 @@ const MapView = forwardRef(function MapView(props, ref) {
   }, []);
 
   // Build GeoJSON for route polylines (DAYS mode — decoded transit routes)
+  // OBJ5: when activeActivityIdx >= 0, only show the active leg's polyline
   const polylinesGeoJSON = useMemo(() => {
     if (mode !== "days") return { type: "FeatureCollection", features: [] };
     const features = [];
-    (activities || []).forEach((a, i) => {
+    const acts = activities || [];
+    const hasActiveIdx = activeActivityIdx >= 0;
+    acts.forEach((a, i) => {
       if (!a.transport_to_next?.polyline) return;
+      // OBJ5: only render the active leg's route
+      if (hasActiveIdx && i !== activeActivityIdx) return;
       const decoded = decodePolyline(a.transport_to_next.polyline);
       if (decoded.length < 2) return;
       // GeoJSON needs [lng, lat] order
       const coords = decoded.map(([lat, lng]) => [lng, lat]);
-      const isActive = activeActivityIdx >= 0 && i === activeActivityIdx;
       features.push({
         type: "Feature",
-        properties: { active: isActive },
+        properties: { active: true },
         geometry: { type: "LineString", coordinates: coords },
       });
     });
@@ -336,21 +340,22 @@ const MapView = forwardRef(function MapView(props, ref) {
         }
       });
     } else if (mode === "days") {
-      (activities || []).forEach((a, i) => {
-        if (a.lat != null && a.lng != null) {
-          let kind = "dim";
-          if (activeActivityIdx >= 0) {
-            if (i === activeActivityIdx) kind = "active";
-            else if (i === activeActivityIdx + 1) kind = "default";
-          } else {
-            kind = "default";
+      const acts = activities || [];
+      const hasActiveIdx = activeActivityIdx >= 0;
+      acts.forEach((a, i) => {
+        if (a.lat == null || a.lng == null) return;
+        // OBJ5: when active leg is selected, show only activity[i] and
+        // activity[i+1]; skip all others to keep the map clean.
+        if (hasActiveIdx) {
+          if (i === activeActivityIdx) {
+            allPoints.push({ lat: a.lat, lng: a.lng, label: String(i + 1), kind: "active" });
+          } else if (i === activeActivityIdx + 1) {
+            allPoints.push({ lat: a.lat, lng: a.lng, label: String(i + 1), kind: "default" });
           }
-          allPoints.push({
-            lat: a.lat,
-            lng: a.lng,
-            label: String(i + 1),
-            kind,
-          });
+          // skip all other points
+        } else {
+          // No selection: show all activities as dim overview
+          allPoints.push({ lat: a.lat, lng: a.lng, label: String(i + 1), kind: "default" });
         }
       });
     }
@@ -404,6 +409,8 @@ const MapView = forwardRef(function MapView(props, ref) {
           ],
           "line-opacity": 0.9,
           "line-blur": 0.5,
+          // OBJ6: smooth fade when arcs are replaced (1-stop ↔ non-stop)
+          "line-opacity-transition": { duration: 300, delay: 0 },
         },
       });
     } else {
@@ -531,19 +538,28 @@ const MapView = forwardRef(function MapView(props, ref) {
     if (reducedMotion) map.jumpTo(opts); else map.flyTo(opts);
   }, [selectedHotelIdx, loaded, mode, hotels, reducedMotion]);
 
-  // MIG4 — Fit map to day activities when switching days or entering DAYS mode
+  // MIG4/OBJ5 — Fit map to the active leg (2 pts) or all activities
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !loaded || mode !== "days") return;
-    const pts = (activities || []).filter((a) => a.lat != null && a.lng != null);
-    if (pts.length < 2) return;
-    const bounds = computeBounds(pts.map((a) => [a.lat, a.lng]));
+    const acts = activities || [];
+    let ptsToFit;
+    if (activeActivityIdx >= 0) {
+      // OBJ5: fit to just the 2 leg pins
+      const from = acts[activeActivityIdx];
+      const to = acts[activeActivityIdx + 1];
+      ptsToFit = [from, to].filter((a) => a && a.lat != null && a.lng != null);
+    } else {
+      ptsToFit = acts.filter((a) => a.lat != null && a.lng != null);
+    }
+    if (ptsToFit.length < 2) return;
+    const bounds = computeBounds(ptsToFit.map((a) => [a.lat, a.lng]));
     if (!bounds) return;
     map.fitBounds(
       [[bounds.minLng, bounds.minLat], [bounds.maxLng, bounds.maxLat]],
       { padding: 80, duration: reducedMotion ? 0 : 1400, essential: true },
     );
-  }, [activities, loaded, mode, reducedMotion]);
+  }, [activities, activeActivityIdx, loaded, mode, reducedMotion]);
 
   // Airport badge (DOM overlay) when airport is distant
   const airportBadge = useMemo(() => {
