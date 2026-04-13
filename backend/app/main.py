@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import chat, geo, itinerary, photo
+from app.routers import chat, geo, itinerary, photo, speech
 
 # ─── Logging setup ──────────────────────────────────────────────────
 # Logs to both stderr (visible in terminal) and backend/logs/app.log
@@ -38,6 +38,7 @@ app.include_router(chat.router)
 app.include_router(itinerary.router)
 app.include_router(photo.router)
 app.include_router(geo.router)
+app.include_router(speech.router)
 
 
 @app.get("/health")

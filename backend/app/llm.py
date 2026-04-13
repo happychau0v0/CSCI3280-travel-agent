@@ -36,6 +36,7 @@ import json
 import logging
 import os
 import re
+import time
 from pathlib import Path
 from typing import AsyncIterator, Awaitable, Callable
 
@@ -145,6 +146,38 @@ def _format_trip_dates(trip_dates: dict | None) -> str:
         "Use them as the start/end of the itinerary and as the date for "
         "search_flights and any date-sensitive lookups):\n- " + line
     )
+
+
+def _map_partial(fn_name: str, fn_args: dict, result: dict) -> dict | None:
+    """Map a completed tool result to a partial_itinerary payload, or return None."""
+    if result.get("error"):
+        return None
+    if fn_name == "search_flights":
+        return {"flight": result}  # already has options, from_lat/lng, to_lat/lng
+    if fn_name == "search_places":
+        places = result.get("places", [])
+        if not places:
+            return None
+        query = (fn_args.get("query") or "").lower()
+        is_hotel = any(k in query for k in
+            ("hotel", "hostel", "resort", "inn", "accommodation", "lodging"))
+        if is_hotel:
+            hotels = [
+                {
+                    "name": p.get("name", ""),
+                    "lat": p.get("lat"),
+                    "lng": p.get("lng"),
+                    "rating": p.get("rating"),
+                    "price_level": p.get("price_level"),
+                    "address": p.get("address", ""),
+                    "photo_url": p.get("photo_url"),
+                    "place_id": p.get("place_id"),
+                    "_preview": True,
+                }
+                for p in places if p.get("lat") is not None
+            ]
+            return {"hotels": hotels} if hotels else None
+    return None
 
 
 EventCallback = Callable[[str, dict], Awaitable[None]]
@@ -273,6 +306,15 @@ async def _run_loop(
             elapsed_ms = int((asyncio.get_event_loop().time() - t0) * 1000)
             logger.info("Tool done: %s — %dms", fn_name, elapsed_ms)
             if on_event is not None:
+                # Emit a partial_itinerary snapshot immediately so the
+                # frontend can show flights/hotels while the LLM is still
+                # generating its closing text.
+                if isinstance(tool_result, dict):
+                    partial = _map_partial(fn_name, fn_args, tool_result)
+                    if partial:
+                        partial["_emitted_at"] = int(time.time() * 1000)
+                        logger.info("Partial itinerary emitted: %s", fn_name)
+                        await on_event("partial_itinerary", partial)
                 await on_event("tool_end", {"name": fn_name, "elapsed_ms": elapsed_ms})
 
             return {
