@@ -55,8 +55,17 @@ TURN 1 — Flights (triggered by "Plan a trip to {destination}...")
   `get_phrasebook(destination)`.
 - Copy the ENTIRE `options` array from search_flights VERBATIM.
   The frontend lists ALL options. Do NOT truncate or pick one.
+- For 1-stop or multi-stop options, fill `stop_cities` with the IATA
+  code(s) of the intermediate airports, e.g. `["BKK"]` for HKG→BKK→NRT.
+  Leave as `[]` for non-stop flights.
+- For ROUND-TRIP trips (where the user specified both outbound and return
+  dates), call `search_flights` TWICE in the same batch: once for the
+  outbound leg and once for the return leg (swapped origin↔destination,
+  return date). Place the outbound results in `flight.options` and the
+  return results in `flight.return_options`. Set `flight.return_date` to
+  the return date string. For ONE-WAY trips, leave `return_options` empty.
 - Emit JSON with: title, origin, destination, local_transport_mode,
-  flight (full options array + coords), phrasebook.
+  flight (full options array + coords + return_options if round-trip), phrasebook.
 - Do NOT include hotels or days — the user hasn't picked a flight yet.
 - Call `navigate_menu("FLIGHTS")` at the very end.
 
@@ -242,6 +251,9 @@ class FlightOption(BaseModel):
     # Round 12 — cabin class the price was computed for.
     seat_class: str | None = None
     seat_class_label: str | None = None
+    # IATA codes of intermediate stop airports, e.g. ["BKK"] for a
+    # HKG→BKK→NRT routing. Empty list for non-stop flights.
+    stop_cities: list[str] = []
 
 
 class AlternateAirport(BaseModel):
@@ -272,6 +284,11 @@ class Flight(BaseModel):
     source: str = "estimator"
     google_flights_url: str | None = None
     options: list[FlightOption] = []
+    # Return leg options — populated when the user is doing a round-trip.
+    # The LLM calls search_flights a second time (swapped origin/destination,
+    # return date) and places the results here.
+    return_options: list[FlightOption] = []
+    return_date: str | None = None
     # Top-level convenience fields populated from the chosen option.
     departure_time: str | None = None
     arrival_time: str | None = None
