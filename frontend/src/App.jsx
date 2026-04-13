@@ -296,6 +296,9 @@ function App() {
   // truncation bug where pre-truncating + editLast=true would drop
   // additional turns).
   const editTurnIdxRef = useRef(null);
+  // Tracks the last tool narration spoken so we don't repeat the same
+  // status line ("Looking up places…") on consecutive calls to the same tool.
+  const lastSpokenToolLabelRef = useRef(null);
   const handleEditTurn = useCallback((idx, text) => {
     if (idx < 0) return;
     editTurnIdxRef.current = idx;
@@ -681,6 +684,7 @@ function App() {
       setCurrentTool(null);
       setToolTimings([]);
       subtitles.clear();
+      lastSpokenToolLabelRef.current = null; // reset dedup on every new request
       const preview = text.length > 60 ? text.slice(0, 57) + "…" : text;
       // Echo the user's own message as a visible subtitle but DO NOT
       // read it back via TTS (R9-A2). `spoken: false` displays the
@@ -704,10 +708,14 @@ function App() {
                 // Push a friendly narration so the user sees progress
                 // in the subtitle bar in addition to the status banner.
                 const label = TOOL_NARRATIONS[tool];
-                // Display tool status in subtitles but don't speak it —
-                // reading "Checking the weather…" on every tool call is
-                // distracting mid-sentence narration.
-                if (label) subtitles.push(label, { spoken: false });
+                if (label) {
+                  // Speak the narration the first time this label appears;
+                  // subsequent identical labels (same tool called again) are
+                  // display-only so the voice doesn't loop "Looking up places…".
+                  const alreadySpoken = lastSpokenToolLabelRef.current === label;
+                  if (!alreadySpoken) lastSpokenToolLabelRef.current = label;
+                  subtitles.push(label, { spoken: !alreadySpoken });
+                }
               }
             } else if (type === "tool_end") {
               // Record per-tool elapsed time for the benchmark display
