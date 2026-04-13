@@ -4,6 +4,34 @@ import { reverseGeocode } from "../api/client";
 const SESSION_KEY = "travel-user-location";
 
 /**
+ * IP-based geolocation fallback for non-HTTPS origins (e.g. Tailscale IPs).
+ * Uses ip-api.com free tier — no key required.
+ * Returns a location object on success, null on failure.
+ */
+async function tryIpGeolocation() {
+  try {
+    const r = await fetch(
+      "https://ip-api.com/json/?fields=status,city,country,lat,lon",
+      { signal: AbortSignal.timeout(5000) },
+    );
+    const data = await r.json();
+    if (data.status === "success" && data.lat != null) {
+      return {
+        lat: data.lat,
+        lng: data.lon,
+        city: data.city || "",
+        country: data.country || "",
+        formatted: data.city ? `${data.city}, ${data.country}` : `${data.lat.toFixed(2)}, ${data.lon.toFixed(2)}`,
+        source: "ip",
+      };
+    }
+  } catch {
+    // network error or timeout — caller will set status "unavailable"
+  }
+  return null;
+}
+
+/**
  * Geolocation hook with reverse-geocoded city name.
  *
  * Returns {location, status, error, requestPermission, setManual} where:
@@ -38,6 +66,15 @@ export function useGeolocation() {
 
   const requestPermission = useCallback(async () => {
     if (!navigator.geolocation) {
+      // No GPS API — likely a non-HTTPS origin (e.g. Tailscale IP).
+      // Fall back to IP-based geolocation so the LIVE card still works.
+      setStatus("requesting");
+      const ipLoc = await tryIpGeolocation();
+      if (ipLoc) {
+        persist(ipLoc);
+        setStatus("granted");
+        return ipLoc;
+      }
       setStatus("unavailable");
       setError(new Error("Geolocation is not supported in this browser."));
       return null;
@@ -77,8 +114,17 @@ export function useGeolocation() {
       setStatus("granted");
       return loc;
     } catch (err) {
-      // 1 = permission denied, 2 = position unavailable, 3 = timeout
+      // 1 = permission denied, 2 = position unavailable, 3 = timeout.
+      // For denied/unavailable, try IP fallback so Tailscale users aren't stuck.
       const code = err?.code;
+      if (code === 1 || code === 2) {
+        const ipLoc = await tryIpGeolocation();
+        if (ipLoc) {
+          persist(ipLoc);
+          setStatus("granted");
+          return ipLoc;
+        }
+      }
       if (code === 1) setStatus("denied");
       else setStatus("unavailable");
       setError(err);
