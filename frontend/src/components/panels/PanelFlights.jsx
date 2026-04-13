@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { formatDisplayPrice } from "../SettingsOverlay";
 
 /**
@@ -12,6 +13,9 @@ import { formatDisplayPrice } from "../SettingsOverlay";
  * Round 14 — currency prop controls the displayed currency, backed
  * by a fixed rate table in SettingsOverlay. Backend always returns
  * HKD; the frontend re-labels.
+ *
+ * Round N — outbound/return tab strip when return_options are present;
+ * stop cities shown in STOPS DETAIL.
  */
 
 function formatDuration(min) {
@@ -59,9 +63,16 @@ export default function PanelFlights({
 }) {
   const formatPrice = (n) => formatDisplayPrice(n, currency);
   const flight = itinerary?.flight;
-  const options = flight?.options || [];
+  const outboundOptions = flight?.options || [];
+  const returnOptions = flight?.return_options || [];
+  const hasReturn = returnOptions.length > 0;
 
-  if (!flight || options.length === 0) {
+  // Tab state — only relevant when return_options are present
+  const [activeTab, setActiveTab] = useState("outbound");
+
+  const options = activeTab === "return" ? returnOptions : outboundOptions;
+
+  if (!flight || outboundOptions.length === 0) {
     return (
       <section className="panel panel-grid panel-flights" aria-label="Flights">
         <div className="panel-grid-empty">
@@ -75,7 +86,9 @@ export default function PanelFlights({
   const selectedIdx = Math.min(Math.max(0, listIndex), options.length - 1);
   const selected = options[selectedIdx];
   const isLive = flight.source === "fast-flights";
-  const picked = itinerary?.selected_flight;
+  const picked = activeTab === "return"
+    ? itinerary?.selected_return_flight
+    : itinerary?.selected_flight;
   const pickedIdx = picked
     ? options.findIndex(
         (o) =>
@@ -83,6 +96,23 @@ export default function PanelFlights({
           (o.label === picked.label && o.airline === picked.airline),
       )
     : -1;
+
+  // Route label swaps for return tab
+  const fromLabel = activeTab === "return"
+    ? (flight.to_city || flight.to_iata)
+    : (flight.from_city || flight.from_iata);
+  const toLabel = activeTab === "return"
+    ? (flight.from_city || flight.from_iata)
+    : (flight.to_city || flight.to_iata);
+  const fromIata = activeTab === "return" ? flight.to_iata : flight.from_iata;
+  const toIata = activeTab === "return" ? flight.from_iata : flight.to_iata;
+  const fromName = activeTab === "return"
+    ? (flight.to_name || `${flight.to_city} Airport`)
+    : (flight.from_name || `${flight.from_city} Airport`);
+  const toName = activeTab === "return"
+    ? (flight.from_name || `${flight.from_city} Airport`)
+    : (flight.to_name || `${flight.to_city} Airport`);
+  const legDate = activeTab === "return" ? (flight.return_date || "—") : (flight.date || "—");
 
   return (
     <section className="panel panel-grid panel-flights" aria-label="Flights">
@@ -114,6 +144,32 @@ export default function PanelFlights({
             </span>
           )}
         </div>
+
+        {/* Outbound / Return tab strip — only when return_options exist */}
+        {hasReturn && (
+          <div className="flight-tab-strip" role="tablist" aria-label="Flight direction">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "outbound"}
+              className={`flight-tab${activeTab === "outbound" ? " active" : ""}`}
+              onClick={() => setActiveTab("outbound")}
+              data-testid="flight-tab-outbound"
+            >
+              ✈ {flight.from_iata} → {flight.to_iata}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "return"}
+              className={`flight-tab${activeTab === "return" ? " active" : ""}`}
+              onClick={() => setActiveTab("return")}
+              data-testid="flight-tab-return"
+            >
+              ✈ {flight.to_iata} → {flight.from_iata}
+            </button>
+          </div>
+        )}
       </header>
 
       {/* LEFT — options list */}
@@ -160,12 +216,12 @@ export default function PanelFlights({
           <>
             {/* Route header */}
             <div className="flight-route-header">
-              <span>{flight.from_city || flight.from_iata}</span>
+              <span>{fromLabel}</span>
               <span className="flight-route-arrow"> → </span>
-              <span>{flight.to_city || flight.to_iata}</span>
+              <span>{toLabel}</span>
             </div>
             <div className="flight-route-meta">
-              {flight.date || "—"} · {formatDuration(selected.duration_min)} · {stopsLabel(selected.stops)}
+              {legDate} · {formatDuration(selected.duration_min)} · {stopsLabel(selected.stops)}
             </div>
 
             {/* Timeline: departure → arrival */}
@@ -174,9 +230,14 @@ export default function PanelFlights({
                 <div className="flight-timeline-time">{selected.departure_time || "—"}</div>
                 <div className="flight-timeline-dot" />
                 <div className="flight-timeline-info">
-                  {flight.from_iata} {flight.from_name || `${flight.from_city} Airport`}
+                  {fromIata} {fromName}
                 </div>
               </div>
+              {selected.stops > 0 && selected.stop_cities?.length > 0 && (
+                <div className="flight-timeline-stops">
+                  via {selected.stop_cities.join(" → ")}
+                </div>
+              )}
               <div className="flight-timeline-line">
                 <div className="flight-timeline-airline">
                   {selected.airline || "—"} · {selected.seat_class_label || "Economy"}
@@ -186,7 +247,7 @@ export default function PanelFlights({
                 <div className="flight-timeline-time">{selected.arrival_time || "—"}</div>
                 <div className="flight-timeline-dot" />
                 <div className="flight-timeline-info">
-                  {flight.to_iata} {flight.to_name || `${flight.to_city} Airport`}
+                  {toIata} {toName}
                 </div>
               </div>
             </div>
@@ -205,12 +266,16 @@ export default function PanelFlights({
             <button
               type="button"
               className="trip-plan-btn"
-              onClick={() => onPick?.(selectedIdx)}
+              onClick={() => onPick?.(selectedIdx, activeTab)}
               disabled={selectedIdx === pickedIdx}
               data-testid="flight-pick-btn"
               style={{ marginTop: 16 }}
             >
-              {selectedIdx === pickedIdx ? "✓ PICKED" : "PICK & FIND HOTELS →"}
+              {selectedIdx === pickedIdx
+                ? "✓ PICKED"
+                : activeTab === "return"
+                  ? "PICK RETURN FLIGHT ✓"
+                  : "PICK & FIND HOTELS →"}
             </button>
 
             {flight.google_flights_url && (
@@ -252,8 +317,10 @@ export default function PanelFlights({
               <>
                 <div className="home-card-label">STOPS DETAIL</div>
                 <div className="home-summary-line">
-                  {selected.stops} {selected.stops === 1 ? "stop" : "stops"} · total{" "}
-                  <strong>{formatDuration(selected.duration_min)}</strong>
+                  {selected.stop_cities?.length > 0
+                    ? <>via <strong>{selected.stop_cities.join(" → ")}</strong> · total <strong>{formatDuration(selected.duration_min)}</strong></>
+                    : <>{selected.stops} {selected.stops === 1 ? "stop" : "stops"} · total <strong>{formatDuration(selected.duration_min)}</strong></>
+                  }
                 </div>
               </>
             )}

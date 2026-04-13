@@ -156,7 +156,12 @@ function buildPrompt(form) {
   const transport = form.transport || "any";
   const party = form.party_size ? `${form.party_size} people` : "1 person";
   const interests = form.interests?.trim() || "general sightseeing";
-  const dateText = start ? ` starting ${start}` : "";
+  const dateText =
+    start && end && start !== end
+      ? ` from ${start} to ${end} (return date: ${end})`
+      : start
+        ? ` starting ${start}`
+        : "";
   const origin = form.origin?.trim() || "my current city";
   const seat = form.seat_class || "economy";
   const seatText = SEAT_CLASS_TEXT[seat] || "economy";

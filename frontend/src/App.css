@@ -35,16 +35,7 @@
   z-index: 50;
 }
 
-/* When MapLibre is active on HOTELS/DAYS panels, the center column
- * is kept as a placeholder but transparent so the background map shows through. */
-.panel-grid-center.maplibre-passthrough {
-  background: transparent;
-  border-color: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  animation: none;
-  pointer-events: none;
-}
+
 
 
 /* ─── Global keyboard focus indicator ─────────────────────── */
@@ -523,6 +514,12 @@ li[tabindex]:focus-visible {
   color: var(--text-dim);
   font-size: 14px;
   font-weight: 500;
+}
+
+/* Preview hotel cards — raw search_places results before LLM enrichment */
+.hotel-card-preview {
+  opacity: 0.72;
+  border-style: dashed !important;
 }
 
 /* Hotel option row with thumb */
@@ -4797,6 +4794,63 @@ body.subtitle-large .subtitle {
   background: rgba(94, 234, 212, 0.15);
   border-color: var(--accent);
   color: var(--accent);
+}
+
+/* Transport mode badge — floats over the DayMiniMap bottom-left */
+.transport-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 600;
+  padding: 5px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  background: rgba(0, 12, 24, 0.88);
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Flight outbound / return tab strip */
+.flight-tab-strip {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.flight-tab {
+  padding: 4px 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.flight-tab:hover {
+  color: var(--text-h);
+  border-color: var(--accent);
+}
+.flight-tab.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(0, 217, 255, 0.08);
+}
+
+/* Stop cities inline in flight timeline */
+.flight-timeline-stops {
+  padding: 3px 8px 3px 36px;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
 }
 
 .day-mini-pin.airport {

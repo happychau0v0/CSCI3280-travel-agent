@@ -31,21 +31,30 @@ import "./App.css";
 
 // Lazy-load the globe so the Three.js bundle doesn't block first paint.
 const GlobeView = lazy(() => import("./components/GlobeView"));
-// Phase 1: Experimental MapLibre-based unified map view (feature-flagged).
-// Enabled via URL `?map=maplibre` OR localStorage `useMapLibre=true`.
-const MapView = lazy(() => import("./components/MapView"));
 
-function useMapLibreFlag() {
-  if (typeof window === "undefined") return false;
-  try {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("map") === "maplibre") return true;
-    if (params.get("map") === "legacy") return false;
-    return localStorage.getItem("useMapLibre") === "true";
-  } catch {
-    return false;
-  }
-}
+// IATA → [lat, lng] for resolving stop cities on the globe.
+// Derived from backend/app/tools/airports.py.
+const IATA_COORDS = {
+  AMS: [52.3105, 4.7683],  ATH: [37.9364, 23.9445],  ATL: [33.6407, -84.4277],
+  AUH: [24.4330, 54.6511], BKK: [13.6900, 100.7501],  BOM: [19.0896, 72.8656],
+  BOS: [42.3656, -71.0096], CDG: [49.0097, 2.5479],   CGK: [-6.1256, 106.6558],
+  CPH: [55.6181, 12.6561], DEL: [28.5562, 77.1000],   DEN: [39.8561, -104.6737],
+  DFW: [32.8998, -97.0403], DOH: [25.2731, 51.6080],  DXB: [25.2532, 55.3657],
+  EWR: [40.6925, -74.1687], FCO: [41.8003, 12.2389],  FRA: [50.0379, 8.5622],
+  GRU: [-23.4356, -46.4731], HEL: [60.3172, 24.9633], HKG: [22.3080, 113.9185],
+  HND: [35.5494, 139.7798], IAD: [38.9531, -77.4565], IAH: [29.9844, -95.3414],
+  ICN: [37.4602, 126.4407], IST: [41.2753, 28.7519],  JFK: [40.6413, -73.7781],
+  KIX: [34.4347, 135.2440], KUL: [2.7456, 101.7099],  LAX: [33.9416, -118.4085],
+  LHR: [51.4700, -0.4543],  LIM: [-12.0219, -77.1143], LIS: [38.7813, -9.1359],
+  MAD: [40.4719, -3.5626],  MEX: [19.4361, -99.0719],  MIA: [25.7959, -80.2870],
+  MNL: [14.5086, 121.0194], MUC: [48.3538, 11.7861],  MXP: [45.6306, 8.7281],
+  NBO: [-1.3192, 36.9278],  NRT: [35.7720, 140.3929],  ORD: [41.9742, -87.9073],
+  OSL: [60.1939, 11.1004],  PEK: [40.0801, 116.5846],  PVG: [31.1443, 121.8083],
+  SEA: [47.4502, -122.3088], SFO: [37.6213, -122.3790], SGN: [10.8188, 106.6519],
+  SIN: [1.3644, 103.9915],  SVO: [55.9726, 37.4146],   SYD: [-33.9399, 151.1753],
+  TPE: [25.0777, 121.2328], VIE: [48.1102, 16.5697],   YVR: [49.1967, -123.1815],
+  YYZ: [43.6777, -79.6248], ZRH: [47.4647, 8.5492],
+};
 
 const STATE_KEY = "travel-chat-state";
 const TRIP_DATES_KEY = "travel-trip-dates";
@@ -158,10 +167,6 @@ function buildHistoryEntry(itinerary, messages) {
 
 function App() {
   const initial = loadState();
-  // Feature flag — set `?map=maplibre` in URL to enable the new MapLibre
-  // unified map view. Default is legacy (react-globe.gl + react-leaflet).
-  const useMapLibre = useMapLibreFlag();
-  const mapViewRef = useRef(null);
   const [messages, setMessages] = useState(initial.messages);
   const [currentItinerary, setCurrentItinerary] = useState(initial.itinerary);
   const [planHistory, setPlanHistory] = useState(() => loadPlanHistory());
@@ -209,8 +214,6 @@ function App() {
   const [pendingInputRequest, _setPendingInputRequest] = useState(null);
   // OBJ3 — LLM can pre-fill the trip form and auto-trigger planning
   const [pendingFormPrefill, setPendingFormPrefill] = useState(null);
-  // OBJ5 — track which activity is active in DAYS panel for the 2-pin map
-  const [activeActivityIdx, setActiveActivityIdx] = useState(-1);
   // Tracks the in-flight done→idle setTimeout so a new request can
   // cancel it before it overwrites the new "working" state (B6).
   const idleTimerRef = useRef(null);
@@ -550,7 +553,6 @@ function App() {
       // the destination. null on HOME/FLIGHTS, {lat, lng, altitude}
       // otherwise.
       globeFocus,
-      mapFocus,
       planHistory,
       undoCount,
       redoCount,
@@ -757,6 +759,30 @@ function App() {
                 setPendingFormPrefill(prefill);
               }
               subtitles.push("Filling in your trip details...");
+            } else if (type === "partial_itinerary") {
+              // Progressive disclosure — show raw tool results before the LLM
+              // finishes generating its closing text. The `done` event's final
+              // itinerary will overwrite these previews seamlessly.
+              setCurrentItinerary((prev) => {
+                const next = { ...(prev || {}) };
+                if (payload.flight) {
+                  next.flight = { ...(prev?.flight || {}), ...payload.flight };
+                }
+                if (payload.hotels) {
+                  // Keep LLM-confirmed hotels (no _preview flag); append fresh previews
+                  const confirmed = (prev?.hotels || []).filter((h) => !h._preview);
+                  const ids = new Set(confirmed.map((h) => h.place_id).filter(Boolean));
+                  const fresh = payload.hotels.filter((h) => !ids.has(h.place_id));
+                  next.hotels = [...confirmed, ...fresh];
+                }
+                return next;
+              });
+              // Early navigate to FLIGHTS as soon as flight options arrive —
+              // don't wait for the LLM's closing text.
+              if (payload.flight?.options?.length > 0 && menu.state.panel === "HOME") {
+                menu.setPanel("FLIGHTS");
+                pendingNavigateRef.current = null;
+              }
             }
           },
         });
@@ -784,7 +810,19 @@ function App() {
               newData.selected_hotel = match || prevSnapshot.selected_hotel || null;
             }
 
-            return { ...prevSnapshot, ...newData };
+            // Turn 1 indicator: flight arrived but no hotels yet. Clear
+            // stale hotels/days/picks from a previous trip so they don't
+            // bleed through into the new plan. Hotels and days will be
+            // populated fresh in Turn 2 and Turn 3 respectively.
+            let base = { ...prevSnapshot };
+            if (newData.flight && !newData.hotels?.length && !newData.days?.length) {
+              delete base.hotels;
+              delete base.days;
+              delete base.selected_hotel;
+              delete base.selected_flight;
+            }
+
+            return { ...base, ...newData };
           });
           cues.chime();
           // Persist to history. Use currentItinerary spread with newData
@@ -900,28 +938,53 @@ function App() {
       const selIdx = menu.state.panel === "FLIGHTS" ? menu.state.listIndex : -1;
       const selOpt = selIdx >= 0 ? options[selIdx] : null;
       const stops = selOpt?.stops ?? 0;
+      const stopCities = selOpt?.stop_cities || [];
 
-      if (stops >= 1) {
-        // Visual midpoint as approximate layover location (geo midpoint)
+      // Resolve stop city IATA codes to coordinates
+      const resolvedStops = stopCities
+        .map((iata) => {
+          const c = IATA_COORDS[iata];
+          return c ? { iata, lat: c[0], lng: c[1] } : null;
+        })
+        .filter(Boolean);
+
+      if (stops >= 1 && resolvedStops.length > 0) {
+        // Multi-segment arcs through actual stop airports
+        const waypoints = [
+          { iata: flight.from_iata, lat: flight.from_lat, lng: flight.from_lng },
+          ...resolvedStops,
+          { iata: flight.to_iata, lat: flight.to_lat, lng: flight.to_lng },
+        ];
+        for (let wi = 0; wi < waypoints.length - 1; wi++) {
+          const from = waypoints[wi];
+          const to = waypoints[wi + 1];
+          arcs.push({
+            startLat: from.lat, startLng: from.lng,
+            endLat: to.lat, endLng: to.lng,
+            color: ["#00d9ff", "#5eead4"],
+            label: `${from.iata} → ${to.iata}`,
+          });
+        }
+        // Layover pins
+        for (const stop of resolvedStops) {
+          points.push({ lat: stop.lat, lng: stop.lng, size: 0.4, color: "#fbbf24", label: `${stop.iata} (layover)` });
+        }
+      } else if (stops >= 1) {
+        // Geometric midpoint fallback when stop IATA not in lookup table
         const midLat = (flight.from_lat + flight.to_lat) / 2;
         const midLng = (flight.from_lng + flight.to_lng) / 2;
         arcs.push({
-          startLat: flight.from_lat,
-          startLng: flight.from_lng,
-          endLat: midLat,
-          endLng: midLng,
+          startLat: flight.from_lat, startLng: flight.from_lng,
+          endLat: midLat, endLng: midLng,
           color: ["#00d9ff", "#5eead4"],
           label: `${flight.from_iata} → layover`,
         });
         arcs.push({
-          startLat: midLat,
-          startLng: midLng,
-          endLat: flight.to_lat,
-          endLng: flight.to_lng,
+          startLat: midLat, startLng: midLng,
+          endLat: flight.to_lat, endLng: flight.to_lng,
           color: ["#5eead4", "#00d9ff"],
           label: `layover → ${flight.to_iata}`,
         });
-        // Layover pin
         points.push({ lat: midLat, lng: midLng, size: 0.4, color: "#fbbf24", label: "Layover" });
       } else {
         // Non-stop: single arc
@@ -934,6 +997,19 @@ function App() {
           label: `${flight.from_iata} → ${flight.to_iata}`,
         });
       }
+
+      // Return arc — gold color to distinguish from outbound
+      if (flight.return_options?.length > 0) {
+        arcs.push({
+          startLat: flight.to_lat,
+          startLng: flight.to_lng,
+          endLat: flight.from_lat,
+          endLng: flight.from_lng,
+          color: ["#fbbf24", "#f59e0b"],
+          label: `${flight.to_iata} → ${flight.from_iata} (return)`,
+        });
+      }
+
       points.push({
         lat: flight.to_lat,
         lng: flight.to_lng,
@@ -995,54 +1071,6 @@ function App() {
     return null;
   }, [menu.state.panel, currentItinerary]);
 
-  // MIG5 — MapLibre focus uses zoom (not altitude). Separate from globeFocus
-  // so GlobeView (legacy) and MapView each get the right coordinate format.
-  const mapFocus = useMemo(() => {
-    const dest = currentItinerary?.flight;
-    if (dest?.to_lat == null || dest?.to_lng == null) return null;
-    if (menu.state.panel === "HOTELS") {
-      return { lat: dest.to_lat, lng: dest.to_lng, zoom: 12 };
-    }
-    if (menu.state.panel === "DAYS") {
-      return { lat: dest.to_lat, lng: dest.to_lng, zoom: 13 };
-    }
-    return null;
-  }, [menu.state.panel, currentItinerary]);
-
-  // MIG3 — Imperative panel-switch flyTo for MapLibre.
-  // Uses the ref (set by useImperativeHandle) with a window.__mapViewHandle
-  // fallback for the lazy-load race: the first render fires this effect before
-  // MapView has mounted and set the ref, so we retry after a short delay.
-  useEffect(() => {
-    if (!useMapLibre) return;
-    const dest = currentItinerary?.flight;
-
-    const doFly = () => {
-      // Prefer the React ref; fall back to the window handle (set in useImperativeHandle)
-      const handle = mapViewRef.current ?? window.__mapViewHandle;
-      if (!handle) return false;
-      if (!dest?.to_lat || !dest?.to_lng) {
-        if (menu.state.panel === "HOME" || menu.state.panel === "FLIGHTS") {
-          handle.resetToGlobe();
-        }
-        return true;
-      }
-      if (menu.state.panel === "HOTELS") {
-        handle.flyTo({ lat: dest.to_lat, lng: dest.to_lng, zoom: 12 });
-      } else if (menu.state.panel === "DAYS") {
-        handle.flyTo({ lat: dest.to_lat, lng: dest.to_lng, zoom: 13 });
-      } else if (menu.state.panel === "HOME" || menu.state.panel === "FLIGHTS") {
-        handle.resetToGlobe();
-      }
-      return true;
-    };
-
-    // Try immediately; if handle not available yet (lazy-load), retry after map boots.
-    if (!doFly()) {
-      const t = setTimeout(doFly, 800);
-      return () => clearTimeout(t);
-    }
-  }, [menu.state.panel, useMapLibre, currentItinerary]);
 
   // F2b: Globe fade-out timeline. When user is on HOTELS/DAYS, set
   // data-landed="true" on the globe canvas after a short delay so the
@@ -1072,47 +1100,15 @@ function App() {
         <ErrorBanner error={error} onDismiss={() => setError(null)} />
       )}
 
-      {/* Background map — MapLibre (?map=maplibre) OR legacy globe */}
+      {/* Background globe */}
       <Suspense fallback={<div className="globe-loading">Loading globe…</div>}>
-        {useMapLibre ? (
-          <MapView
-            ref={mapViewRef}
-            mode={
-              menu.state.panel === "HOTELS" ? "hotels"
-              : menu.state.panel === "DAYS" ? "days"
-              : "globe"
-            }
-            userLocation={userLocation}
-            arcs={arcs}
-            points={points}
-            hotels={currentItinerary?.hotels || []}
-            selectedHotelIdx={menu.state.listIndex}
-            activities={
-              currentItinerary?.days?.[
-                menu.state.panel === "DAYS" ? menu.state.listIndex : 0
-              ]?.activities || []
-            }
-            activeActivityIdx={activeActivityIdx}
-            airport={
-              currentItinerary?.flight?.to_lat != null
-                ? {
-                    lat: currentItinerary.flight.to_lat,
-                    lng: currentItinerary.flight.to_lng,
-                    iata: currentItinerary.flight.to_iata,
-                  }
-                : null
-            }
-            focus={mapFocus}
-          />
-        ) : (
-          <GlobeView
-            userLocation={userLocation}
-            arcs={arcs}
-            points={points}
-            drawerOpen={false}
-            focus={globeFocus}
-          />
-        )}
+        <GlobeView
+          userLocation={userLocation}
+          arcs={arcs}
+          points={points}
+          drawerOpen={false}
+          focus={globeFocus}
+        />
       </Suspense>
 
       {/* Prominent agent-working banner — pinned below the tab strip
@@ -1184,12 +1180,22 @@ function App() {
             listIndex={menu.state.listIndex}
             currency={currency}
             onSelect={selectListItem}
-            onPick={(i) => {
-              const opt = currentItinerary?.flight?.options?.[i];
+            onPick={(i, tab) => {
+              const isReturn = tab === "return";
+              const opts = isReturn
+                ? currentItinerary?.flight?.return_options
+                : currentItinerary?.flight?.options;
+              const opt = opts?.[i];
               if (!opt) return;
               pushPickSnapshot();
-              // Stamp the flight pick locally, then fire Turn 2 so the
-              // LLM searches for hotels near the destination.
+              if (isReturn) {
+                // Save return flight choice — don't navigate to hotels yet
+                setCurrentItinerary({ ...currentItinerary, selected_return_flight: opt });
+                cues.chime();
+                return;
+              }
+              // Stamp the outbound flight pick locally, then fire Turn 2
+              // so the LLM searches for hotels near the destination.
               setCurrentItinerary({ ...currentItinerary, selected_flight: opt });
               cues.chime();
               const label = [
@@ -1218,7 +1224,6 @@ function App() {
             onSelect={selectListItem}
             autoReplan={autoReplan}
             onToggleAutoReplan={toggleAutoReplan}
-            useMapLibre={useMapLibre}
             onPick={(i) => {
               const hotel = currentItinerary?.hotels?.[i];
               if (!hotel) return;
@@ -1371,9 +1376,6 @@ function App() {
               });
               cues.tick?.();
             }}
-            useMapLibre={useMapLibre}
-            activeActivityIdx={activeActivityIdx}
-            onActivityChange={setActiveActivityIdx}
             favoriteKeys={favoriteKeys}
             onToggleFavorite={(dayIdx, actIdx) => {
               // Round 19 — toggle a favorite entry keyed by place_id
