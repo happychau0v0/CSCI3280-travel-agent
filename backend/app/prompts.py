@@ -159,7 +159,7 @@ ALL DAYS (universal rules):
 - Times must be strictly monotonic.
 - Call `get_weather(destination)` at the START of Turn 3 if you don't
   have weather data from conversation history. For EACH day, set the
-  `weather` field: {"condition": "...", "temp_c": N}
+  `weather` field: {"temp": "22°C", "condition": "Partly cloudy", "humidity": 65}
   matching the forecast date. This is REQUIRED — the frontend shows
   weather per day and it breaks when null.
 - Prefer outdoor on sunny days, indoor on rainy (from get_weather).
@@ -193,7 +193,7 @@ TURN 2 example (hotels only — no flight, no days; show 3 to illustrate schema;
 
 TURN 3 example (days only — no flight, no hotels):
 ```json
-{"itinerary": {"selected_hotel": {"name": "Park Hyatt Tokyo", "address": "3-7-1-2 Nishi Shinjuku", "rating": 4.6, "lat": 35.685, "lng": 139.690, "place_id": "ChIJa..."}, "days": [{"day": 1, "date": "2026-05-15", "theme": "Arrival & East Tokyo", "weather": {"condition": "Partly cloudy", "temp_c": 22}, "activities": [{"time": "11:35", "name": "NRT Airport · Arrival", "address": "Narita International Airport", "duration_min": 60, "lat": 35.772, "lng": 140.392}, {"time": "13:30", "name": "Park Hyatt Tokyo", "address": "hotel", "duration_min": 30}, {"time": "14:30", "name": "Senso-ji Temple", "address": "2-3-1 Asakusa", "duration_min": 90, "place_id": "ChIJ...", "lat": 35.714, "lng": 139.796, "photo_url": "/photo/...", "transport_to_next": {"mode": "TRANSIT", "duration": "22 min", "distance": "5.1 km"}}, {"time": "17:00", "name": "Omoide Yokocho", "address": "Nishi Shinjuku", "duration_min": 90, "place_id": "ChIJ...", "lat": 35.693, "lng": 139.698, "photo_url": "/photo/..."}, {"time": "19:00", "name": "Park Hyatt Tokyo", "address": "hotel", "duration_min": 30}]}]}}
+{"itinerary": {"selected_hotel": {"name": "Park Hyatt Tokyo", "address": "3-7-1-2 Nishi Shinjuku", "rating": 4.6, "lat": 35.685, "lng": 139.690, "place_id": "ChIJa..."}, "days": [{"day": 1, "date": "2026-05-15", "theme": "Arrival & East Tokyo", "weather": {"temp": "22°C", "condition": "Partly cloudy", "humidity": 65}, "activities": [{"time": "11:35", "name": "NRT Airport · Arrival", "address": "Narita International Airport", "duration_min": 60, "lat": 35.772, "lng": 140.392}, {"time": "13:30", "name": "Park Hyatt Tokyo", "address": "hotel", "duration_min": 30}, {"time": "14:30", "name": "Senso-ji Temple", "address": "2-3-1 Asakusa", "duration_min": 90, "place_id": "ChIJ...", "lat": 35.714, "lng": 139.796, "photo_url": "/photo/...", "transport_to_next": {"mode": "TRANSIT", "duration": "22 min", "distance": "5.1 km"}}, {"time": "17:00", "name": "Omoide Yokocho", "address": "Nishi Shinjuku", "duration_min": 90, "place_id": "ChIJ...", "lat": 35.693, "lng": 139.698, "photo_url": "/photo/..."}, {"time": "19:00", "name": "Park Hyatt Tokyo", "address": "hotel", "duration_min": 30}]}]}}
 ```
 
 FIELDS PER TURN:

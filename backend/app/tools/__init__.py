@@ -198,7 +198,7 @@ TOOL_DEFINITIONS: list[dict] = [
                 "properties": {
                     "panel": {
                         "type": "string",
-                        "enum": ["HOME", "FLIGHTS", "HOTELS", "DAYS"],
+                        "enum": ["FLIGHTS", "HOTELS", "DAYS"],
                         "description": "The panel to switch to",
                     },
                     "item": {
