@@ -146,10 +146,10 @@ const SUBTITLE_SIZES = ["small", "medium", "large"];
 const LLM_MODEL_STORAGE_KEY = "travel-llm-model";
 
 export const LLM_MODELS = [
-  { id: "grok-4.20-0309-non-reasoning", label: "GROK FAST",        hint: "xAI · quick responses" },
-  { id: "grok-4.20-0309-reasoning",     label: "GROK REASONING",   hint: "xAI · deeper multi-step" },
-  { id: "grok-4.20-multi-agent-0309",   label: "GROK MULTI-AGENT", hint: "xAI · agentic tasks" },
-  { id: "gemini-3.1-pro-preview",       label: "GEMINI 3.1 PRO",   hint: "Google · fallback provider" },
+  { id: "grok-4.20-0309-reasoning",     label: "grok-4.20 Thinking",     hint: "xAI · extended reasoning (default)" },
+  { id: "grok-4.20-0309-non-reasoning", label: "grok-4.20 Non-Reasoning", hint: "xAI · faster, no extended thinking" },
+  { id: "grok-4.20-multi-agent-0309",   label: "grok-4.20 Multi-Agent",   hint: "xAI · agentic tasks" },
+  { id: "gemini-3.1-pro-preview",       label: "Gemini 3.1 Pro Preview",  hint: "Google · fallback provider" },
 ];
 
 export function loadLlmModel() {
@@ -232,6 +232,7 @@ export default function SettingsOverlay({
   onTtsChange,
   onCurrencyChange,
   onLlmModelChange,
+  onThemeChange,
   muted = false,
   onToggleMute,
   onClearAll,
@@ -351,6 +352,7 @@ export default function SettingsOverlay({
         setTheme(next);
         saveTheme(next);
         applyTheme(next);
+        onThemeChange?.(next);
         setSavedFlash(true);
         setTimeout(() => setSavedFlash(false), 600);
       },

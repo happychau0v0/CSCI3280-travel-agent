@@ -3633,6 +3633,15 @@ body.subtitle-large .subtitle {
   border-bottom: 1px solid var(--border);
 }
 
+body.theme-light .tab-strip {
+  background: linear-gradient(
+    180deg,
+    rgba(243, 239, 224, 0.95) 0%,
+    rgba(243, 239, 224, 0.7) 80%,
+    transparent 100%
+  );
+}
+
 .tab {
   display: inline-flex;
   align-items: center;
@@ -3717,6 +3726,15 @@ body.subtitle-large .subtitle {
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.06em;
+}
+
+body.theme-light .footer-hints {
+  background: linear-gradient(
+    0deg,
+    rgba(243, 239, 224, 0.95) 0%,
+    rgba(243, 239, 224, 0.7) 80%,
+    transparent 100%
+  );
 }
 
 .hint {

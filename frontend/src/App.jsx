@@ -14,6 +14,7 @@ import SettingsOverlay, {
   applySubtitleSize,
   loadLlmModel,
 } from "./components/SettingsOverlay";
+
 import HelpOverlay from "./components/HelpOverlay";
 import PrintView from "./components/PrintView";
 import TripChecklist from "./components/TripChecklist";
@@ -266,6 +267,7 @@ function App() {
   const [tts, setTts] = useState(() => loadTts());
   const [currency, setCurrency] = useState(() => loadCurrency());
   const [llmModel, setLlmModel] = useState(() => loadLlmModel());
+  const [theme, setTheme] = useState(() => loadTheme());
   const subtitles = useSubtitleQueue({
     muted,
     rate: tts.rate,
@@ -1150,6 +1152,7 @@ function App() {
           points={points}
           drawerOpen={false}
           focus={globeFocus}
+          theme={theme}
         />
       </Suspense>
 
@@ -1474,6 +1477,7 @@ function App() {
         onTtsChange={setTts}
         onCurrencyChange={setCurrency}
         onLlmModelChange={setLlmModel}
+        onThemeChange={setTheme}
         muted={muted}
         onToggleMute={() => setMuted((m) => !m)}
         onClearAll={handleClearAll}

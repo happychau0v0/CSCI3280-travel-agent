@@ -2,6 +2,21 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Globe from "react-globe.gl";
 import * as THREE from "three";
 
+// Derive globe palette from the current theme so light mode looks natural.
+function buildGlobeMaterial(theme) {
+  const mat = new THREE.MeshPhongMaterial();
+  if (theme === "light") {
+    mat.color.set(0xddd5b8);   // warm sand — matches the cream body background
+    mat.specular.set(0x8ab4b0);
+    mat.shininess = 12;
+  } else {
+    mat.color.set(0x0a1525);   // deep navy
+    mat.specular.set(0x224466);
+    mat.shininess = 8;
+  }
+  return mat;
+}
+
 /**
  * Full-bleed dark globe rendered with react-globe.gl.
  *
@@ -25,10 +40,13 @@ export default function GlobeView({
   points = [],
   drawerOpen = false,
   focus = null,
+  theme = "dark",
 }) {
   const globeRef = useRef(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [countries, setCountries] = useState({ features: [] });
+
+  const globeMaterial = useMemo(() => buildGlobeMaterial(theme), [theme]);
 
   // Track viewport for the globe canvas
   useEffect(() => {
@@ -97,6 +115,13 @@ export default function GlobeView({
       scene.userData.starfield = stars;
     }
   }, [countries]);
+
+  // Show/hide starfield based on theme — stars make no sense on a cream background.
+  useEffect(() => {
+    const scene = globeRef.current?.scene?.();
+    if (!scene?.userData.starfield) return;
+    scene.userData.starfield.material.opacity = theme === "light" ? 0 : 0.65;
+  }, [theme, countries]); // re-run after countries loads (which is when stars are added)
 
   // Fly to user location on first lock
   useEffect(() => {
@@ -173,15 +198,16 @@ export default function GlobeView({
         height={size.h}
         backgroundColor="rgba(0,0,0,0)"
         globeImageUrl={null}
+        globeMaterial={globeMaterial}
         showAtmosphere={true}
-        atmosphereColor="#4cc9f0"
+        atmosphereColor={theme === "light" ? "#2bbfb0" : "#4cc9f0"}
         atmosphereAltitude={0.25}
         // Hexagonal country polygons — the dot-matrix look
         hexPolygonsData={countries.features}
         hexPolygonResolution={3}
         hexPolygonMargin={0.35}
         hexPolygonUseDots={true}
-        hexPolygonColor={() => "rgba(0, 217, 255, 0.75)"}
+        hexPolygonColor={() => theme === "light" ? "rgba(26, 155, 143, 0.9)" : "rgba(0, 217, 255, 0.75)"}
         // Arcs (flight paths)
         arcsData={arcs}
         arcStartLat={(d) => d.startLat}

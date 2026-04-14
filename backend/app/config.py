@@ -8,9 +8,9 @@ load_dotenv()
 XAI_API_KEY = os.getenv("XAI_API_KEY", "")
 XAI_BASE_URL = "https://api.x.ai/v1"
 
-# Active model — defaults to grok-4.20 non-reasoning (fast, cost-efficient)
-# Other options: grok-4.20-0309-reasoning, grok-4.20-multi-agent-0309
-LLM_MODEL = os.getenv("LLM_MODEL", "grok-4.20-0309-non-reasoning")
+# Active model — defaults to grok-4.20 reasoning (extended thinking, best quality)
+# Other options: grok-4.20-0309-non-reasoning (faster), grok-4.20-multi-agent-0309
+LLM_MODEL = os.getenv("LLM_MODEL", "grok-4.20-0309-reasoning")
 
 # Fallback model used when xAI is down (outage) or geo-restricted.
 # Points to Gemini on Google's OpenAI-compatible endpoint — different
