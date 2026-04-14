@@ -47,6 +47,9 @@ class Case:
     forbid_tools: set[str] = field(default_factory=set)   # none of these
     expect_itinerary: bool = False
     expect_partial: bool = False
+    # "plan" prompts are scored on all dimensions (days, hotels, coords, descriptions).
+    # "search" prompts only expect flights + phrasebook so the max meaningful score is ~25.
+    prompt_type: str = "plan"
 
 
 CASES = [
@@ -67,6 +70,7 @@ CASES = [
         prompt="Search flights from Hong Kong to Tokyo for 2026-05-10.",
         expect_tools={"search_flights"},
         expect_partial=True,
+        prompt_type="search",  # correctly responds with flights only, not a full plan
     ),
     Case(
         label="3day-plan",
@@ -121,21 +125,39 @@ async def fetch_full_done(client: httpx.AsyncClient, prompt: str) -> dict | None
     return None
 
 
-def score_itinerary(itin: dict | None) -> tuple[int, list[str]]:
-    """Return (0-100 completeness score, list of features present)."""
+def score_itinerary(itin: dict | None, prompt_type: str = "plan") -> tuple[int, list[str]]:
+    """Return (0-100 completeness score, list of features present).
+
+    Scoring dimensions:
+      search prompts (prompt_type="search"):
+        flights (≤20) + phrasebook (5) = 25 max
+      plan prompts (prompt_type="plan"):
+        days (≤20) + flights (≤20) + return (5) + hotels (≤15) +
+        phrasebook (5) + coords (≤20) + descriptions (≤15) = 100 max
+    """
     if not isinstance(itin, dict):
         return 0, []
     features = []
     score = 0
-    days = itin.get("days") or []
-    if days:
-        features.append(f"{len(days)}d")
-        score += min(20, len(days) * 5)
+
     flight = itin.get("flight") or {}
     opts = flight.get("options") or []
     if opts:
         features.append(f"{len(opts)} flights")
         score += min(20, len(opts) * 3)
+    if itin.get("phrasebook"):
+        features.append("phrasebook")
+        score += 5
+
+    if prompt_type == "search":
+        # Flight-search prompts only reasonably include flights + phrasebook
+        return min(25, score), features
+
+    # Plan-only dimensions below
+    days = itin.get("days") or []
+    if days:
+        features.append(f"{len(days)}d")
+        score += min(20, len(days) * 5)
     if flight.get("return_options"):
         features.append("rt")
         score += 5
@@ -143,10 +165,8 @@ def score_itinerary(itin: dict | None) -> tuple[int, list[str]]:
     if hotels:
         features.append(f"{len(hotels)} hotels")
         score += min(15, len(hotels) * 2)
-    if itin.get("phrasebook"):
-        features.append("phrasebook")
-        score += 5
-    # activity coords coverage
+
+    # Activity coord coverage (≤20 pts)
     total_acts = sum(len(d.get("activities", []) or []) for d in days)
     coord_acts = sum(
         1 for d in days for a in (d.get("activities") or [])
@@ -156,6 +176,17 @@ def score_itinerary(itin: dict | None) -> tuple[int, list[str]]:
         coord_pct = int(coord_acts * 100 / total_acts)
         features.append(f"{coord_pct}% coords")
         score += coord_pct // 5
+
+    # Activity description coverage (≤15 pts) — rewards real Places data
+    desc_acts = sum(
+        1 for d in days for a in (d.get("activities") or [])
+        if a.get("description") and len(a["description"]) > 20
+    )
+    if total_acts:
+        desc_pct = int(desc_acts * 100 / total_acts)
+        features.append(f"{desc_pct}% descs")
+        score += min(15, desc_acts * 3)
+
     return min(100, score), features
 
 
@@ -238,7 +269,7 @@ async def run_model(model: str) -> list[dict]:
             done_payload = await fetch_full_done(client, case.prompt)
             itin = (done_payload or {}).get("itinerary")
             reply_text = (done_payload or {}).get("reply", "") or ""
-            itin_score, features = score_itinerary(itin)
+            itin_score, features = score_itinerary(itin, prompt_type=case.prompt_type)
 
             itin_ok = case.expect_itinerary == bool(itin)
             accuracy_pass = (not missing) and (not forbidden_hit) and itin_ok and partial_ok
@@ -246,6 +277,7 @@ async def run_model(model: str) -> list[dict]:
             row = {
                 "case": case.label,
                 "model": model,
+                "prompt_type": case.prompt_type,
                 **{k: r.get(k) for k in ("ttfb_ms", "first_tool_start_ms",
                                           "first_partial_ms", "done_ms",
                                           "tool_rounds")},
@@ -324,10 +356,10 @@ def print_table(all_results: dict[str, list[dict]]):
          lambda rows: str(sum(r.get("tool_count", 0) or 0 for r in rows))),
         ("accuracy passes",
          lambda rows: f"{sum(1 for r in rows if r.get('accuracy_pass'))}/{len(rows)}"),
-        ("avg itin score (where expected)",
+        ("avg itin score (plan prompts)",
          lambda rows: (
-             f"{sum(r.get('itin_score', 0) or 0 for r in rows if r.get('expected_itinerary')) // max(1, sum(1 for r in rows if r.get('expected_itinerary')))}"
-             if any(r.get("expected_itinerary") for r in rows) else "—")),
+             f"{sum(r.get('itin_score', 0) or 0 for r in rows if r.get('prompt_type') == 'plan' and r.get('expected_itinerary')) // max(1, sum(1 for r in rows if r.get('prompt_type') == 'plan' and r.get('expected_itinerary')))}"
+             if any(r.get("prompt_type") == "plan" and r.get("expected_itinerary") for r in rows) else "—")),
         ("errors",
          lambda rows: str(sum(1 for r in rows if r.get("error")))),
     ]:

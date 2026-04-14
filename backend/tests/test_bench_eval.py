@@ -1,13 +1,94 @@
-"""Tests for bench_eval mode — collapses multi-turn flow into one response."""
+"""Tests for bench_eval mode and bench scorer."""
 import json
+import sys
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch, AsyncMock
 
 import pytest
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+from bench_models import score_itinerary  # noqa: E402
+
 from app import llm
 from app.llm import chat, _run_loop
 from app.prompts import BENCH_EVAL_ADDENDUM
+
+# ─── scorer tests ────────────────────────────────────────────────────────────
+
+
+def test_scorer_search_prompt_caps_at_25():
+    """flight-search prompt_type='search' should max out at 25 points."""
+    itin = {
+        "flight": {"options": [{"label": f"F{i}"} for i in range(5)]},
+        "phrasebook": {"language": "Japanese", "phrases": []},
+        # days/hotels should be ignored for search prompts
+        "days": [{"day": 1, "activities": [{"lat": 35.0, "lng": 139.0, "description": "x" * 30}]}],
+        "hotels": [{"name": "H1"}] * 5,
+    }
+    score, features = score_itinerary(itin, prompt_type="search")
+    assert score <= 25, f"search prompt capped at 25, got {score}"
+    assert any("flights" in f for f in features)
+    assert "phrasebook" in features
+    # plan-only features must not appear
+    assert not any("d" in f and f[0].isdigit() for f in features), "days should not be in search features"
+
+
+def test_scorer_plan_prompt_includes_description_coverage():
+    """plan prompt with activity descriptions should earn description pts."""
+    itin = {
+        "flight": {"options": [{"label": "F1"}]},
+        "days": [{"day": 1, "activities": [
+            {"lat": 35.0, "lng": 139.0, "description": "Ancient Buddhist temple in Asakusa."},
+            {"lat": 35.1, "lng": 139.1, "description": ""},  # no desc
+        ]}],
+        "hotels": [],
+        "phrasebook": None,
+    }
+    score_with_desc, features_with_desc = score_itinerary(itin, prompt_type="plan")
+    # Remove description from one activity and verify score drops
+    itin_no_desc = {**itin, "days": [{"day": 1, "activities": [
+        {"lat": 35.0, "lng": 139.0},
+        {"lat": 35.1, "lng": 139.1},
+    ]}]}
+    score_no_desc, _ = score_itinerary(itin_no_desc, prompt_type="plan")
+    assert score_with_desc > score_no_desc, (
+        f"descriptions should add score: {score_with_desc} <= {score_no_desc}"
+    )
+    assert any("descs" in f for f in features_with_desc), "description feature tag missing"
+
+
+def test_scorer_plan_prompt_can_reach_100():
+    """A fully populated plan itinerary should score 100."""
+    days = [
+        {
+            "day": i + 1,
+            "activities": [
+                {
+                    "lat": 35.0 + i * 0.1,
+                    "lng": 139.0 + i * 0.1,
+                    "description": "This is a real description from Google Places API.",
+                }
+                for _ in range(3)
+            ],
+        }
+        for i in range(4)
+    ]
+    itin = {
+        "flight": {
+            "options": [{"label": f"F{i}", "price_low": 1000} for i in range(7)],
+            "return_options": [{"label": "R1"}],
+        },
+        "hotels": [{"name": f"H{i}", "place_id": f"p{i}"} for i in range(8)],
+        "days": days,
+        "phrasebook": {"language": "Japanese", "phrases": ["hello", "thanks"]},
+    }
+    score, features = score_itinerary(itin, prompt_type="plan")
+    assert score == 100, f"fully populated plan should score 100, got {score} with {features}"
+
+
+# ─── bench_eval tests ─────────────────────────────────────────────────────────
+
 
 MOCK_FULL_ITIN = {
     "itinerary": {
