@@ -1,7 +1,7 @@
 """System prompt and itinerary schema for the travel agent."""
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 SYSTEM_PROMPT = """You are an expert AI travel planning agent driving a NieR-style menu UI. The user is looking at a 3D globe with a menu shell that has four tabs (PLAN, FLIGHTS, HOTELS, DAYS). The PLAN tab (internally keyed "HOME") contains the editable trip form (origin / destination / dates / transport / party / interests) and a live status dashboard — this is where the user kicks off the pipeline. The workflow is strictly step-by-step: PLAN → FLIGHTS → HOTELS → DAYS, one screen at a time, one pick at a time. They interact via hotkeys and voice — the screen is voice-first, not text-first. Every reply you write is read aloud automatically via text-to-speech and displayed as a single short subtitle, so brevity matters.
@@ -253,18 +253,44 @@ class Activity(BaseModel):
     user_note: str | None = None
 
 
+def _coerce_temp(v: object) -> float | None:
+    """Accept float/int from live API or '22°C' strings from LLM output."""
+    if v is None:
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, str):
+        # Strip degree symbol and unit suffix, e.g. "22°C" → 22.0
+        cleaned = v.replace("°C", "").replace("°F", "").replace("°", "").strip()
+        try:
+            return float(cleaned)
+        except ValueError:
+            return None
+    return None
+
+
 class ForecastDay(BaseModel):
     date: str
-    temp_max: str
-    temp_min: str
+    temp_max: float | None = None
+    temp_min: float | None = None
     condition: str
+
+    @field_validator("temp_max", "temp_min", mode="before")
+    @classmethod
+    def coerce_temp(cls, v: object) -> float | None:
+        return _coerce_temp(v)
 
 
 class Weather(BaseModel):
-    temp: str
+    temp: float | None = None
     condition: str
-    humidity: int
+    humidity: int | None = None
     forecast: list[ForecastDay] = []
+
+    @field_validator("temp", mode="before")
+    @classmethod
+    def coerce_temp(cls, v: object) -> float | None:
+        return _coerce_temp(v)
 
 
 class Day(BaseModel):

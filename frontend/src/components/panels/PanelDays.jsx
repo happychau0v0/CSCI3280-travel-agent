@@ -24,15 +24,21 @@ const WEATHER_ICONS = {
 
 function weatherIcon(weather) {
   if (!weather) return null;
-  const key = (weather.icon || "").toLowerCase();
-  return WEATHER_ICONS[key] || "🌡️";
+  const key = (weather.condition || "").toLowerCase();
+  if (/sun|clear/.test(key)) return WEATHER_ICONS["sunny"];
+  if (/partly|partial/.test(key)) return WEATHER_ICONS["partly-cloudy"];
+  if (/cloud|overcast/.test(key)) return WEATHER_ICONS["cloudy"];
+  if (/rain|drizzle|shower/.test(key)) return WEATHER_ICONS["rainy"];
+  if (/snow|blizzard/.test(key)) return WEATHER_ICONS["snowy"];
+  if (/storm|thunder/.test(key)) return WEATHER_ICONS["stormy"];
+  return "🌡️";
 }
 
 // Round 18 — heuristic check: is the weather likely to make outdoor
 // activities unpleasant? Returns "rainy" | "snowy" | "stormy" | null.
 function badOutdoorWeather(weather) {
   if (!weather) return null;
-  const key = (weather.icon || weather.condition || "").toLowerCase();
+  const key = (weather.condition || "").toLowerCase();
   if (/rain/.test(key)) return "rainy";
   if (/snow/.test(key)) return "snowy";
   if (/storm|thunder/.test(key)) return "stormy";
@@ -407,8 +413,8 @@ export default function PanelDays({
               {" · "}
               <span>{weatherIcon(selected.weather)}</span>{" "}
               {selected.weather.condition}
-              {selected.weather.temp_c != null && (
-                <> · {Math.round(selected.weather.temp_c)}°C</>
+              {selected.weather.temp != null && (
+                <> · {Math.round(selected.weather.temp)}°C</>
               )}
             </>
           )}
@@ -462,9 +468,9 @@ export default function PanelDays({
                 <span className="day-forecast-icon">
                   {d.weather ? weatherIcon(d.weather) : "—"}
                 </span>
-                {d.weather?.temp_c != null && (
+                {d.weather?.temp != null && (
                   <span className="day-forecast-temp">
-                    {Math.round(d.weather.temp_c)}°
+                    {Math.round(d.weather.temp)}°
                   </span>
                 )}
               </button>
@@ -495,7 +501,7 @@ export default function PanelDays({
               <span className="panel-list-value">{day.theme || "—"}</span>
               <span className="day-option-meta">
                 {(day.activities || []).length} stops
-                {day.weather?.icon && <> · {weatherIcon(day.weather)}</>}
+                {day.weather?.condition && <> · {weatherIcon(day.weather)}</>}
               </span>
               {onRemoveDay && days.length > 1 && (
                 <button

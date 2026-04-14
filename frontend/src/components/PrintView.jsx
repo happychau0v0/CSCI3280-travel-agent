@@ -108,7 +108,7 @@ export default function PrintView({ open, itinerary, currency = "HKD", onClose }
                   {day.weather?.condition && (
                     <p className="print-weather">
                       {day.weather.condition}
-                      {day.weather.temp_c != null && ` · ${Math.round(day.weather.temp_c)}°C`}
+                      {day.weather.temp != null && ` · ${Math.round(day.weather.temp)}°C`}
                     </p>
                   )}
                   <ol className="print-activities">
