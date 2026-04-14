@@ -44,7 +44,7 @@ import httpx
 import openai
 from openai import AsyncOpenAI
 
-from app.config import FALLBACK_LLM_MODEL, LLM_MODEL, XAI_API_KEY, XAI_BASE_URL, check_key
+from app.config import FALLBACK_LLM_MODEL, LLM_MODEL, PRUNE_KEEP_ROUNDS, XAI_API_KEY, XAI_BASE_URL, check_key
 from app.prompts import BENCH_EVAL_ADDENDUM, SYSTEM_PROMPT
 from app.tools import TOOL_DEFINITIONS, TOOL_DISPATCH, ToolUnavailableError
 
@@ -379,7 +379,7 @@ async def _run_loop(
 
         tool_results = await asyncio.gather(*(_run_one(tc) for tc in msg.tool_calls))
         full_messages.extend(tool_results)
-        full_messages = _prune_tool_results(full_messages, keep_recent_rounds=2)
+        full_messages = _prune_tool_results(full_messages, keep_recent_rounds=PRUNE_KEEP_ROUNDS)
     else:
         logger.warning("Hit MAX_TOOL_ROUNDS=%d without final reply", MAX_TOOL_ROUNDS)
 

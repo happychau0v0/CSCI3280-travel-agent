@@ -13,6 +13,12 @@ XAI_BASE_URL = "https://api.x.ai/v1"
 LLM_MODEL = os.getenv("LLM_MODEL", "grok-4.20-0309-non-reasoning")
 FALLBACK_LLM_MODEL = os.getenv("FALLBACK_LLM_MODEL", "grok-4.20-0309-non-reasoning")
 
+# Context pruning: how many recent tool rounds to keep in full.
+# Reasoning models need more historical context (geocode + flight data referenced
+# in later rounds) so they get 3; non-reasoning batches aggressively and only needs 2.
+_model_lower = (LLM_MODEL or "").lower()
+PRUNE_KEEP_ROUNDS: int = 3 if ("reasoning" in _model_lower and "non-reasoning" not in _model_lower) else 2
+
 # OpenRouter kept for reference — not used by default (account banned)
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"

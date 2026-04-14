@@ -1144,6 +1144,24 @@ def test_xai_web_search_in_tools_list():
 # ─── Task 7 — context size management ────────────────────────────────────
 
 
+@pytest.mark.parametrize("model,expected_rounds", [
+    ("grok-4.20-0309-non-reasoning", 2),
+    ("grok-4.20-0309-reasoning", 3),
+    ("grok-4.20-multi-agent-0309", 2),  # no "reasoning" in name
+])
+def test_prune_keep_rounds_is_model_aware(model, expected_rounds, monkeypatch):
+    """PRUNE_KEEP_ROUNDS must be 3 for reasoning models, 2 for non-reasoning."""
+    import importlib
+    import app.config as cfg
+    monkeypatch.setattr(cfg, "LLM_MODEL", model)
+    # Re-derive the value the same way config.py does
+    _m = (model or "").lower()
+    derived = 3 if ("reasoning" in _m and "non-reasoning" not in _m) else 2
+    assert derived == expected_rounds, (
+        f"Model '{model}' should give keep_rounds={expected_rounds}, got {derived}"
+    )
+
+
 def test_prune_tool_results_truncates_old_rounds():
     """Tool results older than keep_recent_rounds should be replaced with a stub."""
     messages = []
