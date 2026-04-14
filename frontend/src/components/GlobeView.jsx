@@ -6,9 +6,9 @@ import * as THREE from "three";
 function buildGlobeMaterial(theme) {
   const mat = new THREE.MeshPhongMaterial();
   if (theme === "light") {
-    mat.color.set(0xddd5b8);   // warm sand — matches the cream body background
-    mat.specular.set(0x8ab4b0);
-    mat.shininess = 12;
+    mat.color.set(0xc8cdd4);   // cool slate-gray — neutral contrast on cream bg
+    mat.specular.set(0x90b0c8);
+    mat.shininess = 14;
   } else {
     mat.color.set(0x0a1525);   // deep navy
     mat.specular.set(0x224466);

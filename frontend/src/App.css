@@ -3737,6 +3737,63 @@ body.theme-light .footer-hints {
   );
 }
 
+/* ─── Light theme: overlay & input overrides ─────────────────────────── */
+
+/* Overlay frames sit on a dark dim scrim. var(--bg-glass) is semi-transparent
+   so the scrim bleeds through and makes them look dark. Use opaque elevated
+   background instead. */
+body.theme-light .history-overlay-frame,
+body.theme-light .settings-overlay-frame {
+  background: var(--bg-elevated);
+  box-shadow: 0 0 48px var(--accent-glow), 0 0 0 1px var(--accent-border);
+}
+
+body.theme-light .history-overlay-header {
+  background: var(--accent-bg);
+}
+
+/* kbd chips inside history/settings headers: white-6% is invisible on cream */
+body.theme-light .history-overlay-meta kbd {
+  background: rgba(38, 29, 10, 0.08);
+  border-color: var(--border-strong);
+  color: var(--text-h);
+}
+
+/* help, checklist, favorites overlays */
+body.theme-light .help-overlay,
+body.theme-light .trip-checklist,
+body.theme-light .favorites-overlay {
+  background: var(--bg-elevated);
+}
+
+/* Input fields — rgba(0,0,0,0.3) looks muddy on cream */
+body.theme-light .panel-input {
+  background: rgba(38, 29, 10, 0.06);
+  color: var(--text-h);
+}
+
+/* <select> has color-scheme: dark hardcoded which forces dark native chrome */
+body.theme-light select.panel-input {
+  color-scheme: light;
+}
+
+body.theme-light .chat-popover input[type="text"] {
+  background: rgba(38, 29, 10, 0.06);
+}
+
+/* Scrollbar tracks inside overlays (hardcoded rgba black) */
+body.theme-light .history-overlay-scroll {
+  scrollbar-color: var(--accent) rgba(38, 29, 10, 0.12);
+}
+
+body.theme-light .history-overlay-scroll::-webkit-scrollbar-track {
+  background: rgba(38, 29, 10, 0.08);
+}
+
+body.theme-light .history-overlay-scroll::-webkit-scrollbar-thumb {
+  background: var(--accent-border);
+}
+
 .hint {
   display: inline-flex;
   align-items: center;
