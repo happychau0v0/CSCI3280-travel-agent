@@ -259,7 +259,10 @@ async def _run_loop(
     (``"tool_start"``) and after it finishes (``"tool_end"``). Pass None to
     disable streaming.
     """
-    client = _get_client()
+    # Pick the right client for whichever model is active — Gemini models use
+    # the Gemini client; everything else uses the xAI client.
+    active_model = preferred_model or LLM_MODEL
+    client = _get_fallback_client() if active_model.startswith("gemini") else _get_client()
 
     # User preferences and live location are injected as addenda to the system
     # prompt rather than separate messages — this keeps them visible to the
@@ -276,11 +279,6 @@ async def _run_loop(
     full_messages: list[dict] = [{"role": "system", "content": system_content}] + list(messages)
     tool_calls_made: list[str] = []
     last_text = ""
-    # Start with the configured primary model. If the first call fails due to
-    # a geo-restriction (e.g. grok-4.20 is US-only; the backend is in HK),
-    # automatically retry round 0 with the fallback model so friends accessing
-    # via Tailscale don't need a separate VPN to use the LLM.
-    active_model = preferred_model or LLM_MODEL
 
     for round_idx in range(MAX_TOOL_ROUNDS):
         # Each iteration is a full chat completion. The model decides whether
@@ -299,7 +297,7 @@ async def _run_loop(
             # Any error on later rounds re-raises — we don't mid-stream switch
             # providers since tool results are already in the message history.
             is_first_round = round_idx == 0
-            already_on_fallback = active_model == FALLBACK_LLM_MODEL
+            already_on_fallback = active_model.startswith("gemini")
             should_fallback = is_first_round and not already_on_fallback and (
                 _is_provider_outage(exc) or _is_region_error(exc)
             )
