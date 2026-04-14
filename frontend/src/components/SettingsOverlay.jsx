@@ -146,8 +146,8 @@ const SUBTITLE_SIZES = ["small", "medium", "large"];
 const LLM_MODEL_STORAGE_KEY = "travel-llm-model";
 
 export const LLM_MODELS = [
-  { id: "grok-4.20-0309-reasoning",     label: "grok-4.20 Thinking",     hint: "xAI · extended reasoning (default)" },
-  { id: "grok-4.20-0309-non-reasoning", label: "grok-4.20 Non-Reasoning", hint: "xAI · faster, no extended thinking" },
+  { id: "grok-4.20-0309-non-reasoning", label: "grok-4.20 Non-Reasoning", hint: "xAI · fast (~3-5 s/round) — default" },
+  { id: "grok-4.20-0309-reasoning",     label: "grok-4.20 Thinking",      hint: "xAI · extended reasoning (~30-60 s/round)" },
   { id: "grok-4.20-multi-agent-0309",   label: "grok-4.20 Multi-Agent",   hint: "xAI · agentic tasks" },
   { id: "gemini-3.1-pro-preview",       label: "Gemini 3.1 Pro Preview",  hint: "Google · fallback provider" },
 ];
