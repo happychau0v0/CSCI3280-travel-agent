@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # Restart both backend and frontend dev servers.
 #
-# The backend (uvicorn) inherits the shell's proxy env vars so that
-# OpenRouter LLM calls route through the local Clash/Shadowsocks proxy
-# (needed for geo-restricted models like grok-4.20 from outside the US).
-# Google Maps tool clients all use trust_env=False so they bypass the
-# proxy and hit Google directly — no 401s from fast-flights.
-#
-# The frontend (Vite) is started with proxy stripped because it only
-# serves static assets and doesn't make outbound network calls.
+# Both backend and frontend start with proxy env stripped:
+#   - xAI (api.x.ai) is directly reachable from HK — no proxy needed
+#   - Google Maps tool clients already use trust_env=False
+#   - fast-flights uses primp with direct HTTP
+#   - Vite only serves static assets
+# Keeping the proxy in-process routed LLM calls through Clash and added
+# latency / hang risk when the proxy was slow.
 #
 # Usage:   ./scripts/restart.sh
 # Options:
@@ -63,9 +62,9 @@ restart_backend() {
     done
   fi
 
-  echo "→ starting uvicorn on ${HOST}:${BACKEND_PORT}${RELOAD_FLAG:+ with --reload}, proxy env preserved for LLM"
+  echo "→ starting uvicorn on ${HOST}:${BACKEND_PORT}${RELOAD_FLAG:+ with --reload}, proxy env stripped (xAI + Google both direct)"
 
-  nohup \
+  nohup "${NO_PROXY_ENV[@]}" \
     .venv/bin/uvicorn app.main:app \
       --host "$HOST" \
       --port "$BACKEND_PORT" \
