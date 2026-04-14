@@ -11,7 +11,13 @@ XAI_BASE_URL = "https://api.x.ai/v1"
 # Active model — defaults to grok-4.20 non-reasoning (fast, cost-efficient)
 # Other options: grok-4.20-0309-reasoning, grok-4.20-multi-agent-0309
 LLM_MODEL = os.getenv("LLM_MODEL", "grok-4.20-0309-non-reasoning")
-FALLBACK_LLM_MODEL = os.getenv("FALLBACK_LLM_MODEL", "grok-4.20-0309-non-reasoning")
+
+# Fallback model used when xAI is down (outage) or geo-restricted.
+# Points to Gemini on Google's OpenAI-compatible endpoint — different
+# provider entirely so it stays up when xAI is having an outage.
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+FALLBACK_LLM_MODEL = os.getenv("FALLBACK_LLM_MODEL", "gemini-3.1-pro-preview")
 
 # Context pruning: how many recent tool rounds to keep in full.
 # Reasoning models need more historical context (geocode + flight data referenced

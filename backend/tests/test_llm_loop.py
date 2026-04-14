@@ -148,6 +148,7 @@ async def test_region_error_swaps_to_fallback_model_on_round_zero():
         events.append((t, p))
 
     with patch.object(llm, "_get_client", return_value=fake_client), \
+         patch.object(llm, "_get_fallback_client", return_value=fake_client), \
          patch.object(llm, "LLM_MODEL", "primary-model"), \
          patch.object(llm, "FALLBACK_LLM_MODEL", "fallback-model"):
         result = await llm._run_loop(
