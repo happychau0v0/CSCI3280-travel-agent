@@ -1076,3 +1076,65 @@ async def test_search_places_null_guards_for_new_fields():
     place = results[0]
     assert not place.get("description")   # None or empty string — not an error
     assert place.get("hours") == []       # always a list, never None
+
+
+# ─── Fix A — mock_weather shape ──────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_mock_weather_matches_live_shape():
+    """Mock weather must match the live get_weather return shape."""
+    from app.tools.mock_dispatch import mock_get_weather
+    result = await mock_get_weather(city="Tokyo")
+    assert "temp" in result, f"missing 'temp'; got: {list(result.keys())}"
+    assert "condition" in result
+    assert "humidity" in result
+    assert isinstance(result.get("forecast"), list)
+    assert "current" not in result, "old mock shape — 'current' key must not exist"
+    if result["forecast"]:
+        day = result["forecast"][0]
+        assert "temp_max" in day, f"should use temp_max, got: {list(day.keys())}"
+        assert "temp_min" in day
+        assert "date" in day
+        assert "high_c" not in day
+        assert "low_c" not in day
+
+
+# ─── Fix B — fast_flights seat class passthrough ─────────────────────────
+
+
+def test_fast_flights_passes_seat_class():
+    """_try_fast_flights must forward seat_class to get_flights, not hardcode economy."""
+    import sys
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+    from app.tools.flights import _try_fast_flights
+
+    mock_get_flights = MagicMock(return_value=SimpleNamespace(flights=[]))
+    fake_ff = SimpleNamespace(
+        FlightData=MagicMock(return_value=None),
+        Passengers=MagicMock(return_value=None),
+        get_flights=mock_get_flights,
+    )
+    with patch.dict(sys.modules, {"fast_flights": fake_ff}):
+        _try_fast_flights("HKG", "NRT", "2026-05-10", seat_class="business")
+
+    call_kwargs = mock_get_flights.call_args.kwargs
+    assert call_kwargs.get("seat") == "business", (
+        f"Expected seat='business', got: {call_kwargs.get('seat')!r}"
+    )
+
+
+# ─── Fix C — navigate_menu description ───────────────────────────────────
+
+
+def test_navigate_menu_description_does_not_mention_home():
+    """navigate_menu description must not mention HOME — system prompt forbids it."""
+    from app.tools import TOOL_DEFINITIONS
+    nav_tool = next(
+        (t for t in TOOL_DEFINITIONS if t.get("function", {}).get("name") == "navigate_menu"),
+        None,
+    )
+    assert nav_tool is not None
+    desc = nav_tool["function"]["description"].upper()
+    assert "HOME" not in desc, "navigate_menu description contradicts system prompt by mentioning HOME"

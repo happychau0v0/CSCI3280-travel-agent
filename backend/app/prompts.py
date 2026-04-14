@@ -159,7 +159,7 @@ ALL DAYS (universal rules):
 - Times must be strictly monotonic.
 - Call `get_weather(destination)` at the START of Turn 3 if you don't
   have weather data from conversation history. For EACH day, set the
-  `weather` field: {"condition": "...", "temp_c": N, "icon": "..."}
+  `weather` field: {"condition": "...", "temp_c": N}
   matching the forecast date. This is REQUIRED — the frontend shows
   weather per day and it breaks when null.
 - Prefer outdoor on sunny days, indoor on rainy (from get_weather).
@@ -253,10 +253,18 @@ class Activity(BaseModel):
     user_note: str | None = None
 
 
-class Weather(BaseModel):
+class ForecastDay(BaseModel):
+    date: str
+    temp_max: str
+    temp_min: str
     condition: str
-    temp_c: float | None = None
-    icon: str | None = None
+
+
+class Weather(BaseModel):
+    temp: str
+    condition: str
+    humidity: int
+    forecast: list[ForecastDay] = []
 
 
 class Day(BaseModel):

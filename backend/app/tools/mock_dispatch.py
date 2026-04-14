@@ -77,16 +77,15 @@ async def mock_get_directions(origin: str, destination: str, mode: str = "TRANSI
 async def mock_get_weather(city: str, date: str | None = None):
     """Return mock weather data."""
     return {
-        "current": {
-            "condition": "Partly cloudy",
-            "temp_c": 24,
-            "humidity": 65,
-            "icon": "partly_cloudy",
-        },
+        "temp": "22°C",
+        "condition": "Partly cloudy",
+        "humidity": 65,
         "forecast": [
-            {"date": "2026-05-15", "condition": "Partly cloudy", "high_c": 26, "low_c": 18, "icon": "partly_cloudy"},
-            {"date": "2026-05-16", "condition": "Sunny", "high_c": 28, "low_c": 19, "icon": "sunny"},
-            {"date": "2026-05-17", "condition": "Light rain", "high_c": 22, "low_c": 17, "icon": "rain"},
+            {"date": "2026-05-01", "temp_max": "24°C", "temp_min": "18°C", "condition": "Sunny"},
+            {"date": "2026-05-02", "temp_max": "23°C", "temp_min": "17°C", "condition": "Cloudy"},
+            {"date": "2026-05-03", "temp_max": "21°C", "temp_min": "16°C", "condition": "Light rain"},
+            {"date": "2026-05-04", "temp_max": "22°C", "temp_min": "17°C", "condition": "Partly cloudy"},
+            {"date": "2026-05-05", "temp_max": "25°C", "temp_min": "19°C", "condition": "Sunny"},
         ],
     }
 
