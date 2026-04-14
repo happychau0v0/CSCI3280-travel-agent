@@ -40,7 +40,8 @@ PLACES_DETAILS_URL = "https://places.googleapis.com/v1/places/{place_id}"
 # costs more per request — see Google's pricing tiers for the breakdown.
 SEARCH_FIELD_MASK = (
     "places.id,places.displayName,places.formattedAddress,places.location,"
-    "places.rating,places.photos,places.priceLevel"
+    "places.rating,places.photos,places.priceLevel,"
+    "places.editorialSummary,places.regularOpeningHours"
 )
 DETAILS_FIELD_MASK = (
     "id,displayName,formattedAddress,location,editorialSummary,"
@@ -116,6 +117,8 @@ async def search_places(
                 "photos": photo_urls,
                 "lat": location.get("latitude"),
                 "lng": location.get("longitude"),
+                "description": (place.get("editorialSummary") or {}).get("text"),
+                "hours": (place.get("regularOpeningHours") or {}).get("weekdayDescriptions"),
             }
         )
     return results

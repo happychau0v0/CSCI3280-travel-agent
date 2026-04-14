@@ -29,7 +29,7 @@ TOOL_DEFINITIONS: list[dict] = [
             "description": (
                 "Search for real places (restaurants, attractions, hotels, museums) by text query. "
                 "ALWAYS call this before recommending any place. Returns names, addresses, ratings, "
-                "and place IDs."
+                "place IDs, editorial descriptions, and opening hours."
             ),
             "parameters": {
                 "type": "object",

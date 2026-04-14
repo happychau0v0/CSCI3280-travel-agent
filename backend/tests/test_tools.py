@@ -68,6 +68,38 @@ async def test_search_places_returns_normalized_list():
 
 
 @pytest.mark.asyncio
+async def test_search_places_includes_description_and_hours():
+    fake_response = {
+        "places": [
+            {
+                "id": "place123",
+                "displayName": {"text": "Senso-ji Temple"},
+                "formattedAddress": "2-3-1 Asakusa, Taito City, Tokyo",
+                "location": {"latitude": 35.7148, "longitude": 139.7967},
+                "rating": 4.7,
+                "priceLevel": "PRICE_LEVEL_FREE",
+                "editorialSummary": {"text": "Ancient Buddhist temple with iconic gate."},
+                "regularOpeningHours": {
+                    "weekdayDescriptions": ["Monday: Open 24 hours"]
+                },
+                "photos": [{"name": "places/place123/photos/photo1"}],
+            }
+        ]
+    }
+    with patch("app.tools.places.httpx.AsyncClient") as mock_client:
+        mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+            return_value=_mock_response(fake_response)
+        )
+        results = await places.search_places("temples in Tokyo")
+
+    assert len(results) == 1
+    place = results[0]
+    assert place.get("description") == "Ancient Buddhist temple with iconic gate."
+    assert place.get("hours") is not None
+    assert "Monday: Open 24 hours" in place["hours"]
+
+
+@pytest.mark.asyncio
 async def test_search_places_missing_key(monkeypatch):
     monkeypatch.setattr(places, "GOOGLE_MAPS_API_KEY", "")
     with pytest.raises(ToolUnavailableError):
