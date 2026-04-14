@@ -50,6 +50,11 @@ from app.tools import TOOL_DEFINITIONS, TOOL_DISPATCH, ToolUnavailableError
 
 logger = logging.getLogger(__name__)
 
+
+def _build_tools_list() -> list[dict]:
+    """Return TOOL_DEFINITIONS plus xAI server-side tools."""
+    return list(TOOL_DEFINITIONS) + [{"type": "web_search_preview"}]
+
 # A typical multi-day itinerary takes 3-6 tool calls (one weather lookup,
 # 2-4 place searches, a handful of directions). 10 rounds gives plenty of
 # headroom while still capping pathological loops where the model keeps
@@ -233,7 +238,7 @@ async def _run_loop(
             response = await client.chat.completions.create(
                 model=active_model,
                 messages=full_messages,
-                tools=TOOL_DEFINITIONS,
+                tools=_build_tools_list(),
                 tool_choice="auto",
             )
         except (openai.APIStatusError, openai.APIConnectionError) as exc:

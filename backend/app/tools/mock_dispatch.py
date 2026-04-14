@@ -240,11 +240,6 @@ async def mock_get_phrasebook(destination: str):
     }
 
 
-async def mock_web_search(query: str):
-    """Mock web search stub."""
-    return {"results": [], "note": "Mock: no results"}
-
-
 # The dispatch table that replaces TOOL_DISPATCH when MOCK_TOOLS=1
 MOCK_DISPATCH: dict = {
     "search_places": mock_search_places,
@@ -257,5 +252,4 @@ MOCK_DISPATCH: dict = {
     "request_input": mock_request_input,
     "get_day_windows": mock_get_day_windows,
     "get_phrasebook": mock_get_phrasebook,
-    "web_search": mock_web_search,
 }

@@ -1138,3 +1138,16 @@ def test_navigate_menu_description_does_not_mention_home():
     assert nav_tool is not None
     desc = nav_tool["function"]["description"].upper()
     assert "HOME" not in desc, "navigate_menu description contradicts system prompt by mentioning HOME"
+
+
+# ─── Task 3 — xAI web_search_preview ─────────────────────────────────────
+
+
+from app.llm import _build_tools_list
+
+
+def test_xai_web_search_in_tools_list():
+    """xAI web_search_preview must be in the tools list sent to the model."""
+    tools = _build_tools_list()
+    types = [t.get("type") for t in tools]
+    assert "web_search_preview" in types, f"web_search_preview missing; got types: {types}"

@@ -10,7 +10,6 @@ from app.tools import (
     phrasebook,
     places,
     request_input as request_input_tool,
-    search,
     ui_tools,
     weather,
 )
@@ -385,23 +384,6 @@ TOOL_DEFINITIONS: list[dict] = [
     {
         "type": "function",
         "function": {
-            "name": "web_search",
-            "description": (
-                "Fallback web search for general info not covered by other tools. "
-                "Currently a stub — prefer the other tools whenever possible."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "description": "Search query"},
-                },
-                "required": ["query"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "get_phrasebook",
             "description": (
                 "Return a small phrasebook (10 essential phrases) for the destination's "
@@ -439,7 +421,6 @@ TOOL_DISPATCH: dict = {
     "get_phrasebook": phrasebook.get_phrasebook,
     "toggle_setting": ui_tools.toggle_setting,
     "submit_trip_form": ui_tools.submit_trip_form,
-    "web_search": search.web_search,
 }
 
 # Integration testing: when MOCK_TOOLS=1 is set, replace all tool
