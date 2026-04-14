@@ -547,7 +547,17 @@ async def search_flights(
     deep_link = _google_flights_url(from_iata, to_iata, date)
 
     # Best-effort live data via fast-flights (offloaded to a thread).
-    live = await asyncio.to_thread(_try_fast_flights, from_iata, to_iata, date)
+    # Hard cap at 6s — fast-flights/primp occasionally hangs indefinitely
+    # on long-haul or rate-limited routes (Vancouver, London). On timeout
+    # we fall through to the estimator so the user always gets options.
+    try:
+        live = await asyncio.wait_for(
+            asyncio.to_thread(_try_fast_flights, from_iata, to_iata, date),
+            timeout=6.0,
+        )
+    except asyncio.TimeoutError:
+        logger.info("fast-flights timed out for %s→%s, using estimator", from_iata, to_iata)
+        live = []
 
     # Try to build options from live data; fall back to estimator if we
     # couldn't get any usable flights from fast-flights.

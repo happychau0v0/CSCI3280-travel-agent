@@ -73,10 +73,15 @@ def _get_client() -> AsyncOpenAI:
                 "XAI_API_KEY not configured. Add it to .env to enable the LLM."
             )
         timeout = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=5.0)
+        # trust_env=False so httpx ignores HTTP_PROXY/HTTPS_PROXY — xAI is
+        # reachable directly from HK, and Clash on 127.0.0.1:7890 adds
+        # latency and stalls when the proxy is slow/unreachable.
+        http_client = httpx.AsyncClient(timeout=timeout, trust_env=False)
         _client = AsyncOpenAI(
             api_key=XAI_API_KEY,
             base_url=XAI_BASE_URL,
             timeout=timeout,
+            http_client=http_client,
         )
     return _client
 
