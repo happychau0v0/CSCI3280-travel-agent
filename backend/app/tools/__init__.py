@@ -186,13 +186,12 @@ TOOL_DEFINITIONS: list[dict] = [
         "function": {
             "name": "navigate_menu",
             "description": (
-                "Move the user's menu cursor to a specific panel. The user is "
-                "viewing a NieR-style menu with four tabs (HOME, FLIGHTS, "
-                "HOTELS, DAYS). HOME contains the editable trip form and the "
-                "live status dashboard. Call this tool to focus the user's "
-                "attention on a specific tab — e.g. after building a trip, "
-                "call navigate_menu('HOME') to show them the dashboard with the "
-                "globe; if they ask about hotels, call navigate_menu('HOTELS')."
+                "Navigate the UI to a named panel. Call ONCE at the very end of your reply, "
+                "after the JSON block has been emitted. Valid targets: "
+                "'FLIGHTS' (after building a flight list), "
+                "'HOTELS' (after a hotel replan), "
+                "'DAYS' (after a day replan). "
+                "Never call this mid-stream or before the JSON is complete."
             ),
             "parameters": {
                 "type": "object",
