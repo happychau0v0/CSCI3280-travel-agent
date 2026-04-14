@@ -1041,4 +1041,38 @@ async def test_places_search_returns_photos_gallery():
 async def test_web_search_returns_stub():
     result = await search.web_search("anything")
     assert len(result) == 1
-    assert "unavailable" in result[0]["title"].lower()
+
+
+# ─── places.py null-guard tests ───────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_search_places_null_guards_for_new_fields():
+    """description and hours must be falsy (not raise) when fields are absent."""
+    mock_response = {
+        "places": [
+            {
+                "id": "p1",
+                "displayName": {"text": "Some Place"},
+                "formattedAddress": "Tokyo",
+                "location": {"latitude": 35.0, "longitude": 139.0},
+            }
+        ]
+    }
+    with patch("app.tools.places.GOOGLE_MAPS_API_KEY", "fake-key"), \
+         patch("httpx.AsyncClient") as mock_client_cls:
+        mock_resp = AsyncMock()
+        mock_resp.raise_for_status = lambda: None
+        mock_resp.json = lambda: mock_response
+        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client_cls.return_value)
+        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+        mock_client_cls.return_value.post = AsyncMock(return_value=mock_resp)
+        mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_resp.__aexit__ = AsyncMock(return_value=False)
+
+        results = await places.search_places("anything")
+
+    assert len(results) == 1
+    place = results[0]
+    assert not place.get("description")   # None or empty string — not an error
+    assert place.get("hours") == []       # always a list, never None

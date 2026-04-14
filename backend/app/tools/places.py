@@ -69,7 +69,8 @@ async def search_places(
 ) -> list[dict]:
     """Search for places matching a text query.
 
-    Returns a list of {name, address, rating, photo_url, place_id, price_level}.
+    Returns a list of {place_id, name, address, rating, price_level,
+    photo_url, photos, lat, lng, description, hours}.
     """
     if not check_key(GOOGLE_MAPS_API_KEY):
         raise ToolUnavailableError("GOOGLE_MAPS_API_KEY not configured")
@@ -118,7 +119,7 @@ async def search_places(
                 "lat": location.get("latitude"),
                 "lng": location.get("longitude"),
                 "description": (place.get("editorialSummary") or {}).get("text"),
-                "hours": (place.get("regularOpeningHours") or {}).get("weekdayDescriptions"),
+                "hours": (place.get("regularOpeningHours") or {}).get("weekdayDescriptions") or [],
             }
         )
     return results
