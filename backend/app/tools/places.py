@@ -101,7 +101,7 @@ async def search_places(
     for place in data.get("places", []):
         photos = place.get("photos") or []
         location = place.get("location") or {}
-        photo_urls = [_photo_url(p["name"]) for p in photos[:10] if p.get("name")]
+        photo_urls = [_photo_url(p["name"]) for p in photos[:5] if p.get("name")]
         results.append(
             {
                 "place_id": place.get("id", ""),
