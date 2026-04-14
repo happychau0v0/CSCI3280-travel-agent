@@ -95,7 +95,7 @@ async def fetch_full_done(client: httpx.AsyncClient, prompt: str) -> dict | None
         async with client.stream(
             "POST",
             f"{BACKEND}/chat/stream",
-            json={"message": prompt, "history": []},
+            json={"message": prompt, "history": [], "bench_eval": True},
             timeout=httpx.Timeout(connect=10.0, read=OUTER_TIMEOUT, write=10.0, pool=5.0),
         ) as resp:
             resp.raise_for_status()

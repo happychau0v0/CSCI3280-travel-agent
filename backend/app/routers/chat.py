@@ -26,6 +26,7 @@ class ChatRequest(BaseModel):
     preferences: dict | None = None
     user_location: dict | None = None
     trip_dates: dict | None = None
+    bench_eval: bool = False
 
 
 class ChatResponse(BaseModel):
@@ -47,6 +48,7 @@ async def post_chat(req: ChatRequest) -> ChatResponse:
             preferences=req.preferences,
             user_location=req.user_location,
             trip_dates=req.trip_dates,
+            bench_eval=req.bench_eval,
         )
     except RuntimeError as e:
         # Missing API key — surface as 503 Service Unavailable
@@ -92,6 +94,7 @@ async def post_chat_stream(req: ChatRequest):
             preferences=req.preferences,
             user_location=req.user_location,
             trip_dates=req.trip_dates,
+            bench_eval=req.bench_eval,
         ):
             yield _format_sse(event)
 

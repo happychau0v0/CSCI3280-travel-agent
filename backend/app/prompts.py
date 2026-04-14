@@ -217,6 +217,13 @@ AVAILABLE TOOLS:
 Use tools proactively. Turn 1: geocode_city + search_flights + get_day_windows + get_phrasebook (batch). Turn 2: search_places(hotels) + get_weather (batch). Turn 3: search_places(activities) × N + get_directions × M (batch heavily). Always call navigate_menu LAST.
 """
 
+BENCH_EVAL_ADDENDUM = (
+    "\n\n[EVALUATION MODE] Produce a COMPLETE single-response itinerary that "
+    "includes ALL three planning turns at once: (1) flight options array, "
+    "(2) hotels list, AND (3) days with activities. Do NOT call navigate_menu. "
+    "Do NOT call request_input. Combine everything into one JSON block."
+)
+
 
 # Pydantic models for itinerary validation/documentation
 

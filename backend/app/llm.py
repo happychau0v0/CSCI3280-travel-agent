@@ -45,7 +45,7 @@ import openai
 from openai import AsyncOpenAI
 
 from app.config import FALLBACK_LLM_MODEL, LLM_MODEL, XAI_API_KEY, XAI_BASE_URL, check_key
-from app.prompts import SYSTEM_PROMPT
+from app.prompts import BENCH_EVAL_ADDENDUM, SYSTEM_PROMPT
 from app.tools import TOOL_DEFINITIONS, TOOL_DISPATCH, ToolUnavailableError
 
 logger = logging.getLogger(__name__)
@@ -194,6 +194,7 @@ async def _run_loop(
     user_location: dict | None = None,
     trip_dates: dict | None = None,
     on_event: EventCallback | None = None,
+    bench_eval: bool = False,
 ) -> dict:
     """Internal: shared tool-call loop used by both chat() and chat_stream().
 
@@ -213,6 +214,8 @@ async def _run_loop(
         + _format_trip_dates(trip_dates)
         + _format_preferences(preferences)
     )
+    if bench_eval:
+        system_content += BENCH_EVAL_ADDENDUM
     full_messages: list[dict] = [{"role": "system", "content": system_content}] + list(messages)
     tool_calls_made: list[str] = []
     last_text = ""
@@ -386,6 +389,7 @@ async def chat(
     preferences: dict | None = None,
     user_location: dict | None = None,
     trip_dates: dict | None = None,
+    bench_eval: bool = False,
 ) -> dict:
     """Run the LLM with a tool-call loop and return the final response.
 
@@ -394,6 +398,8 @@ async def chat(
         preferences: optional user profile dict
         user_location: optional {city, country, lat, lng} from browser GPS
         trip_dates: optional {start, end} ISO dates picked by the user
+        bench_eval: if True, append addendum instructing the model to collapse
+            all planning turns into one response for accurate benchmark scoring
 
     Returns:
         {reply: str, itinerary: dict | None, tool_calls_made: list[str]}
@@ -404,6 +410,7 @@ async def chat(
         user_location=user_location,
         trip_dates=trip_dates,
         on_event=None,
+        bench_eval=bench_eval,
     )
 
 
@@ -412,6 +419,7 @@ async def chat_stream(
     preferences: dict | None = None,
     user_location: dict | None = None,
     trip_dates: dict | None = None,
+    bench_eval: bool = False,
 ) -> AsyncIterator[dict]:
     """Run the LLM and yield events as tool calls fire.
 
@@ -435,6 +443,7 @@ async def chat_stream(
                 user_location=user_location,
                 trip_dates=trip_dates,
                 on_event=emit,
+                bench_eval=bench_eval,
             )
             await queue.put({"type": "done", "data": result})
         except RuntimeError as e:
