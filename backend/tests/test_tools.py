@@ -1131,14 +1131,20 @@ def test_navigate_menu_description_does_not_mention_home():
     assert "HOME" not in desc, "navigate_menu description contradicts system prompt by mentioning HOME"
 
 
-# ─── Task 3 — xAI web_search_preview ─────────────────────────────────────
+# ─── Task 3 — tools list only contains function-type tools ────────────────
 
 
-def test_xai_web_search_in_tools_list():
-    """xAI web_search_preview must be in the tools list sent to the model."""
+def test_tools_list_only_contains_function_types():
+    """All tools sent to the model must be type=function.
+
+    xAI deprecated web_search_preview (now returns 422); it was removed so
+    the tools list only contains standard function-call tool definitions.
+    """
     tools = _build_tools_list()
-    types = [t.get("type") for t in tools]
-    assert "web_search_preview" in types, f"web_search_preview missing; got types: {types}"
+    for t in tools:
+        assert t.get("type") == "function", (
+            f"Non-function tool found in list: {t}"
+        )
 
 
 # ─── Task 7 — context size management ────────────────────────────────────
