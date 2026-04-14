@@ -44,7 +44,7 @@ import httpx
 import openai
 from openai import AsyncOpenAI
 
-from app.config import FALLBACK_LLM_MODEL, LLM_API_KEY, LLM_BASE_URL, LLM_MODEL, LLM_PROVIDER, OPENROUTER_PROXY, check_key
+from app.config import FALLBACK_LLM_MODEL, LLM_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL, OPENROUTER_PROXY, check_key
 from app.prompts import SYSTEM_PROMPT
 from app.tools import TOOL_DEFINITIONS, TOOL_DISPATCH, ToolUnavailableError
 
@@ -71,29 +71,26 @@ def _get_client() -> AsyncOpenAI:
     """
     global _client
     if _client is None:
-        if not check_key(LLM_API_KEY):
-            provider_hint = (
-                "GOOGLE_AI_API_KEY" if LLM_PROVIDER == "google" else "OPENROUTER_API_KEY"
-            )
+        if not check_key(OPENROUTER_API_KEY):
             raise RuntimeError(
-                f"{provider_hint} not configured. Add it to .env to enable the LLM."
+                "OPENROUTER_API_KEY not configured. Add it to .env to enable the LLM."
             )
         timeout = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=5.0)
         # If OPENROUTER_PROXY is set in .env, route LLM calls through it so
-        # geo-restricted models work from HK. Google Maps tool clients all use
-        # trust_env=False so they bypass the proxy and hit Google directly.
+        # geo-restricted models (e.g. grok-4.20 is US-only) work from HK.
+        # Google Maps tool clients all use trust_env=False, so they bypass
+        # the proxy and hit Google directly.
         if OPENROUTER_PROXY:
             http_client = httpx.AsyncClient(proxy=OPENROUTER_PROXY, timeout=timeout)
-            logger.info("LLM (%s) routing via proxy: %s", LLM_PROVIDER, OPENROUTER_PROXY)
+            logger.info("OpenRouter LLM will route via proxy: %s", OPENROUTER_PROXY)
         else:
             http_client = None
         _client = AsyncOpenAI(
-            api_key=LLM_API_KEY,
-            base_url=LLM_BASE_URL,
+            api_key=OPENROUTER_API_KEY,
+            base_url=OPENROUTER_BASE_URL,
             timeout=timeout,
             http_client=http_client,
         )
-        logger.info("LLM provider: %s  model: %s  base: %s", LLM_PROVIDER, LLM_MODEL, LLM_BASE_URL)
     return _client
 
 
