@@ -189,6 +189,25 @@ def _is_region_error(exc: Exception) -> bool:
     ))
 
 
+def _prune_tool_results(messages: list[dict], keep_recent_rounds: int = 2) -> list[dict]:
+    """Replace content of old tool result messages with a short summary.
+
+    Identifies assistant turns (round boundaries) and truncates tool result
+    messages from rounds older than keep_recent_rounds.
+    """
+    round_starts = [i for i, m in enumerate(messages) if m.get("role") == "assistant"]
+    if len(round_starts) <= keep_recent_rounds:
+        return messages
+    cutoff_idx = round_starts[-keep_recent_rounds]
+    pruned = []
+    for i, msg in enumerate(messages):
+        if msg.get("role") == "tool" and i < cutoff_idx:
+            pruned.append({**msg, "content": "[tool result omitted]"})
+        else:
+            pruned.append(msg)
+    return pruned
+
+
 EventCallback = Callable[[str, dict], Awaitable[None]]
 
 
@@ -360,6 +379,7 @@ async def _run_loop(
 
         tool_results = await asyncio.gather(*(_run_one(tc) for tc in msg.tool_calls))
         full_messages.extend(tool_results)
+        full_messages = _prune_tool_results(full_messages, keep_recent_rounds=2)
     else:
         logger.warning("Hit MAX_TOOL_ROUNDS=%d without final reply", MAX_TOOL_ROUNDS)
 

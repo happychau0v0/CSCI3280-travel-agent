@@ -1151,3 +1151,30 @@ def test_xai_web_search_in_tools_list():
     tools = _build_tools_list()
     types = [t.get("type") for t in tools]
     assert "web_search_preview" in types, f"web_search_preview missing; got types: {types}"
+
+
+# ─── Task 7 — context size management ────────────────────────────────────
+
+
+from app.llm import _prune_tool_results
+
+
+def test_prune_tool_results_truncates_old_rounds():
+    """Tool results older than keep_recent_rounds should be replaced with a stub."""
+    messages = []
+    for i in range(4):
+        messages.append({"role": "assistant", "content": f"round {i}", "tool_calls": []})
+        messages.append({
+            "role": "tool",
+            "tool_call_id": f"tc_{i}",
+            "content": "x" * 500,
+        })
+
+    pruned = _prune_tool_results(messages, keep_recent_rounds=2)
+
+    tool_msgs = [m for m in pruned if m.get("role") == "tool"]
+    assert len(tool_msgs) == 4  # count unchanged
+    assert len(tool_msgs[0]["content"]) < 500  # round 0 — pruned
+    assert len(tool_msgs[1]["content"]) < 500  # round 1 — pruned
+    assert len(tool_msgs[2]["content"]) == 500  # round 2 — kept
+    assert len(tool_msgs[3]["content"]) == 500  # round 3 — kept
