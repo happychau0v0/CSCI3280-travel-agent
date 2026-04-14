@@ -155,6 +155,10 @@ MIDDLE DAYS (day 2 .. day N-1) — FULL 09:00-21:00 windows:
 ALL DAYS (universal rules):
 - Every non-hotel/airport activity MUST have place_id, lat, lng,
   address, photos, photo_url copied VERBATIM from search_places.
+- For each non-hotel/airport activity that has a place_id, call
+  `get_place_details(place_id)` and copy its `description` field into
+  the activity. Never fabricate descriptions — only use text returned
+  by the tool. If get_place_details returns no description, omit the field.
 - Call `get_directions` between consecutive activities. Save polyline.
 - Times must be strictly monotonic.
 - Call `get_weather(destination)` at the START of Turn 3 if you don't
@@ -193,7 +197,7 @@ TURN 2 example (hotels only — no flight, no days; show 3 to illustrate schema;
 
 TURN 3 example (days only — no flight, no hotels):
 ```json
-{"itinerary": {"selected_hotel": {"name": "Park Hyatt Tokyo", "address": "3-7-1-2 Nishi Shinjuku", "rating": 4.6, "lat": 35.685, "lng": 139.690, "place_id": "ChIJa..."}, "days": [{"day": 1, "date": "2026-05-15", "theme": "Arrival & East Tokyo", "weather": {"temp": "22°C", "condition": "Partly cloudy", "humidity": 65}, "activities": [{"time": "11:35", "name": "NRT Airport · Arrival", "address": "Narita International Airport", "duration_min": 60, "lat": 35.772, "lng": 140.392}, {"time": "13:30", "name": "Park Hyatt Tokyo", "address": "hotel", "duration_min": 30}, {"time": "14:30", "name": "Senso-ji Temple", "address": "2-3-1 Asakusa", "duration_min": 90, "place_id": "ChIJ...", "lat": 35.714, "lng": 139.796, "photo_url": "/photo/...", "transport_to_next": {"mode": "TRANSIT", "duration": "22 min", "distance": "5.1 km"}}, {"time": "17:00", "name": "Omoide Yokocho", "address": "Nishi Shinjuku", "duration_min": 90, "place_id": "ChIJ...", "lat": 35.693, "lng": 139.698, "photo_url": "/photo/..."}, {"time": "19:00", "name": "Park Hyatt Tokyo", "address": "hotel", "duration_min": 30}]}]}}
+{"itinerary": {"selected_hotel": {"name": "Park Hyatt Tokyo", "address": "3-7-1-2 Nishi Shinjuku", "rating": 4.6, "lat": 35.685, "lng": 139.690, "place_id": "ChIJa..."}, "days": [{"day": 1, "date": "2026-05-15", "theme": "Arrival & East Tokyo", "weather": {"temp": "22°C", "condition": "Partly cloudy", "humidity": 65}, "activities": [{"time": "11:35", "name": "NRT Airport · Arrival", "address": "Narita International Airport", "duration_min": 60, "lat": 35.772, "lng": 140.392}, {"time": "13:30", "name": "Park Hyatt Tokyo", "address": "hotel", "duration_min": 30}, {"time": "14:30", "name": "Senso-ji Temple", "address": "2-3-1 Asakusa", "duration_min": 90, "place_id": "ChIJ...", "lat": 35.714, "lng": 139.796, "photo_url": "/photo/...", "description": "Tokyo's oldest Buddhist temple, founded in 628 AD, famous for its massive Kaminarimon gate and Nakamise shopping street.", "transport_to_next": {"mode": "TRANSIT", "duration": "22 min", "distance": "5.1 km"}}, {"time": "17:00", "name": "Omoide Yokocho", "address": "Nishi Shinjuku", "duration_min": 90, "place_id": "ChIJ...", "lat": 35.693, "lng": 139.698, "photo_url": "/photo/...", "description": "Narrow alley lined with tiny yakitori and ramen stalls dating back to post-WWII, known as Memory Lane."}, {"time": "19:00", "name": "Park Hyatt Tokyo", "address": "hotel", "duration_min": 30}]}]}}
 ```
 
 FIELDS PER TURN:
