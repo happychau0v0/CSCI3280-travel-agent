@@ -217,6 +217,8 @@ AVAILABLE TOOLS:
 Use tools proactively. Turn 1: geocode_city + search_flights + get_day_windows + get_phrasebook (batch). Turn 2: search_places(hotels) + get_weather (batch). Turn 3: search_places(activities) × N + get_directions × M (batch heavily). Always call navigate_menu LAST.
 """
 
+# [EVALUATION MODE] bracketed prefix marks this as a special instruction block
+# injected only during bench evaluation runs, not in normal user sessions.
 BENCH_EVAL_ADDENDUM = (
     "\n\n[EVALUATION MODE] Produce a COMPLETE single-response itinerary that "
     "includes ALL three planning turns at once: (1) flight options array, "
