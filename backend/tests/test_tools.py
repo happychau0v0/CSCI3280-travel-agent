@@ -14,10 +14,10 @@ from app.tools import (
     phrasebook,
     places,
     request_input as request_input_tool,
-    search,
     weather,
 )
 from app.tools.errors import ToolUnavailableError
+from app.llm import _build_tools_list, _prune_tool_results
 
 
 @pytest.fixture(autouse=True)
@@ -1034,15 +1034,6 @@ async def test_places_search_returns_photos_gallery():
         assert results[0]["photo_url"] == results[0]["photos"][0]
 
 
-# ─── web_search stub ─────────────────────────────────────────────────────
-
-
-@pytest.mark.asyncio
-async def test_web_search_returns_stub():
-    result = await search.web_search("anything")
-    assert len(result) == 1
-
-
 # ─── places.py null-guard tests ───────────────────────────────────────────
 
 
@@ -1143,9 +1134,6 @@ def test_navigate_menu_description_does_not_mention_home():
 # ─── Task 3 — xAI web_search_preview ─────────────────────────────────────
 
 
-from app.llm import _build_tools_list
-
-
 def test_xai_web_search_in_tools_list():
     """xAI web_search_preview must be in the tools list sent to the model."""
     tools = _build_tools_list()
@@ -1154,9 +1142,6 @@ def test_xai_web_search_in_tools_list():
 
 
 # ─── Task 7 — context size management ────────────────────────────────────
-
-
-from app.llm import _prune_tool_results
 
 
 def test_prune_tool_results_truncates_old_rounds():

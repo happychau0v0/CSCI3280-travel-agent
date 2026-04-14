@@ -385,8 +385,6 @@ async def _run_loop(
 
     # Debug: dump raw LLM text when DUMP_LLM=1 so we can record golden
     # fixtures for schema validation tests (P1 of the testing plan).
-    import os
-
     if os.getenv("DUMP_LLM"):
         dump_dir = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "llm_outputs"
         dump_dir.mkdir(parents=True, exist_ok=True)
