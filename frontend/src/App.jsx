@@ -634,15 +634,22 @@ function App() {
   }, []);
 
   const handleSend = useCallback(
-    async (text, { editLast = false, truncateBefore = null } = {}) => {
+    async (text, { editLast = false, truncateBefore = null, reset = false } = {}) => {
       const userMsg = { role: "user", content: text };
+
+      // New trip from the PLAN page: wipe the previous itinerary and
+      // conversation so stale Busan/wherever data doesn't bleed into the
+      // new Taipei trip while the agent is working.
+      if (reset) {
+        setCurrentItinerary(null);
+      }
 
       // Edit-and-rerun: truncate the conversation back to before a
       // specific turn (truncateBefore) or before the most recent user
       // turn (editLast) so the agent responds to the edited prompt as
       // if the original never happened. truncateBefore wins when both
       // are set — it's used by the HISTORY overlay's per-turn edit.
-      let baseMessages = messages;
+      let baseMessages = reset ? [] : messages;
       if (truncateBefore != null && truncateBefore >= 0) {
         baseMessages = messages.slice(0, truncateBefore);
       } else if (editLast) {
@@ -1182,7 +1189,7 @@ function App() {
                 setPanelWithCue(panel);
               }
             }}
-            onPlan={handleSend}
+            onPlan={(prompt) => handleSend(prompt, { reset: true })}
             onResolveInput={(field, value, fieldIdx) => {
               if (typeof fieldIdx === "number" && fieldIdx >= 0) {
                 menu.setListIndex(fieldIdx);
