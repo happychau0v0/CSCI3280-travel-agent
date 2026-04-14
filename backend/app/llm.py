@@ -44,16 +44,29 @@ import httpx
 import openai
 from openai import AsyncOpenAI
 
-from app.config import FALLBACK_LLM_MODEL, LLM_MODEL, PRUNE_KEEP_ROUNDS, XAI_API_KEY, XAI_BASE_URL, check_key
+from app.config import (
+    FALLBACK_LLM_MODEL,
+    GEMINI_API_KEY,
+    GEMINI_BASE_URL,
+    LLM_MODEL,
+    PRUNE_KEEP_ROUNDS,
+    XAI_API_KEY,
+    XAI_BASE_URL,
+    check_key,
+)
 from app.prompts import BENCH_EVAL_ADDENDUM, SYSTEM_PROMPT
 from app.tools import TOOL_DEFINITIONS, TOOL_DISPATCH, ToolUnavailableError
 
 logger = logging.getLogger(__name__)
 
 
-def _build_tools_list() -> list[dict]:
-    """Return TOOL_DEFINITIONS plus xAI server-side tools."""
-    return list(TOOL_DEFINITIONS) + [{"type": "web_search_preview"}]
+def _build_tools_list(model: str = LLM_MODEL) -> list[dict]:
+    """Return TOOL_DEFINITIONS for the given model.
+
+    xAI deprecated web_search_preview in their tools API (now returns 422);
+    all providers including xAI only accept type=function tools via this endpoint.
+    """
+    return list(TOOL_DEFINITIONS)
 
 # A typical multi-day itinerary takes 3-6 tool calls (one weather lookup,
 # 2-4 place searches, a handful of directions). 10 rounds gives plenty of
@@ -62,15 +75,11 @@ def _build_tools_list() -> list[dict]:
 MAX_TOOL_ROUNDS = 20
 
 _client: AsyncOpenAI | None = None
+_fallback_client: AsyncOpenAI | None = None
 
 
 def _get_client() -> AsyncOpenAI:
-    """Lazily build the OpenAI client pointed at xAI's direct API.
-
-    xAI API (https://api.x.ai/v1) is OpenAI SDK compatible and accessible
-    from HK without VPN — no proxy needed. Google Maps tool clients all use
-    trust_env=False, so they are unaffected by any system proxy settings.
-    """
+    """Lazily build the OpenAI client pointed at xAI's direct API."""
     global _client
     if _client is None:
         if not check_key(XAI_API_KEY):
@@ -78,9 +87,6 @@ def _get_client() -> AsyncOpenAI:
                 "XAI_API_KEY not configured. Add it to .env to enable the LLM."
             )
         timeout = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=5.0)
-        # trust_env=False so httpx ignores HTTP_PROXY/HTTPS_PROXY — xAI is
-        # reachable directly from HK, and Clash on 127.0.0.1:7890 adds
-        # latency and stalls when the proxy is slow/unreachable.
         http_client = httpx.AsyncClient(timeout=timeout, trust_env=False)
         _client = AsyncOpenAI(
             api_key=XAI_API_KEY,
@@ -89,6 +95,27 @@ def _get_client() -> AsyncOpenAI:
             http_client=http_client,
         )
     return _client
+
+
+def _get_fallback_client() -> AsyncOpenAI:
+    """Lazily build the fallback client pointed at Google Gemini's OpenAI-compatible API.
+
+    Used when xAI is down (outage) or geo-restricted. Gemini uses the same
+    OpenAI SDK wire format so no changes to tool calling or response parsing needed.
+    """
+    global _fallback_client
+    if _fallback_client is None:
+        if not check_key(GEMINI_API_KEY):
+            raise RuntimeError(
+                "GEMINI_API_KEY not configured. Add it to .env for LLM fallback."
+            )
+        timeout = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=5.0)
+        _fallback_client = AsyncOpenAI(
+            api_key=GEMINI_API_KEY,
+            base_url=GEMINI_BASE_URL,
+            timeout=timeout,
+        )
+    return _fallback_client
 
 
 def _format_preferences(preferences: dict | None) -> str:
@@ -181,12 +208,17 @@ def _map_partial(fn_name: str, fn_args: dict, result: dict) -> dict | None:
 
 
 def _is_region_error(exc: Exception) -> bool:
-    """Return True when OpenRouter rejected the model due to geo-restriction."""
+    """Return True when the provider rejected the model due to geo-restriction."""
     msg = str(exc).lower()
     return any(k in msg for k in (
         "region", "not available", "not supported", "geo", "country",
         "unsupported", "access denied", "403",
     ))
+
+
+def _is_provider_outage(exc: Exception) -> bool:
+    """Return True when the primary provider is having an outage (500 from their API)."""
+    return isinstance(exc, openai.InternalServerError)
 
 
 def _prune_tool_results(messages: list[dict], keep_recent_rounds: int = 2) -> list[dict]:
@@ -219,6 +251,7 @@ async def _run_loop(
     trip_dates: dict | None = None,
     on_event: EventCallback | None = None,
     bench_eval: bool = False,
+    preferred_model: str | None = None,
 ) -> dict:
     """Internal: shared tool-call loop used by both chat() and chat_stream().
 
@@ -247,7 +280,7 @@ async def _run_loop(
     # a geo-restriction (e.g. grok-4.20 is US-only; the backend is in HK),
     # automatically retry round 0 with the fallback model so friends accessing
     # via Tailscale don't need a separate VPN to use the LLM.
-    active_model = LLM_MODEL
+    active_model = preferred_model or LLM_MODEL
 
     for round_idx in range(MAX_TOOL_ROUNDS):
         # Each iteration is a full chat completion. The model decides whether
@@ -257,23 +290,31 @@ async def _run_loop(
             response = await client.chat.completions.create(
                 model=active_model,
                 messages=full_messages,
-                tools=_build_tools_list(),
+                tools=_build_tools_list(active_model),
                 tool_choice="auto",
             )
         except (openai.APIStatusError, openai.APIConnectionError) as exc:
-            # If round 0 fails due to geo-restriction, silently retry with
-            # the fallback model. Any other round or any other error re-raises
-            # so the caller sees a real error event.
-            if round_idx == 0 and active_model != FALLBACK_LLM_MODEL and _is_region_error(exc):
+            # On round 0 only: if the primary provider is down (outage) or
+            # geo-restricted, transparently retry with the Gemini fallback.
+            # Any error on later rounds re-raises — we don't mid-stream switch
+            # providers since tool results are already in the message history.
+            is_first_round = round_idx == 0
+            already_on_fallback = active_model == FALLBACK_LLM_MODEL
+            should_fallback = is_first_round and not already_on_fallback and (
+                _is_provider_outage(exc) or _is_region_error(exc)
+            )
+            if should_fallback:
+                reason = "outage" if _is_provider_outage(exc) else "region_restricted"
                 logger.warning(
-                    "Model %s unavailable (region error), retrying with %s: %s",
-                    active_model, FALLBACK_LLM_MODEL, exc,
+                    "Primary model %s unavailable (%s), falling back to %s: %s",
+                    active_model, reason, FALLBACK_LLM_MODEL, exc,
                 )
+                client = _get_fallback_client()
                 active_model = FALLBACK_LLM_MODEL
                 if on_event is not None:
                     await on_event("model_fallback", {
                         "from": LLM_MODEL, "to": FALLBACK_LLM_MODEL,
-                        "reason": "region_restricted",
+                        "reason": reason,
                     })
                 continue
             raise
@@ -413,6 +454,7 @@ async def chat(
     user_location: dict | None = None,
     trip_dates: dict | None = None,
     bench_eval: bool = False,
+    preferred_model: str | None = None,
 ) -> dict:
     """Run the LLM with a tool-call loop and return the final response.
 
@@ -423,6 +465,7 @@ async def chat(
         trip_dates: optional {start, end} ISO dates picked by the user
         bench_eval: if True, append addendum instructing the model to collapse
             all planning turns into one response for accurate benchmark scoring
+        preferred_model: override the default LLM_MODEL for this request
 
     Returns:
         {reply: str, itinerary: dict | None, tool_calls_made: list[str]}
@@ -434,6 +477,7 @@ async def chat(
         trip_dates=trip_dates,
         on_event=None,
         bench_eval=bench_eval,
+        preferred_model=preferred_model,
     )
 
 
@@ -443,6 +487,7 @@ async def chat_stream(
     user_location: dict | None = None,
     trip_dates: dict | None = None,
     bench_eval: bool = False,
+    preferred_model: str | None = None,
 ) -> AsyncIterator[dict]:
     """Run the LLM and yield events as tool calls fire.
 
@@ -467,6 +512,7 @@ async def chat_stream(
                 trip_dates=trip_dates,
                 on_event=emit,
                 bench_eval=bench_eval,
+                preferred_model=preferred_model,
             )
             await queue.put({"type": "done", "data": result})
         except RuntimeError as e:

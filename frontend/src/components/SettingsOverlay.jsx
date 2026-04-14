@@ -142,6 +142,29 @@ function saveCurrency(code) {
 const SUBTITLE_SIZE_KEY = "travel-subtitle-size";
 const SUBTITLE_SIZES = ["small", "medium", "large"];
 
+// LLM model selector — stored in localStorage, sent to backend on each request.
+const LLM_MODEL_STORAGE_KEY = "travel-llm-model";
+
+export const LLM_MODELS = [
+  { id: "grok-4.20-0309-non-reasoning", label: "GROK FAST",        hint: "xAI · quick responses" },
+  { id: "grok-4.20-0309-reasoning",     label: "GROK REASONING",   hint: "xAI · deeper multi-step" },
+  { id: "grok-4.20-multi-agent-0309",   label: "GROK MULTI-AGENT", hint: "xAI · agentic tasks" },
+  { id: "gemini-3.1-pro-preview",       label: "GEMINI 3.1 PRO",   hint: "Google · fallback provider" },
+];
+
+export function loadLlmModel() {
+  try {
+    const raw = localStorage.getItem(LLM_MODEL_STORAGE_KEY);
+    return LLM_MODELS.find((m) => m.id === raw)?.id || LLM_MODELS[0].id;
+  } catch {
+    return LLM_MODELS[0].id;
+  }
+}
+
+function saveLlmModel(id) {
+  try { localStorage.setItem(LLM_MODEL_STORAGE_KEY, id); } catch { /* ignore */ }
+}
+
 export function loadSubtitleSize() {
   try {
     const raw = localStorage.getItem(SUBTITLE_SIZE_KEY);
@@ -208,6 +231,7 @@ export default function SettingsOverlay({
   onChange,
   onTtsChange,
   onCurrencyChange,
+  onLlmModelChange,
   muted = false,
   onToggleMute,
   onClearAll,
@@ -217,12 +241,14 @@ export default function SettingsOverlay({
   const [theme, setTheme] = useState(() => loadTheme());
   const [currency, setCurrency] = useState(() => loadCurrency());
   const [subtitleSize, setSubtitleSize] = useState(() => loadSubtitleSize());
+  const [llmModel, setLlmModel] = useState(() => loadLlmModel());
   const [voices, setVoices] = useState([]);
   const [confirmClear, setConfirmClear] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
   const [savedFlash, setSavedFlash] = useState(false);
   const previousFocusRef = useRef(null);
   const rootRef = useRef(null);
+  const listRef = useRef(null);
 
   useEffect(() => {
     onChange?.(preferencesForApi(prefs));
@@ -237,6 +263,10 @@ export default function SettingsOverlay({
   useEffect(() => {
     onCurrencyChange?.(currency);
   }, [currency, onCurrencyChange]);
+
+  useEffect(() => {
+    onLlmModelChange?.(llmModel);
+  }, [llmModel, onLlmModelChange]);
 
   // speechSynthesis.getVoices() returns [] until the voices finish
   // loading on some browsers (Chrome). Subscribe to the onvoiceschanged
@@ -296,6 +326,7 @@ export default function SettingsOverlay({
   ];
   const rows = [
     ...PREF_FIELDS.map((f) => ({ kind: "field", ...f })),
+    { kind: "llm", key: "llm_model", label: "LLM MODEL", value: llmModel },
     {
       kind: "tts",
       key: "tts_voice",
@@ -312,7 +343,9 @@ export default function SettingsOverlay({
       kind: "action",
       key: "theme",
       label: "THEME",
-      value: theme === "light" ? "LIGHT" : "DARK",
+      value: theme,
+      options: ["dark", "light"],
+      optionLabels: ["DARK", "LIGHT"],
       onActivate: () => {
         const next = theme === "light" ? "dark" : "light";
         setTheme(next);
@@ -327,6 +360,7 @@ export default function SettingsOverlay({
       key: "currency",
       label: "CURRENCY",
       value: currency,
+      cycleHint: true,
       onActivate: () => {
         const codes = Object.keys(CURRENCY_TO_HKD);
         const idx = codes.indexOf(currency);
@@ -341,7 +375,9 @@ export default function SettingsOverlay({
       kind: "action",
       key: "subtitle_size",
       label: "SUBTITLE SIZE",
-      value: subtitleSize.toUpperCase(),
+      value: subtitleSize,
+      options: ["small", "medium", "large"],
+      optionLabels: ["SMALL", "MED", "LARGE"],
       onActivate: () => {
         const idx = SUBTITLE_SIZES.indexOf(subtitleSize);
         const next = SUBTITLE_SIZES[(idx + 1) % SUBTITLE_SIZES.length];
@@ -356,7 +392,9 @@ export default function SettingsOverlay({
       kind: "action",
       key: "mute",
       label: "MUTE TTS",
-      value: muted ? "ON" : "OFF",
+      value: muted ? "on" : "off",
+      options: ["off", "on"],
+      optionLabels: ["OFF", "ON"],
       onActivate: onToggleMute,
     },
     {
@@ -415,6 +453,13 @@ export default function SettingsOverlay({
     return () => document.removeEventListener("keydown", handler);
   }, [open, rows, selectedIdx, onClose]);
 
+  // Scroll the active row into view when navigating with arrow keys.
+  useEffect(() => {
+    if (!open) return;
+    listRef.current?.querySelector(".panel-list-item.active")
+      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [activeIdx, open]);
+
   const handleRowClick = (i, row) => {
     setActiveIdx(i);
     if (row.kind === "action") row.onActivate?.();
@@ -440,17 +485,37 @@ export default function SettingsOverlay({
         </header>
 
         <div className="settings-overlay-body">
-          <ul className="panel-list-items settings-overlay-list">
+          <ul className="panel-list-items settings-overlay-list" ref={listRef}>
             {rows.map((row, i) => {
-              let display = "—";
-              if (row.kind === "field") {
-                const value = prefs[row.key];
-                display =
-                  row.type === "select"
-                    ? row.options.find(([v]) => v === value)?.[1] || "—"
-                    : value || "—";
+              let displayEl;
+              if (row.kind === "action" && row.options) {
+                displayEl = (
+                  <span className="panel-list-options">
+                    {row.options.map((opt, oi) => (
+                      <span
+                        key={opt}
+                        className={`panel-list-opt${opt === row.value ? " opt-active" : ""}`}
+                      >
+                        {row.optionLabels[oi]}
+                      </span>
+                    ))}
+                  </span>
+                );
+              } else if (row.cycleHint) {
+                displayEl = (
+                  <span className="panel-list-cycle">‹ {row.value.toUpperCase()} ›</span>
+                );
+              } else if (row.kind === "llm") {
+                const label = LLM_MODELS.find((m) => m.id === row.value)?.label || row.value;
+                displayEl = <span className="panel-list-value">{label}</span>;
+              } else if (row.kind === "field") {
+                const v = prefs[row.key];
+                const text = row.type === "select"
+                  ? row.options.find(([val]) => val === v)?.[1] || "—"
+                  : v || "—";
+                displayEl = <span className="panel-list-value">{text}</span>;
               } else {
-                display = row.value;
+                displayEl = <span className="panel-list-value">{row.value}</span>;
               }
               return (
                 <li
@@ -463,7 +528,7 @@ export default function SettingsOverlay({
                   data-row-key={row.key}
                 >
                   <span className="panel-list-label">{row.label}</span>
-                  <span className="panel-list-value">{display}</span>
+                  {displayEl}
                 </li>
               );
             })}
@@ -539,6 +604,33 @@ export default function SettingsOverlay({
                 <p className="panel-detail-hint">
                   Speaking rate (0.8–1.5×). Higher is faster. Applies to the
                   next spoken subtitle.
+                </p>
+              </>
+            )}
+
+            {selected.kind === "llm" && (
+              <>
+                <select
+                  value={llmModel}
+                  onChange={(e) => {
+                    setLlmModel(e.target.value);
+                    saveLlmModel(e.target.value);
+                    setSavedFlash(true);
+                    setTimeout(() => setSavedFlash(false), 600);
+                  }}
+                  className="panel-input"
+                  data-testid="settings-llm-model"
+                >
+                  {LLM_MODELS.map(({ id, label, hint }) => (
+                    <option key={id} value={id}>
+                      {label} — {hint}
+                    </option>
+                  ))}
+                </select>
+                <p className="panel-detail-hint">
+                  Selects the AI model for planning. xAI models require the xAI
+                  API key; Gemini requires the Google API key. Change takes effect
+                  on the next message.
                 </p>
               </>
             )}

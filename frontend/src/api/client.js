@@ -98,12 +98,14 @@ export async function streamChat({
   preferences = null,
   userLocation = null,
   tripDates = null,
+  llmModel = null,
   onEvent,
 }) {
   const body = { message, history };
   if (preferences) body.preferences = preferences;
   if (userLocation) body.user_location = userLocation;
   if (tripDates) body.trip_dates = tripDates;
+  if (llmModel) body.preferred_model = llmModel;
 
   const response = await fetch(`${API_BASE}/chat/stream`, {
     method: "POST",

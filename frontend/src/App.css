@@ -2591,6 +2591,38 @@ li[tabindex]:focus-visible {
   text-transform: uppercase;
 }
 
+/* Option chips for toggle/cycle rows (THEME, MUTE TTS, SUBTITLE SIZE) */
+.panel-list-options {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.panel-list-opt {
+  font-size: 0.72rem;
+  padding: 1px 5px;
+  border-radius: 2px;
+  color: var(--text-dim);
+  background: transparent;
+  letter-spacing: 0.05em;
+  font-family: var(--font-mono);
+}
+
+.panel-list-opt.opt-active {
+  color: var(--accent);
+  background: var(--accent-bg);
+  font-weight: 700;
+}
+
+/* Cycle hint for long-cycle rows (CURRENCY) */
+.panel-list-cycle {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
 .settings-saved {
   margin-left: 12px;
   font-size: 10px;

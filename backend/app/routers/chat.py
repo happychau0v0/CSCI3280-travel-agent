@@ -20,6 +20,14 @@ class Message(BaseModel):
     content: str
 
 
+ALLOWED_MODELS = {
+    "grok-4.20-0309-non-reasoning",
+    "grok-4.20-0309-reasoning",
+    "grok-4.20-multi-agent-0309",
+    "gemini-3.1-pro-preview",
+}
+
+
 class ChatRequest(BaseModel):
     message: str
     history: list[Message] = Field(default_factory=list)
@@ -27,6 +35,7 @@ class ChatRequest(BaseModel):
     user_location: dict | None = None
     trip_dates: dict | None = None
     bench_eval: bool = False
+    preferred_model: str | None = None
 
 
 class ChatResponse(BaseModel):
@@ -42,6 +51,9 @@ async def post_chat(req: ChatRequest) -> ChatResponse:
         {"role": "user", "content": req.message}
     ]
 
+    if req.preferred_model and req.preferred_model not in ALLOWED_MODELS:
+        raise HTTPException(status_code=400, detail=f"Unknown model: {req.preferred_model}")
+
     try:
         result = await llm.chat(
             messages,
@@ -49,6 +61,7 @@ async def post_chat(req: ChatRequest) -> ChatResponse:
             user_location=req.user_location,
             trip_dates=req.trip_dates,
             bench_eval=req.bench_eval,
+            preferred_model=req.preferred_model,
         )
     except RuntimeError as e:
         # Missing API key — surface as 503 Service Unavailable
@@ -88,6 +101,9 @@ async def post_chat_stream(req: ChatRequest):
         {"role": "user", "content": req.message}
     ]
 
+    if req.preferred_model and req.preferred_model not in ALLOWED_MODELS:
+        raise HTTPException(status_code=400, detail=f"Unknown model: {req.preferred_model}")
+
     async def event_generator():
         async for event in llm.chat_stream(
             messages,
@@ -95,6 +111,7 @@ async def post_chat_stream(req: ChatRequest):
             user_location=req.user_location,
             trip_dates=req.trip_dates,
             bench_eval=req.bench_eval,
+            preferred_model=req.preferred_model,
         ):
             yield _format_sse(event)
 

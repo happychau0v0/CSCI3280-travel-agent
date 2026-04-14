@@ -12,6 +12,7 @@ import SettingsOverlay, {
   loadCurrency,
   loadSubtitleSize,
   applySubtitleSize,
+  loadLlmModel,
 } from "./components/SettingsOverlay";
 import HelpOverlay from "./components/HelpOverlay";
 import PrintView from "./components/PrintView";
@@ -264,6 +265,7 @@ function App() {
   const menu = useMenuState();
   const [tts, setTts] = useState(() => loadTts());
   const [currency, setCurrency] = useState(() => loadCurrency());
+  const [llmModel, setLlmModel] = useState(() => loadLlmModel());
   const subtitles = useSubtitleQueue({
     muted,
     rate: tts.rate,
@@ -724,6 +726,7 @@ function App() {
           preferences,
           userLocation,
           tripDates,
+          llmModel,
           onEvent: ({ type, data: payload }) => {
             if (type === "tool_start") {
               cues.bloop();
@@ -935,6 +938,7 @@ function App() {
       subtitles,
       menu,
       cues,
+      llmModel,
       saveCurrentPlanToHistory,
       setPendingInputRequest,
     ],
@@ -1469,6 +1473,7 @@ function App() {
         onChange={setPreferences}
         onTtsChange={setTts}
         onCurrencyChange={setCurrency}
+        onLlmModelChange={setLlmModel}
         muted={muted}
         onToggleMute={() => setMuted((m) => !m)}
         onClearAll={handleClearAll}
