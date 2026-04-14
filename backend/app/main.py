@@ -32,6 +32,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    max_age=3600,  # cache preflight for 1 hour — eliminates per-request OPTIONS round-trips
 )
 
 app.include_router(chat.router)

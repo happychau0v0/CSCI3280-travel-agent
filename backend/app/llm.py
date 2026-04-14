@@ -40,9 +40,11 @@ import time
 from pathlib import Path
 from typing import AsyncIterator, Awaitable, Callable
 
+import httpx
+import openai
 from openai import AsyncOpenAI
 
-from app.config import LLM_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL, check_key
+from app.config import FALLBACK_LLM_MODEL, LLM_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL, OPENROUTER_PROXY, check_key
 from app.prompts import SYSTEM_PROMPT
 from app.tools import TOOL_DEFINITIONS, TOOL_DISPATCH, ToolUnavailableError
 
@@ -54,40 +56,41 @@ logger = logging.getLogger(__name__)
 # calling tools without producing a final reply.
 MAX_TOOL_ROUNDS = 20
 
-# Proxy env vars that Clash/Shadowsocks/V2Ray set. The OpenAI SDK uses
-# httpx internally, which will try to route through these proxies and
-# fail with "socksio not installed" on most installs. Strip them before
-# creating the client, same as flights.py does for Google Flights.
-_PROXY_ENV_VARS = (
-    "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
-    "ALL_PROXY", "all_proxy",
-)
-
 _client: AsyncOpenAI | None = None
 
 
 def _get_client() -> AsyncOpenAI:
-    """Lazily build the OpenAI client pointed at OpenRouter."""
+    """Lazily build the OpenAI client pointed at OpenRouter.
+
+    The client intentionally inherits HTTP_PROXY / HTTPS_PROXY / ALL_PROXY
+    from the process environment so that geo-restricted models (e.g.
+    grok-4.20 is US-only) route through the server's local proxy
+    (Clash/Shadowsocks). socksio is listed in requirements.txt so SOCKS5
+    URLs work. Google Maps tool clients all use trust_env=False, so they
+    bypass the proxy regardless.
+    """
     global _client
     if _client is None:
         if not check_key(OPENROUTER_API_KEY):
             raise RuntimeError(
                 "OPENROUTER_API_KEY not configured. Add it to .env to enable the LLM."
             )
-        # Clear proxy env vars so httpx doesn't try to route through a
-        # local SOCKS proxy (Clash, Shadowsocks, V2Ray). These proxies
-        # cause "socksio not installed" crashes on most machines.
-        saved = {}
-        for key in _PROXY_ENV_VARS:
-            val = os.environ.pop(key, None)
-            if val is not None:
-                saved[key] = val
+        timeout = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=5.0)
+        # If OPENROUTER_PROXY is set in .env, route LLM calls through it so
+        # geo-restricted models (e.g. grok-4.20 is US-only) work from HK.
+        # Google Maps tool clients all use trust_env=False, so they bypass
+        # the proxy and hit Google directly.
+        if OPENROUTER_PROXY:
+            http_client = httpx.AsyncClient(proxy=OPENROUTER_PROXY, timeout=timeout)
+            logger.info("OpenRouter LLM will route via proxy: %s", OPENROUTER_PROXY)
+        else:
+            http_client = None
         _client = AsyncOpenAI(
             api_key=OPENROUTER_API_KEY,
             base_url=OPENROUTER_BASE_URL,
+            timeout=timeout,
+            http_client=http_client,
         )
-        # Restore env vars so other code (e.g. user scripts) isn't affected.
-        os.environ.update(saved)
     return _client
 
 
@@ -180,6 +183,15 @@ def _map_partial(fn_name: str, fn_args: dict, result: dict) -> dict | None:
     return None
 
 
+def _is_region_error(exc: Exception) -> bool:
+    """Return True when OpenRouter rejected the model due to geo-restriction."""
+    msg = str(exc).lower()
+    return any(k in msg for k in (
+        "region", "not available", "not supported", "geo", "country",
+        "unsupported", "access denied", "403",
+    ))
+
+
 EventCallback = Callable[[str, dict], Awaitable[None]]
 
 
@@ -212,17 +224,40 @@ async def _run_loop(
     full_messages: list[dict] = [{"role": "system", "content": system_content}] + list(messages)
     tool_calls_made: list[str] = []
     last_text = ""
+    # Start with the configured primary model. If the first call fails due to
+    # a geo-restriction (e.g. grok-4.20 is US-only; the backend is in HK),
+    # automatically retry round 0 with the fallback model so friends accessing
+    # via Tailscale don't need a separate VPN to use the LLM.
+    active_model = LLM_MODEL
 
     for round_idx in range(MAX_TOOL_ROUNDS):
         # Each iteration is a full chat completion. The model decides whether
         # to call tools (by returning .tool_calls) or to produce a final text
         # reply (by leaving .tool_calls empty).
-        response = await client.chat.completions.create(
-            model=LLM_MODEL,
-            messages=full_messages,
-            tools=TOOL_DEFINITIONS,
-            tool_choice="auto",
-        )
+        try:
+            response = await client.chat.completions.create(
+                model=active_model,
+                messages=full_messages,
+                tools=TOOL_DEFINITIONS,
+                tool_choice="auto",
+            )
+        except (openai.APIStatusError, openai.APIConnectionError) as exc:
+            # If round 0 fails due to geo-restriction, silently retry with
+            # the fallback model. Any other round or any other error re-raises
+            # so the caller sees a real error event.
+            if round_idx == 0 and active_model != FALLBACK_LLM_MODEL and _is_region_error(exc):
+                logger.warning(
+                    "Model %s unavailable (region error), retrying with %s: %s",
+                    active_model, FALLBACK_LLM_MODEL, exc,
+                )
+                active_model = FALLBACK_LLM_MODEL
+                if on_event is not None:
+                    await on_event("model_fallback", {
+                        "from": LLM_MODEL, "to": FALLBACK_LLM_MODEL,
+                        "reason": "region_restricted",
+                    })
+                continue
+            raise
 
         msg = response.choices[0].message
         last_text = msg.content or last_text

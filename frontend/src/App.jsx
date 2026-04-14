@@ -655,7 +655,20 @@ function App() {
         }
         if (idx >= 0) baseMessages = messages.slice(0, idx);
       }
-      const history = baseMessages.map((m) => ({ role: m.role, content: m.content }));
+      // Strip ```json…``` itinerary blocks from assistant messages before
+      // sending history to the LLM. A full 3-day itinerary can be 5,000+
+      // tokens — re-sending it on every follow-up turn inflates the context
+      // window and adds 10-20s of LLM inference time compared to the
+      // benchmark (which always starts with empty history). The LLM's system
+      // prompt already tells it to emit only the current turn's fields and
+      // that the frontend merges additively, so it doesn't need to re-read
+      // its own JSON output from prior turns. The short narrative sentence
+      // after the JSON (the spoken subtitle) is preserved for context.
+      const history = baseMessages.map((m) => {
+        if (m.role !== "assistant") return { role: m.role, content: m.content };
+        const trimmed = m.content.replace(/```json[\s\S]*?```/g, "[itinerary data]");
+        return { role: m.role, content: trimmed };
+      });
 
       setMessages([...baseMessages, userMsg]);
       setIsLoading(true);

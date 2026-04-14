@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
-# Restart both backend and frontend dev servers with proxy env vars
-# stripped. fast-flights' direct Google Flights endpoint 401s when
-# requests come through a VPN/datacenter proxy (Clash/Shadowsocks),
-# so every outbound call must bypass the local proxy.
+# Restart both backend and frontend dev servers.
+#
+# The backend (uvicorn) inherits the shell's proxy env vars so that
+# OpenRouter LLM calls route through the local Clash/Shadowsocks proxy
+# (needed for geo-restricted models like grok-4.20 from outside the US).
+# Google Maps tool clients all use trust_env=False so they bypass the
+# proxy and hit Google directly — no 401s from fast-flights.
+#
+# The frontend (Vite) is started with proxy stripped because it only
+# serves static assets and doesn't make outbound network calls.
 #
 # Usage:   ./scripts/restart.sh
 # Options:
@@ -41,19 +47,23 @@ restart_backend() {
     return 1
   fi
 
-  # Kill uvicorn processes matching this port only.
-  local existing
-  existing="$(pgrep -af "uvicorn app.main:app.*--port $BACKEND_PORT" | awk '{print $1}' || true)"
-  if [[ -n "$existing" ]]; then
-    echo "→ stopping existing backend (PIDs: $(echo "$existing" | tr '\n' ' '))"
+  # Kill every process holding port BACKEND_PORT and wait until it's free.
+  local port_pids
+  port_pids="$(lsof -ti ":$BACKEND_PORT" 2>/dev/null || true)"
+  if [[ -n "$port_pids" ]]; then
+    echo "→ stopping processes on port $BACKEND_PORT (PIDs: $(echo "$port_pids" | tr '\n' ' '))"
     # shellcheck disable=SC2086
-    kill $existing 2>/dev/null || true
-    sleep 1
+    kill $port_pids 2>/dev/null || true
+    # Wait up to 5 s for the port to become free.
+    for _ in $(seq 1 10); do
+      sleep 0.5
+      if ! lsof -ti ":$BACKEND_PORT" &>/dev/null; then break; fi
+    done
   fi
 
-  echo "→ starting uvicorn on ${HOST}:${BACKEND_PORT}${RELOAD_FLAG:+ with --reload}, proxy env stripped"
+  echo "→ starting uvicorn on ${HOST}:${BACKEND_PORT}${RELOAD_FLAG:+ with --reload}, proxy env preserved for LLM"
 
-  nohup "${NO_PROXY_ENV[@]}" \
+  nohup \
     .venv/bin/uvicorn app.main:app \
       --host "$HOST" \
       --port "$BACKEND_PORT" \
@@ -64,7 +74,16 @@ restart_backend() {
 
   for _ in $(seq 1 20); do
     sleep 0.5
-    if curl -s -o /dev/null -w "%{http_code}" "http://localhost:${BACKEND_PORT}/health" 2>/dev/null | grep -q "^200$"; then
+    if .venv/bin/python - <<EOF 2>/dev/null
+import urllib.request, sys
+try:
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    r = opener.open("http://127.0.0.1:${BACKEND_PORT}/health", timeout=2)
+    sys.exit(0 if r.status == 200 else 1)
+except Exception:
+    sys.exit(1)
+EOF
+    then
       echo "✅ backend healthy (PID $pid) — logs: /tmp/backend.log"
       return 0
     fi
@@ -104,7 +123,16 @@ restart_frontend() {
 
   for _ in $(seq 1 30); do
     sleep 0.5
-    if curl -s -o /dev/null -w "%{http_code}" "http://localhost:${FRONTEND_PORT}/" 2>/dev/null | grep -q "^200$"; then
+    if .venv/bin/python - <<EOF 2>/dev/null
+import urllib.request, sys
+try:
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    r = opener.open("http://127.0.0.1:${FRONTEND_PORT}/", timeout=2)
+    sys.exit(0 if r.status == 200 else 1)
+except Exception:
+    sys.exit(1)
+EOF
+    then
       echo "✅ frontend healthy (PID $pid) — logs: /tmp/frontend.log"
       return 0
     fi
