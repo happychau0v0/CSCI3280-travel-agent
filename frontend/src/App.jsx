@@ -190,7 +190,7 @@ function App() {
   const toggleAutoReplan = useCallback(() => {
     setAutoReplan((prev) => {
       const next = !prev;
-      try { localStorage.setItem(AUTO_REPLAN_KEY, String(next)); } catch {}
+      try { localStorage.setItem(AUTO_REPLAN_KEY, String(next)); } catch { /* quota or private-mode — ignore */ }
       return next;
     });
   }, []);
@@ -248,6 +248,12 @@ function App() {
   // the ref later in the same synchronous tick (e.g. the auto-reopen
   // check that fires immediately after a request_input event sets
   // the value mid-stream).
+  // Ref that always holds the latest itinerary so handleSend can read a
+  // fresh value without adding currentItinerary to its dep array (which
+  // would cause the callback to be recreated on every streaming token).
+  const currentItineraryRef = useRef(currentItinerary);
+  useEffect(() => { currentItineraryRef.current = currentItinerary; }, [currentItinerary]);
+
   const pendingInputRequestRef = useRef(null);
   const setPendingInputRequest = useCallback((value) => {
     pendingInputRequestRef.current = value;
@@ -517,7 +523,6 @@ function App() {
     } catch {
       /* ignore malformed hashes */
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Expose internal state to a window-level debug object so the
@@ -860,7 +865,7 @@ function App() {
           // as a best-effort snapshot — the functional updater above is
           // the authoritative state, but this is close enough for history.
           saveCurrentPlanToHistory(
-            { ...(currentItinerary || {}), ...data.itinerary },
+            { ...(currentItineraryRef.current || {}), ...data.itinerary },
             [...baseMessages, userMsg, assistantMsg],
           );
         }
@@ -930,6 +935,8 @@ function App() {
       subtitles,
       menu,
       cues,
+      saveCurrentPlanToHistory,
+      setPendingInputRequest,
     ],
   );
 
