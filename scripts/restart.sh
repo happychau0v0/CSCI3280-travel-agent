@@ -48,12 +48,14 @@ restart_backend() {
   fi
 
   # Kill every process holding port BACKEND_PORT and wait until it's free.
+  # Use SIGKILL directly — uvicorn worker processes ignore SIGTERM when the
+  # reloader is in a low-priority sleep state (seen with Python 3.14 on macOS).
   local port_pids
   port_pids="$(lsof -ti ":$BACKEND_PORT" 2>/dev/null || true)"
   if [[ -n "$port_pids" ]]; then
-    echo "→ stopping processes on port $BACKEND_PORT (PIDs: $(echo "$port_pids" | tr '\n' ' '))"
+    echo "→ killing processes on port $BACKEND_PORT (PIDs: $(echo "$port_pids" | tr '\n' ' '))"
     # shellcheck disable=SC2086
-    kill $port_pids 2>/dev/null || true
+    kill -9 $port_pids 2>/dev/null || true
     # Wait up to 5 s for the port to become free.
     for _ in $(seq 1 10); do
       sleep 0.5
@@ -103,14 +105,18 @@ restart_frontend() {
     return 1
   fi
 
-  # Kill any vite process tied to this repo (match the binary path).
-  local existing
-  existing="$(pgrep -af "node.*frontend/node_modules/\.bin/vite|sh -c vite" | awk '{print $1}' || true)"
-  if [[ -n "$existing" ]]; then
-    echo "→ stopping existing frontend (PIDs: $(echo "$existing" | tr '\n' ' '))"
+  # Kill everything holding FRONTEND_PORT (includes any VS Code Live Preview
+  # process that may shadow Vite on the same port, causing health checks to fail).
+  local port_pids
+  port_pids="$(lsof -ti ":$FRONTEND_PORT" 2>/dev/null || true)"
+  if [[ -n "$port_pids" ]]; then
+    echo "→ killing processes on port $FRONTEND_PORT (PIDs: $(echo "$port_pids" | tr '\n' ' '))"
     # shellcheck disable=SC2086
-    kill $existing 2>/dev/null || true
-    sleep 1
+    kill -9 $port_pids 2>/dev/null || true
+    for _ in $(seq 1 6); do
+      sleep 0.5
+      if ! lsof -ti ":$FRONTEND_PORT" &>/dev/null; then break; fi
+    done
   fi
 
   echo "→ starting vite on port ${FRONTEND_PORT}, proxy env stripped"
@@ -123,7 +129,7 @@ restart_frontend() {
 
   for _ in $(seq 1 30); do
     sleep 0.5
-    if .venv/bin/python - <<EOF 2>/dev/null
+    if "$ROOT/backend/.venv/bin/python" - <<EOF 2>/dev/null
 import urllib.request, sys
 try:
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
