@@ -295,7 +295,7 @@ def _normalize_time(time_str: str | None) -> str | None:
     return None
 
 
-def _try_fast_flights(from_iata: str, to_iata: str, date: str) -> list[dict]:
+def _try_fast_flights(from_iata: str, to_iata: str, date: str, seat_class: str = "economy") -> list[dict]:
     """Synchronously call fast-flights. Returns [] on any error.
 
     Wrapped in asyncio.to_thread by the caller so we don't block the loop.
@@ -320,7 +320,7 @@ def _try_fast_flights(from_iata: str, to_iata: str, date: str) -> list[dict]:
             flight_data=[FlightData(date=date, from_airport=from_iata, to_airport=to_iata)],
             trip="one-way",
             passengers=Passengers(adults=1),
-            seat="economy",
+            seat=seat_class,
             fetch_mode="common",
         )
     except Exception as e:
@@ -552,7 +552,7 @@ async def search_flights(
     # we fall through to the estimator so the user always gets options.
     try:
         live = await asyncio.wait_for(
-            asyncio.to_thread(_try_fast_flights, from_iata, to_iata, date),
+            asyncio.to_thread(_try_fast_flights, from_iata, to_iata, date, seat_class),
             timeout=6.0,
         )
     except asyncio.TimeoutError:
