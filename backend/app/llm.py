@@ -1,8 +1,8 @@
-"""LLM orchestrator: OpenRouter via OpenAI SDK with tool-calling loop.
+"""LLM orchestrator: xAI direct API via OpenAI SDK with tool-calling loop.
 
 Architecture (matches the TA brief's "Brain → Hands → Interface" diagram):
 
-    user message ─► chat() ─► OpenAI SDK pointed at OpenRouter
+    user message ─► chat() ─► OpenAI SDK pointed at xAI (api.x.ai)
                        ▲                  │
                        │                  ▼
                        │           model response
@@ -44,7 +44,7 @@ import httpx
 import openai
 from openai import AsyncOpenAI
 
-from app.config import FALLBACK_LLM_MODEL, LLM_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL, OPENROUTER_PROXY, check_key
+from app.config import FALLBACK_LLM_MODEL, LLM_MODEL, XAI_API_KEY, XAI_BASE_URL, check_key
 from app.prompts import SYSTEM_PROMPT
 from app.tools import TOOL_DEFINITIONS, TOOL_DISPATCH, ToolUnavailableError
 
@@ -60,36 +60,23 @@ _client: AsyncOpenAI | None = None
 
 
 def _get_client() -> AsyncOpenAI:
-    """Lazily build the OpenAI client pointed at OpenRouter.
+    """Lazily build the OpenAI client pointed at xAI's direct API.
 
-    The client intentionally inherits HTTP_PROXY / HTTPS_PROXY / ALL_PROXY
-    from the process environment so that geo-restricted models (e.g.
-    grok-4.20 is US-only) route through the server's local proxy
-    (Clash/Shadowsocks). socksio is listed in requirements.txt so SOCKS5
-    URLs work. Google Maps tool clients all use trust_env=False, so they
-    bypass the proxy regardless.
+    xAI API (https://api.x.ai/v1) is OpenAI SDK compatible and accessible
+    from HK without VPN — no proxy needed. Google Maps tool clients all use
+    trust_env=False, so they are unaffected by any system proxy settings.
     """
     global _client
     if _client is None:
-        if not check_key(OPENROUTER_API_KEY):
+        if not check_key(XAI_API_KEY):
             raise RuntimeError(
-                "OPENROUTER_API_KEY not configured. Add it to .env to enable the LLM."
+                "XAI_API_KEY not configured. Add it to .env to enable the LLM."
             )
         timeout = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=5.0)
-        # If OPENROUTER_PROXY is set in .env, route LLM calls through it so
-        # geo-restricted models (e.g. grok-4.20 is US-only) work from HK.
-        # Google Maps tool clients all use trust_env=False, so they bypass
-        # the proxy and hit Google directly.
-        if OPENROUTER_PROXY:
-            http_client = httpx.AsyncClient(proxy=OPENROUTER_PROXY, timeout=timeout)
-            logger.info("OpenRouter LLM will route via proxy: %s", OPENROUTER_PROXY)
-        else:
-            http_client = None
         _client = AsyncOpenAI(
-            api_key=OPENROUTER_API_KEY,
-            base_url=OPENROUTER_BASE_URL,
+            api_key=XAI_API_KEY,
+            base_url=XAI_BASE_URL,
             timeout=timeout,
-            http_client=http_client,
         )
     return _client
 
