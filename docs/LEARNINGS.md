@@ -106,7 +106,58 @@ the navigation immediately, the user lands on an empty panel.
 **Rule:** Buffer navigate events in a ref during streaming; flush
 only after `setCurrentItinerary` runs in the `done` handler.
 
-## 8. Feature Rounds in This Project
+## 8. macOS `setenv`/`unsetenv` Are Not Thread-Safe
+
+`asyncio.to_thread` dispatches blocking work to a thread pool. When two
+concurrent flight searches both called `os.environ.pop()` from different
+threads, the underlying C `unsetenv()` function deadlocked — blocking the
+entire asyncio event loop silently. The server accepted the request but
+never responded, with no error or timeout in logs.
+
+**Fix:** A single `threading.Lock` (`_env_lock`) wraps the env mutation +
+`get_flights()` call in `tools/flights.py`, serializing the critical section
+while still allowing all other tool calls to run in parallel.
+
+**Symptoms of this bug:** Server appears to accept request (200 returned
+immediately), but stream hangs forever. Lsof shows port 8000 open. No
+exception in uvicorn logs. CPU pegged at 100% on one thread.
+
+**Rule:** Any tool that mutates `os.environ` and may be called concurrently
+MUST use a module-level `threading.Lock` around the mutation + the
+side-effecting call it enables.
+
+## 9. With Non-Reasoning Models, Output Volume Is the New Bottleneck
+
+After switching from `grok-4.20-0309-reasoning` to `grok-4.20-0309-non-reasoning`,
+TTFT dropped from 26-33s to 7-16s per round — but total E2E for hotels and
+days stayed high because the LLM generates thousands of tokens of structured
+JSON output (5-8 hotels × full schema; 3 days × 6+ activities × directions).
+
+| Role | Reasoning E2E | Non-reasoning E2E | Bottleneck |
+|------|--------------|-------------------|------------|
+| plan | 48.6s | 36.1s | TTFT (fast now) |
+| hotels | 66.3s | 65.8s | Token output volume (~42s generation in round 2) |
+| days | 92.9s | 165.7s | Token output volume + tool call count (29 tools, 3 rounds) |
+
+**Rule:** For roles that emit large JSON schemas, optimizing inference speed
+gives diminishing returns after the first TTFT improvement. Future gains
+require either: (a) reducing output schema size (strip redundant/optional
+fields), (b) splitting output across multiple smaller responses, or (c)
+streaming progressive rendering so the user sees results arrive token-by-token.
+
+## 10. Per-Role Model Defaults Beat a Global Env Default
+
+A single `LLM_MODEL` env var meant bench scripts, API callers, and fresh
+installs all used whatever was in `.env` — often the reasoning model set
+during testing. Browser users had a localStorage default that was already
+correct, so they never felt the slowdown.
+
+**Fix:** `ROLE_DEFAULT_MODELS` dict in `llm.py` maps each call_role to
+`grok-4.20-0309-non-reasoning`. Model resolution order: explicit user choice
+(Settings UI) > role default > global `LLM_MODEL`. This means the right
+model is used regardless of `.env` unless the user explicitly overrides it.
+
+## 12. Feature Rounds in This Project
 
 | Round | Key Changes |
 |-------|------------|
@@ -122,3 +173,4 @@ only after `setCurrentItinerary` runs in the `done` handler.
 | 18 | Weather hints, checklist, subtitle pause |
 | 19 | ICS export, activity favorites |
 | 20 | Favorites overlay, photo lightbox navigation |
+| 21 | Scoped LLM calls (plan/hotels/days/chat roles), ROLE_DEFAULT_MODELS, thread-safety deadlock fix for parallel flight search, ETA progress bar |
