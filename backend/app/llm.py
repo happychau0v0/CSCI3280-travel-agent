@@ -513,6 +513,14 @@ async def _run_loop(
                 # submit_trip_form pre-fills the PLAN form and triggers planning.
                 elif fn_name == "submit_trip_form":
                     await on_event("submit_form", fn_args)
+                # pick_flight / pick_hotel / replace_activity — chat mode
+                # UI-action tools that mirror the FLIGHTS/HOTELS/DAYS buttons.
+                elif fn_name == "pick_flight":
+                    await on_event("pick_flight", fn_args)
+                elif fn_name == "pick_hotel":
+                    await on_event("pick_hotel", fn_args)
+                elif fn_name == "replace_activity":
+                    await on_event("replace_activity", fn_args)
 
             fn = TOOL_DISPATCH.get(fn_name)
             if fn is None:

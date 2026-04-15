@@ -41,3 +41,24 @@ async def submit_trip_form(
     if interests:
         prefill["interests"] = interests
     return {"ok": True, "action": "submit_trip_form", "prefill": prefill}
+
+
+async def pick_flight(label: str | None = None, index: int | None = None) -> dict:
+    """Signal the frontend to select a flight option from the current list."""
+    return {"ok": True, "action": "pick_flight", "label": label, "index": index}
+
+
+async def pick_hotel(name: str | None = None, index: int | None = None) -> dict:
+    """Signal the frontend to select a hotel from the current list."""
+    return {"ok": True, "action": "pick_hotel", "name": name, "index": index}
+
+
+async def replace_activity(day: int, activity_name: str, query: str = "") -> dict:
+    """Signal the frontend to replace a day activity with a new search."""
+    return {
+        "ok": True,
+        "action": "replace_activity",
+        "day": day,
+        "activity_name": activity_name,
+        "query": query,
+    }

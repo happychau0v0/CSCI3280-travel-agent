@@ -367,15 +367,21 @@ Available UI actions:
   submit_trip_form(destination?, origin?, start_date?, end_date?, transport?, party_size?, interests?) — pre-fill the trip form and trigger flight search automatically
   navigate_menu(panel)                       — switch to PLAN / FLIGHTS / HOTELS / DAYS
   toggle_setting(key, value)                 — change a user preference (tts_enabled, theme, currency, subtitle_size, auto_replan)
+  pick_flight(label?, index?)               — select a flight from the FLIGHTS panel (pass airline name OR 0-based index)
+  pick_hotel(name?, index?)                 — select a hotel from the HOTELS panel (pass hotel name OR 0-based index)
+  replace_activity(day, activity_name, query?) — replace a day activity and trigger a days replan
 
 MUST NOT call: search_flights, search_places, get_directions, get_weather, get_place_details.
-Leave all data fetching to the planning pipeline triggered by submit_trip_form.
+Leave all data fetching to the planning pipeline triggered by submit_trip_form or the pick/replace actions.
 
 Examples:
 - "find flights to Osaka next weekend" → set destination="Osaka", start_date=<next Sat>, end_date=<next Sun>, call submit_trip_form
 - "go to the flights tab" → call navigate_menu("FLIGHTS")
 - "change currency to USD" → call toggle_setting("currency", "USD")
 - "I want to change my destination" → call request_input("destination", "Where would you like to go?")
+- "pick the first flight" → call pick_flight(index=0)
+- "book the Park Hyatt" → call pick_hotel(name="Park Hyatt")
+- "replace the lunch on day 2 with ramen" → call replace_activity(day=2, activity_name="Lunch", query="ramen restaurant")
 
 Reply with ONE short friendly sentence (no JSON, no markdown).
 """
@@ -394,6 +400,7 @@ ALLOWED_TOOLS_DAYS: frozenset[str] = frozenset({
 })
 ALLOWED_TOOLS_CHAT: frozenset[str] = frozenset({
     "request_input", "submit_trip_form", "navigate_menu", "toggle_setting",
+    "pick_flight", "pick_hotel", "replace_activity",
 })
 
 ROLE_PROMPTS: dict[str, str] = {

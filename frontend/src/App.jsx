@@ -395,14 +395,11 @@ function App() {
     },
     [cues, menu],
   );
-  // Mouse click on a list item: move the cursor AND enter list scope
-  // explicitly. The scope flip is what makes ←/→ stop cycling tabs and
-  // signals to the user that they're now "inside" the panel.
+  // Mouse click on a list item: move the cursor to the clicked row.
   const selectListItem = useCallback(
     (index) => {
       cues.tick();
       menu.setListIndex(index);
-      menu.setScope("list");
     },
     [cues, menu],
   );
@@ -413,7 +410,6 @@ function App() {
     state: menu.state,
     setPanel: setPanelWithCue,
     setListIndex: setListIndexWithCue,
-    setScope: menu.setScope,
     listSize,
     onOpenChat: () => {
       cues.select();
@@ -461,8 +457,6 @@ function App() {
     onBack: () => {
       if (chatPopoverOpen) {
         setChatPopoverOpen(false);
-      } else if (menu.state.scope === "list") {
-        menu.setScope("tabs");
       }
     },
     onToggleMute: () => setMuted((m) => !m),
@@ -835,6 +829,65 @@ function App() {
                 setPendingFormPrefill(prefill);
               }
               subtitles.push("Filling in your trip details...");
+            } else if (type === "pick_flight") {
+              // Chat mode — LLM picked a flight on the user's behalf.
+              const { label, index } = payload || {};
+              const opts = currentItineraryRef.current?.flight?.options;
+              const opt = label
+                ? opts?.find(
+                    (o) =>
+                      o.label === label ||
+                      o.airline?.toLowerCase() === label?.toLowerCase(),
+                  )
+                : opts?.[index ?? 0];
+              if (opt) {
+                pushPickSnapshot();
+                setCurrentItinerary((prev) => ({ ...prev, selected_flight: opt }));
+                cues.chime();
+                const lbl = [
+                  opt.airline,
+                  opt.departure_time && opt.arrival_time
+                    ? `${opt.departure_time}→${opt.arrival_time}`
+                    : null,
+                  opt.price_low ? `HK$${opt.price_low}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(", ");
+                handleSend(`Selected flight: ${lbl}. Now find hotels.`, {
+                  callRole: "hotels",
+                });
+              }
+            } else if (type === "pick_hotel") {
+              // Chat mode — LLM picked a hotel on the user's behalf.
+              const { name, index } = payload || {};
+              const hotels = currentItineraryRef.current?.hotels;
+              const hotel = name
+                ? hotels?.find(
+                    (h) => h.name?.toLowerCase() === name?.toLowerCase(),
+                  )
+                : hotels?.[index ?? 0];
+              if (hotel) {
+                pushPickSnapshot();
+                setCurrentItinerary((prev) => ({
+                  ...prev,
+                  selected_hotel: hotel,
+                }));
+                cues.chime();
+                if (autoReplan) {
+                  handleSend(
+                    `Set "${hotel.name}" as the base hotel. ` +
+                      `Plan the day-by-day itinerary with activities, meals, and directions.`,
+                    { callRole: "days" },
+                  );
+                }
+              }
+            } else if (type === "replace_activity") {
+              // Chat mode — LLM wants to replace a day activity.
+              const { day, activity_name, query } = payload || {};
+              const q = query
+                ? `Replace "${activity_name}" on day ${day} with: ${query}`
+                : `Replace "${activity_name}" on day ${day} with a suitable alternative`;
+              handleSend(q, { callRole: "days" });
             } else if (type === "partial_itinerary") {
               // Progressive disclosure — show raw tool results before the LLM
               // finishes generating its closing text. The `done` event's final
@@ -993,6 +1046,8 @@ function App() {
       llmModel,
       saveCurrentPlanToHistory,
       setPendingInputRequest,
+      autoReplan,
+      pushPickSnapshot,
     ],
   );
 
