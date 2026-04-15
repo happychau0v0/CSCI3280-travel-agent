@@ -104,12 +104,22 @@ async def export_pdf(req: ExportRequest) -> Response:
     selected_flight = itinerary.get("selected_flight")
     selected_return_flight = itinerary.get("selected_return_flight")
 
-    # Fetch hotel photo as a base64 data URL so weasyprint can embed it
+    # Fetch hotel photo as a base64 data URL so weasyprint can embed it.
+    # selected_hotel from Turn 3 often lacks photo_url (the LLM strips it
+    # to reduce output size). Fall back to the matching entry in hotels[].
     hotel_photo_data_url = None
     if hotel:
-        photo_url = hotel.get("photo_url") or (
-            hotel.get("photos", [None])[0] if hotel.get("photos") else None
-        )
+        photo_url = hotel.get("photo_url")
+        if not photo_url:
+            # Look up by place_id first, then name
+            place_id = hotel.get("place_id")
+            name = hotel.get("name", "").lower()
+            for h in itinerary.get("hotels", []):
+                if (place_id and h.get("place_id") == place_id) or (
+                    name and h.get("name", "").lower() == name
+                ):
+                    photo_url = h.get("photo_url")
+                    break
         hotel_photo_data_url = await _photo_to_data_url(photo_url)
 
     # Fetch activity photos (one per activity, capped to avoid huge PDFs).
