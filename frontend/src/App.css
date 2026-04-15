@@ -807,13 +807,14 @@ li[tabindex]:focus-visible {
   border: 1px solid var(--border);
 }
 
-.home-form-list {
+/* Use .home-form ancestor to get specificity (0,2,0) > .panel-list-items (0,1,0)
+ * so these overrides definitively win the cascade. Without the parent selector,
+ * .panel-list-items { overflow-y: auto; max-height: 100% } wins by source order
+ * and makes the list scroll instead of showing all rows. */
+.home-form .home-form-list {
   flex: 0 0 auto;
-  /* Cancel .panel-list-items base rules that don't apply to the inline
-   * home form: the form wrapper already provides background/border, and
-   * the list should never scroll — all rows must always be visible. */
-  overflow: visible;
-  max-height: none;
+  overflow: visible !important;
+  max-height: none !important;
   background: transparent;
   border: none;
   backdrop-filter: none;
@@ -822,7 +823,7 @@ li[tabindex]:focus-visible {
 
 .home-form .trip-plan-btn {
   margin: 0;
-  padding: 11px 18px;
+  padding: 7px 18px;
   font-size: 13px;
   border-top: 1px solid var(--border);
   border-left: none;
