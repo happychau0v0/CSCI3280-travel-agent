@@ -326,20 +326,8 @@ export default function SettingsOverlay({
     ...voices.map((v) => [v.name, `${v.name} (${v.lang})`]),
   ];
   const rows = [
-    ...PREF_FIELDS.map((f) => ({ kind: "field", ...f })),
+    // Most-used: model and appearance
     { kind: "llm", key: "llm_model", label: "LLM MODEL", value: llmModel },
-    {
-      kind: "tts",
-      key: "tts_voice",
-      label: "TTS VOICE",
-      value: tts.voiceName || "System default",
-    },
-    {
-      kind: "tts",
-      key: "tts_rate",
-      label: "TTS SPEED",
-      value: `${tts.rate.toFixed(2)}×`,
-    },
     {
       kind: "action",
       key: "theme",
@@ -357,6 +345,7 @@ export default function SettingsOverlay({
         setTimeout(() => setSavedFlash(false), 600);
       },
     },
+    // Common display preferences
     {
       kind: "action",
       key: "currency",
@@ -375,6 +364,28 @@ export default function SettingsOverlay({
     },
     {
       kind: "action",
+      key: "mute",
+      label: "MUTE TTS",
+      value: muted ? "on" : "off",
+      options: ["off", "on"],
+      optionLabels: ["OFF", "ON"],
+      onActivate: onToggleMute,
+    },
+    // TTS fine-tuning
+    {
+      kind: "tts",
+      key: "tts_voice",
+      label: "TTS VOICE",
+      value: tts.voiceName || "System default",
+    },
+    {
+      kind: "tts",
+      key: "tts_rate",
+      label: "TTS SPEED",
+      value: `${tts.rate.toFixed(2)}×`,
+    },
+    {
+      kind: "action",
       key: "subtitle_size",
       label: "SUBTITLE SIZE",
       value: subtitleSize,
@@ -390,15 +401,9 @@ export default function SettingsOverlay({
         setTimeout(() => setSavedFlash(false), 600);
       },
     },
-    {
-      kind: "action",
-      key: "mute",
-      label: "MUTE TTS",
-      value: muted ? "on" : "off",
-      options: ["off", "on"],
-      optionLabels: ["OFF", "ON"],
-      onActivate: onToggleMute,
-    },
+    // Trip preferences
+    ...PREF_FIELDS.map((f) => ({ kind: "field", ...f })),
+    // Destructive / meta
     {
       kind: "action",
       key: "clear",

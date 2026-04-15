@@ -12,6 +12,9 @@ import httpx
 from app.config import GOOGLE_MAPS_API_KEY, check_key
 from app.tools.errors import ToolUnavailableError
 
+# Module-level shared client: reuses TCP connections across calls.
+_http = httpx.AsyncClient(timeout=15.0, trust_env=False)
+
 GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 
 
@@ -41,10 +44,9 @@ async def geocode_city(query: str) -> dict:
         "result_type": "locality|administrative_area_level_1|country",
     }
 
-    async with httpx.AsyncClient(timeout=15.0, trust_env=False) as client:
-        resp = await client.get(GEOCODE_URL, params=params)
-        resp.raise_for_status()
-        data = resp.json()
+    resp = await _http.get(GEOCODE_URL, params=params)
+    resp.raise_for_status()
+    data = resp.json()
 
     results = data.get("results", [])
     if not results:
@@ -88,10 +90,9 @@ async def reverse_geocode(lat: float, lng: float) -> dict:
         "result_type": "locality|administrative_area_level_1|country",
     }
 
-    async with httpx.AsyncClient(timeout=15.0, trust_env=False) as client:
-        resp = await client.get(GEOCODE_URL, params=params)
-        resp.raise_for_status()
-        data = resp.json()
+    resp = await _http.get(GEOCODE_URL, params=params)
+    resp.raise_for_status()
+    data = resp.json()
 
     results = data.get("results", [])
     if not results:

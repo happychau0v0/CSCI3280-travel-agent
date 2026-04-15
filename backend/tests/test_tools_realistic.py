@@ -58,8 +58,8 @@ class TestPlacesPageSize:
             captured_bodies.append(json)
             return _mock_response({"places": []})
 
-        with patch("app.tools.places.httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+        with patch("app.tools.places._http") as mock_http:
+            mock_http.post = AsyncMock(
                 side_effect=capture_post
             )
             await places.search_places("hotels", location="Tokyo, Japan")
@@ -80,8 +80,8 @@ class TestPlacesPageSize:
             captured_bodies.append(json)
             return _mock_response({"places": []})
 
-        with patch("app.tools.places.httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+        with patch("app.tools.places._http") as mock_http:
+            mock_http.post = AsyncMock(
                 side_effect=capture_post
             )
             await places.search_places("hotels in Tokyo")
@@ -102,8 +102,8 @@ class TestPlacesRealisticNormalization:
     async def test_handles_7_results_with_sparse_fields(self):
         """Feed the realistic fixture (7 places, some sparse) through search_places."""
         fixture = json.loads((FIXTURES / "places_hotels_tokyo.json").read_text())
-        with patch("app.tools.places.httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+        with patch("app.tools.places._http") as mock_http:
+            mock_http.post = AsyncMock(
                 return_value=_mock_response(fixture)
             )
             results = await places.search_places("hotels in Tokyo")
@@ -114,8 +114,8 @@ class TestPlacesRealisticNormalization:
     async def test_missing_photos_returns_none(self):
         """Place with no photos array should have photo_url=None."""
         fixture = json.loads((FIXTURES / "places_hotels_tokyo.json").read_text())
-        with patch("app.tools.places.httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+        with patch("app.tools.places._http") as mock_http:
+            mock_http.post = AsyncMock(
                 return_value=_mock_response(fixture)
             )
             results = await places.search_places("hotels in Tokyo")
@@ -128,8 +128,8 @@ class TestPlacesRealisticNormalization:
     async def test_empty_photos_array_returns_none(self):
         """Place with photos=[] should have photo_url=None."""
         fixture = json.loads((FIXTURES / "places_hotels_tokyo.json").read_text())
-        with patch("app.tools.places.httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+        with patch("app.tools.places._http") as mock_http:
+            mock_http.post = AsyncMock(
                 return_value=_mock_response(fixture)
             )
             results = await places.search_places("hotels in Tokyo")
@@ -142,8 +142,8 @@ class TestPlacesRealisticNormalization:
     async def test_photo_without_name_field_skipped(self):
         """Photo entry with no "name" key should be skipped, not crash."""
         fixture = json.loads((FIXTURES / "places_hotels_tokyo.json").read_text())
-        with patch("app.tools.places.httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+        with patch("app.tools.places._http") as mock_http:
+            mock_http.post = AsyncMock(
                 return_value=_mock_response(fixture)
             )
             results = await places.search_places("hotels in Tokyo")
@@ -157,8 +157,8 @@ class TestPlacesRealisticNormalization:
     async def test_missing_rating_is_none(self):
         """Place with no rating field should have rating=None."""
         fixture = json.loads((FIXTURES / "places_hotels_tokyo.json").read_text())
-        with patch("app.tools.places.httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+        with patch("app.tools.places._http") as mock_http:
+            mock_http.post = AsyncMock(
                 return_value=_mock_response(fixture)
             )
             results = await places.search_places("hotels in Tokyo")
@@ -170,8 +170,8 @@ class TestPlacesRealisticNormalization:
     async def test_missing_location_returns_none_coords(self):
         """Place with no location field should have lat=None, lng=None."""
         fixture = json.loads((FIXTURES / "places_hotels_tokyo.json").read_text())
-        with patch("app.tools.places.httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+        with patch("app.tools.places._http") as mock_http:
+            mock_http.post = AsyncMock(
                 return_value=_mock_response(fixture)
             )
             results = await places.search_places("hotels in Tokyo")
@@ -184,8 +184,8 @@ class TestPlacesRealisticNormalization:
     async def test_all_results_have_place_id_and_name(self):
         """Every result must always have place_id and name, regardless of sparseness."""
         fixture = json.loads((FIXTURES / "places_hotels_tokyo.json").read_text())
-        with patch("app.tools.places.httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+        with patch("app.tools.places._http") as mock_http:
+            mock_http.post = AsyncMock(
                 return_value=_mock_response(fixture)
             )
             results = await places.search_places("hotels in Tokyo")

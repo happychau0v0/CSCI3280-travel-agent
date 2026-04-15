@@ -54,10 +54,8 @@ async def test_search_places_returns_normalized_list():
             }
         ]
     }
-    with patch("app.tools.places.httpx.AsyncClient") as mock_client:
-        mock_client.return_value.__aenter__.return_value.post = AsyncMock(
-            return_value=_mock_response(fake_response)
-        )
+    with patch("app.tools.places._http") as mock_http:
+        mock_http.post = AsyncMock(return_value=_mock_response(fake_response))
         result = await places.search_places("temples in Tokyo")
 
     assert len(result) == 1
@@ -86,10 +84,8 @@ async def test_search_places_includes_description_and_hours():
             }
         ]
     }
-    with patch("app.tools.places.httpx.AsyncClient") as mock_client:
-        mock_client.return_value.__aenter__.return_value.post = AsyncMock(
-            return_value=_mock_response(fake_response)
-        )
+    with patch("app.tools.places._http") as mock_http:
+        mock_http.post = AsyncMock(return_value=_mock_response(fake_response))
         results = await places.search_places("temples in Tokyo")
 
     assert len(results) == 1
@@ -118,10 +114,8 @@ async def test_get_place_details_returns_dict():
         "photos": [{"name": "places/ChIJabc/photos/p1"}],
         "rating": 4.5,
     }
-    with patch("app.tools.places.httpx.AsyncClient") as mock_client:
-        mock_client.return_value.__aenter__.return_value.get = AsyncMock(
-            return_value=_mock_response(fake_response)
-        )
+    with patch("app.tools.places._http") as mock_http:
+        mock_http.get = AsyncMock(return_value=_mock_response(fake_response))
         result = await places.get_place_details("ChIJabc")
 
     assert result["name"] == "Senso-ji"
@@ -158,10 +152,8 @@ async def test_get_directions_parses_route():
             }
         ]
     }
-    with patch("app.tools.directions.httpx.AsyncClient") as mock_client:
-        mock_client.return_value.__aenter__.return_value.post = AsyncMock(
-            return_value=_mock_response(fake_response)
-        )
+    with patch("app.tools.directions._http") as mock_http:
+        mock_http.post = AsyncMock(return_value=_mock_response(fake_response))
         result = await directions.get_directions("Asakusa", "Shibuya", "TRANSIT")
 
     assert result["duration"] == "20 min"
@@ -207,9 +199,8 @@ async def test_get_weather_returns_current_and_forecast():
         ]
     }
 
-    with patch("app.tools.weather.httpx.AsyncClient") as mock_client:
-        ctx = mock_client.return_value.__aenter__.return_value
-        ctx.get = AsyncMock(
+    with patch("app.tools.weather._http") as mock_http:
+        mock_http.get = AsyncMock(
             side_effect=[
                 _mock_response(geocode_response),
                 _mock_response(current_response),
@@ -228,10 +219,8 @@ async def test_get_weather_returns_current_and_forecast():
 
 @pytest.mark.asyncio
 async def test_get_weather_geocode_failure_returns_empty():
-    with patch("app.tools.weather.httpx.AsyncClient") as mock_client:
-        mock_client.return_value.__aenter__.return_value.get = AsyncMock(
-            return_value=_mock_response({"results": []})
-        )
+    with patch("app.tools.weather._http") as mock_http:
+        mock_http.get = AsyncMock(return_value=_mock_response({"results": []}))
         result = await weather.get_weather("Atlantis")
 
     assert result["temp"] is None
@@ -255,10 +244,8 @@ async def test_geocode_city_returns_coords():
             }
         ]
     }
-    with patch("app.tools.geocode.httpx.AsyncClient") as mock_client:
-        mock_client.return_value.__aenter__.return_value.get = AsyncMock(
-            return_value=_mock_response(fake_response)
-        )
+    with patch("app.tools.geocode._http") as mock_http:
+        mock_http.get = AsyncMock(return_value=_mock_response(fake_response))
         result = await geocode.geocode_city("Tokyo")
 
     assert result["name"] == "Tokyo"
@@ -269,10 +256,8 @@ async def test_geocode_city_returns_coords():
 
 @pytest.mark.asyncio
 async def test_geocode_city_no_results_returns_error():
-    with patch("app.tools.geocode.httpx.AsyncClient") as mock_client:
-        mock_client.return_value.__aenter__.return_value.get = AsyncMock(
-            return_value=_mock_response({"results": []})
-        )
+    with patch("app.tools.geocode._http") as mock_http:
+        mock_http.get = AsyncMock(return_value=_mock_response({"results": []}))
         result = await geocode.geocode_city("Atlantis")
 
     assert "error" in result
@@ -299,10 +284,8 @@ async def test_reverse_geocode_returns_city():
             }
         ]
     }
-    with patch("app.tools.geocode.httpx.AsyncClient") as mock_client:
-        mock_client.return_value.__aenter__.return_value.get = AsyncMock(
-            return_value=_mock_response(fake_response)
-        )
+    with patch("app.tools.geocode._http") as mock_http:
+        mock_http.get = AsyncMock(return_value=_mock_response(fake_response))
         result = await geocode.reverse_geocode(22.3193, 114.1694)
 
     assert result["city"] == "Hong Kong"
@@ -757,23 +740,15 @@ async def test_places_search_always_sends_pagesize_without_location():
 
     class _Resp:
         status_code = 200
-        def raise_for_status(self):
-            pass
-        def json(self):
-            return {"places": []}
+        def raise_for_status(self): pass
+        def json(self): return {"places": []}
 
-    class _Client:
-        def __init__(self, *args, **kwargs):
-            pass
-        async def __aenter__(self):
-            return self
-        async def __aexit__(self, *args):
-            return None
-        async def post(self, url, json=None, headers=None):
-            captured["body"] = json
-            return _Resp()
+    async def fake_post(url, json=None, headers=None):
+        captured["body"] = json
+        return _Resp()
 
-    with patch("httpx.AsyncClient", _Client):
+    with patch("app.tools.places._http") as mock_http:
+        mock_http.post = fake_post
         await places.search_places("hotels in Tokyo")
 
     assert captured["body"]["pageSize"] == 20
@@ -787,23 +762,15 @@ async def test_places_search_with_location_still_sends_pagesize():
 
     class _Resp:
         status_code = 200
-        def raise_for_status(self):
-            pass
-        def json(self):
-            return {"places": []}
+        def raise_for_status(self): pass
+        def json(self): return {"places": []}
 
-    class _Client:
-        def __init__(self, *args, **kwargs):
-            pass
-        async def __aenter__(self):
-            return self
-        async def __aexit__(self, *args):
-            return None
-        async def post(self, url, json=None, headers=None):
-            captured["body"] = json
-            return _Resp()
+    async def fake_post(url, json=None, headers=None):
+        captured["body"] = json
+        return _Resp()
 
-    with patch("httpx.AsyncClient", _Client):
+    with patch("app.tools.places._http") as mock_http:
+        mock_http.post = fake_post
         await places.search_places("ramen", location="Shinjuku")
 
     assert captured["body"]["pageSize"] == 20
@@ -1051,15 +1018,11 @@ async def test_search_places_null_guards_for_new_fields():
         ]
     }
     with patch("app.tools.places.GOOGLE_MAPS_API_KEY", "fake-key"), \
-         patch("httpx.AsyncClient") as mock_client_cls:
+         patch("app.tools.places._http") as mock_http:
         mock_resp = AsyncMock()
         mock_resp.raise_for_status = lambda: None
         mock_resp.json = lambda: mock_response
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client_cls.return_value)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
-        mock_client_cls.return_value.post = AsyncMock(return_value=mock_resp)
-        mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
-        mock_resp.__aexit__ = AsyncMock(return_value=False)
+        mock_http.post = AsyncMock(return_value=mock_resp)
 
         results = await places.search_places("anything")
 

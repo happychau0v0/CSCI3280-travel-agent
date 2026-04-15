@@ -14,6 +14,7 @@ This catches:
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -42,17 +43,66 @@ def _make_tool_call(tc_id: str, name: str, args: dict):
 
 
 def _make_completion(message):
-    """Wrap a message in a fake ChatCompletion response."""
+    """Wrap a message in a fake ChatCompletion response (kept for readability at call sites)."""
     resp = MagicMock()
     resp.choices = [MagicMock()]
     resp.choices[0].message = message
     return resp
 
 
+async def _astream_message(msg):
+    """Convert a fake message into streaming chunks (async generator).
+
+    chat_stream() now uses stream=True, so mocks must return async generators
+    instead of plain completion objects.
+    """
+    if msg.content:
+        yield SimpleNamespace(
+            choices=[SimpleNamespace(
+                delta=SimpleNamespace(content=msg.content, tool_calls=None)
+            )]
+        )
+    if msg.tool_calls:
+        for i, tc in enumerate(msg.tool_calls):
+            yield SimpleNamespace(
+                choices=[SimpleNamespace(
+                    delta=SimpleNamespace(
+                        content=None,
+                        tool_calls=[SimpleNamespace(
+                            index=i,
+                            id=tc.id,
+                            function=SimpleNamespace(
+                                name=tc.function.name,
+                                arguments=tc.function.arguments,
+                            ),
+                        )],
+                    )
+                )]
+            )
+
+
+def _non_token(events: list) -> list:
+    """Filter out token and thinking events so ordering tests stay focused on control flow."""
+    return [e for e in events if e["type"] not in ("token", "thinking")]
+
+
 def _mock_client_with_responses(responses: list):
-    """Build a mock OpenAI client that returns responses in sequence."""
+    """Build a mock OpenAI client that streams responses in sequence.
+
+    Accepts the same list of _make_completion(msg) objects as before;
+    internally extracts the message and returns a streaming async generator.
+    """
+    msgs = [r.choices[0].message for r in responses]
+    idx = 0
+
+    async def fake_create(*args, **kwargs):
+        nonlocal idx
+        stream = _astream_message(msgs[idx])
+        idx += 1
+        return stream
+
     client = AsyncMock()
-    client.chat.completions.create = AsyncMock(side_effect=responses)
+    client.chat.completions.create = fake_create
     return client
 
 
@@ -70,9 +120,13 @@ class TestStreamNoTools:
         with patch("app.llm._get_client", return_value=client):
             events = [e async for e in chat_stream([{"role": "user", "content": "hi"}])]
 
-        assert len(events) == 1
-        assert events[0]["type"] == "done"
-        assert "Hello" in events[0]["data"]["reply"]
+        ctl = _non_token(events)
+        assert len(ctl) == 1
+        assert ctl[0]["type"] == "done"
+        assert "Hello" in ctl[0]["data"]["reply"]
+        # token events should carry the text
+        tokens = [e for e in events if e["type"] == "token"]
+        assert any("Hello" in e["data"]["text"] for e in tokens)
 
     @pytest.mark.asyncio
     async def test_done_has_null_itinerary_when_no_json(self):
@@ -82,7 +136,8 @@ class TestStreamNoTools:
         with patch("app.llm._get_client", return_value=client):
             events = [e async for e in chat_stream([{"role": "user", "content": "hi"}])]
 
-        assert events[0]["data"]["itinerary"] is None
+        done = next(e for e in events if e["type"] == "done")
+        assert done["data"]["itinerary"] is None
 
 
 # ─── Tool call flow: tool_start/tool_end pairing ────────────────────────
@@ -111,12 +166,12 @@ class TestStreamToolPairing:
         ):
             events = [e async for e in chat_stream([{"role": "user", "content": "Where is Tokyo?"}])]
 
-        types = [e["type"] for e in events]
-        starts = [e["data"]["name"] for e in events if e["type"] == "tool_start"]
-        ends = [e["data"]["name"] for e in events if e["type"] == "tool_end"]
+        ctl = _non_token(events)
+        starts = [e["data"]["name"] for e in ctl if e["type"] == "tool_start"]
+        ends = [e["data"]["name"] for e in ctl if e["type"] == "tool_end"]
 
         assert starts == ends, f"Unpaired tool events: starts={starts}, ends={ends}"
-        assert types[-1] == "done"
+        assert ctl[-1]["type"] == "done"
 
     @pytest.mark.asyncio
     async def test_multiple_parallel_tools_paired(self):
@@ -142,8 +197,9 @@ class TestStreamToolPairing:
         ):
             events = [e async for e in chat_stream([{"role": "user", "content": "Tokyo weather"}])]
 
-        starts = sorted([e["data"]["name"] for e in events if e["type"] == "tool_start"])
-        ends = sorted([e["data"]["name"] for e in events if e["type"] == "tool_end"])
+        ctl = _non_token(events)
+        starts = sorted([e["data"]["name"] for e in ctl if e["type"] == "tool_start"])
+        ends = sorted([e["data"]["name"] for e in ctl if e["type"] == "tool_end"])
 
         assert starts == ends
         assert len(starts) == 2
@@ -168,8 +224,9 @@ class TestStreamToolPairing:
         ):
             events = [e async for e in chat_stream([{"role": "user", "content": "ocean weather"}])]
 
-        starts = [e["data"]["name"] for e in events if e["type"] == "tool_start"]
-        ends = [e["data"]["name"] for e in events if e["type"] == "tool_end"]
+        ctl = _non_token(events)
+        starts = [e["data"]["name"] for e in ctl if e["type"] == "tool_start"]
+        ends = [e["data"]["name"] for e in ctl if e["type"] == "tool_end"]
         assert starts == ends == ["get_weather"]
 
 
@@ -199,7 +256,8 @@ class TestStreamNavigateOrdering:
         ):
             events = [e async for e in chat_stream([{"role": "user", "content": "show flights"}])]
 
-        types = [e["type"] for e in events]
+        ctl = _non_token(events)
+        types = [e["type"] for e in ctl]
 
         # Navigate event should exist
         assert "navigate" in types, "navigate event was not emitted"
@@ -230,7 +288,8 @@ class TestStreamNavigateOrdering:
         ):
             events = [e async for e in chat_stream([{"role": "user", "content": "hotels tokyo"}])]
 
-        types = [e["type"] for e in events]
+        ctl = _non_token(events)
+        types = [e["type"] for e in ctl]
         assert types[-1] == "done"
         # No events after done
         done_idx = types.index("done")
@@ -265,10 +324,11 @@ class TestStreamRequestInput:
         ):
             events = [e async for e in chat_stream([{"role": "user", "content": "plan a trip"}])]
 
-        types = [e["type"] for e in events]
+        ctl = _non_token(events)
+        types = [e["type"] for e in ctl]
         assert "request_input" in types
 
-        ri_event = next(e for e in events if e["type"] == "request_input")
+        ri_event = next(e for e in ctl if e["type"] == "request_input")
         assert ri_event["data"]["field"] == "destination"
 
 
@@ -297,5 +357,7 @@ class TestStreamErrorHandling:
         with patch("app.llm._get_client", return_value=client):
             events = [e async for e in chat_stream([{"role": "user", "content": "hi"}])]
 
-        assert len(events) == 1
-        assert events[0]["type"] == "error"
+        # A "thinking" event may precede the error (LLM signalled start before crash).
+        error_events = [e for e in events if e["type"] == "error"]
+        assert len(error_events) == 1
+        assert error_events[0]["type"] == "error"

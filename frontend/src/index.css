@@ -28,6 +28,8 @@
   /* Status */
   --danger: #ff5577;
   --success: #5eead4;
+  --success-glow: rgba(94, 234, 212, 0.5);
+  --status-bar-bg: rgba(13, 18, 30, 0.92);
 
   --shadow:
     rgba(0, 0, 0, 0.5) 0 16px 40px -12px,
@@ -72,6 +74,8 @@ body.theme-light {
 
   --danger: #c2185b;
   --success: #1a9b8f;
+  --success-glow: rgba(26, 155, 143, 0.45);
+  --status-bar-bg: rgba(250, 247, 236, 0.94);
 
   --shadow:
     rgba(38, 29, 10, 0.2) 0 16px 40px -12px,

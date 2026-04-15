@@ -31,6 +31,10 @@ import httpx
 from app.config import GOOGLE_MAPS_API_KEY, check_key
 from app.tools.errors import ToolUnavailableError
 
+# Module-level shared client: reuses TCP connections across calls, eliminating
+# per-call TCP+TLS handshake overhead (~100-300ms saved per Google API call).
+_http = httpx.AsyncClient(timeout=15.0, trust_env=False)
+
 PLACES_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
 PLACES_DETAILS_URL = "https://places.googleapis.com/v1/places/{place_id}"
 
@@ -94,10 +98,9 @@ async def search_places(
         "X-Goog-FieldMask": SEARCH_FIELD_MASK,
     }
 
-    async with httpx.AsyncClient(timeout=15.0, trust_env=False) as client:
-        resp = await client.post(PLACES_SEARCH_URL, json=body, headers=headers)
-        resp.raise_for_status()
-        data = resp.json()
+    resp = await _http.post(PLACES_SEARCH_URL, json=body, headers=headers)
+    resp.raise_for_status()
+    data = resp.json()
 
     results = []
     for place in data.get("places", []):
@@ -136,10 +139,9 @@ async def get_place_details(place_id: str) -> dict:
     }
     url = PLACES_DETAILS_URL.format(place_id=place_id)
 
-    async with httpx.AsyncClient(timeout=15.0, trust_env=False) as client:
-        resp = await client.get(url, headers=headers)
-        resp.raise_for_status()
-        data = resp.json()
+    resp = await _http.get(url, headers=headers)
+    resp.raise_for_status()
+    data = resp.json()
 
     hours = []
     if data.get("regularOpeningHours"):

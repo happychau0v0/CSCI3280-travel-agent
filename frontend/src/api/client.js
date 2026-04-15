@@ -99,6 +99,7 @@ export async function streamChat({
   userLocation = null,
   tripDates = null,
   llmModel = null,
+  callRole = null,
   onEvent,
 }) {
   const body = { message, history };
@@ -106,14 +107,29 @@ export async function streamChat({
   if (userLocation) body.user_location = userLocation;
   if (tripDates) body.trip_dates = tripDates;
   if (llmModel) body.preferred_model = llmModel;
+  if (callRole) body.call_role = callRole;
 
-  const response = await fetch(`${API_BASE}/chat/stream`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  // 90-second overall abort: if the backend crashes or the API stalls
+  // mid-stream, reader.read() would block forever without this guard.
+  const controller = new AbortController();
+  const abortTimer = setTimeout(() => controller.abort(), 90_000);
+
+  let response;
+  try {
+    response = await fetch(`${API_BASE}/chat/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(abortTimer);
+    if (err.name === "AbortError") throw new Error("Request timed out after 90 s");
+    throw err;
+  }
 
   if (!response.ok || !response.body) {
+    clearTimeout(abortTimer);
     throw new Error(`HTTP ${response.status}`);
   }
 
@@ -122,8 +138,16 @@ export async function streamChat({
   let buffer = "";
   let final = null;
 
+  try {
   while (true) {
-    const { done, value } = await reader.read();
+    let chunk;
+    try {
+      chunk = await reader.read();
+    } catch (err) {
+      if (err.name === "AbortError") throw new Error("Request timed out after 90 s");
+      throw err;
+    }
+    const { done, value } = chunk;
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
 
@@ -174,6 +198,11 @@ export async function streamChat({
         throw err;
       }
     }
+  }
+
+  } finally {
+    clearTimeout(abortTimer);
+    reader.releaseLock();
   }
 
   return final;

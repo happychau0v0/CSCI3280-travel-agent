@@ -9,6 +9,9 @@ import httpx
 from app.config import GOOGLE_MAPS_API_KEY, check_key
 from app.tools.errors import ToolUnavailableError
 
+# Module-level shared client: reuses TCP connections across calls.
+_http = httpx.AsyncClient(timeout=15.0, trust_env=False)
+
 GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 WEATHER_CURRENT_URL = "https://weather.googleapis.com/v1/currentConditions:lookup"
 WEATHER_FORECAST_URL = "https://weather.googleapis.com/v1/forecast/days:lookup"
@@ -56,55 +59,54 @@ async def get_weather(city: str, date: str | None = None) -> dict:
     if not check_key(GOOGLE_MAPS_API_KEY):
         raise ToolUnavailableError("GOOGLE_MAPS_API_KEY not configured")
 
-    async with httpx.AsyncClient(timeout=15.0, trust_env=False) as client:
-        coords = await _geocode_city(client, city)
-        if not coords:
-            return {
-                "temp": None,
-                "condition": f"Could not locate '{city}'",
-                "humidity": None,
-                "forecast": [],
-            }
-        lat, lng = coords
+    coords = await _geocode_city(_http, city)
+    if not coords:
+        return {
+            "temp": None,
+            "condition": f"Could not locate '{city}'",
+            "humidity": None,
+            "forecast": [],
+        }
+    lat, lng = coords
 
-        params = {
-            "key": GOOGLE_MAPS_API_KEY,
-            "location.latitude": lat,
-            "location.longitude": lng,
+    params = {
+        "key": GOOGLE_MAPS_API_KEY,
+        "location.latitude": lat,
+        "location.longitude": lng,
+    }
+
+    # Current conditions — Google Weather API is in preview and
+    # occasionally returns 404 for specific lat/lng pairs (ocean
+    # tiles, disputed territories, etc.). Catch and degrade
+    # gracefully so the tool still returns SOMETHING useful
+    # instead of crashing the whole chat stream.
+    try:
+        current_resp = await _http.get(WEATHER_CURRENT_URL, params=params)
+        current_resp.raise_for_status()
+        current = current_resp.json()
+    except httpx.HTTPStatusError as e:
+        return {
+            "temp": None,
+            "condition": f"Weather unavailable for {city} ({e.response.status_code})",
+            "humidity": None,
+            "forecast": [],
+        }
+    except httpx.RequestError as e:
+        return {
+            "temp": None,
+            "condition": f"Weather request failed: {type(e).__name__}",
+            "humidity": None,
+            "forecast": [],
         }
 
-        # Current conditions — Google Weather API is in preview and
-        # occasionally returns 404 for specific lat/lng pairs (ocean
-        # tiles, disputed territories, etc.). Catch and degrade
-        # gracefully so the tool still returns SOMETHING useful
-        # instead of crashing the whole chat stream.
-        try:
-            current_resp = await client.get(WEATHER_CURRENT_URL, params=params)
-            current_resp.raise_for_status()
-            current = current_resp.json()
-        except httpx.HTTPStatusError as e:
-            return {
-                "temp": None,
-                "condition": f"Weather unavailable for {city} ({e.response.status_code})",
-                "humidity": None,
-                "forecast": [],
-            }
-        except httpx.RequestError as e:
-            return {
-                "temp": None,
-                "condition": f"Weather request failed: {type(e).__name__}",
-                "humidity": None,
-                "forecast": [],
-            }
-
-        # 5-day forecast — same defensive handling
-        try:
-            forecast_params = {**params, "days": 5}
-            forecast_resp = await client.get(WEATHER_FORECAST_URL, params=forecast_params)
-            forecast_resp.raise_for_status()
-            forecast_data = forecast_resp.json()
-        except (httpx.HTTPStatusError, httpx.RequestError):
-            forecast_data = {"forecastDays": []}
+    # 5-day forecast — same defensive handling
+    try:
+        forecast_params = {**params, "days": 5}
+        forecast_resp = await _http.get(WEATHER_FORECAST_URL, params=forecast_params)
+        forecast_resp.raise_for_status()
+        forecast_data = forecast_resp.json()
+    except (httpx.HTTPStatusError, httpx.RequestError):
+        forecast_data = {"forecastDays": []}
 
     forecast = []
     for day in forecast_data.get("forecastDays", []):

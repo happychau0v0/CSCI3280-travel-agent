@@ -156,18 +156,16 @@ function buildPrompt(form) {
   const transport = form.transport || "any";
   const party = form.party_size ? `${form.party_size} people` : "1 person";
   const interests = form.interests?.trim() || "general sightseeing";
-  const dateText =
-    start && end && start !== end
-      ? ` from ${start} to ${end} (return date: ${end})`
-      : start
-        ? ` starting ${start}`
-        : "";
   const origin = form.origin?.trim() || "my current city";
   const seat = form.seat_class || "economy";
   const seatText = SEAT_CLASS_TEXT[seat] || "economy";
+  // Explicitly list dates so the LLM can see which fields are missing.
+  const startText = start || "[not set]";
+  const endText = end || "[not set]";
   return (
-    `Plan a ${dayText} trip from ${origin} to ${dest}${dateText} ` +
-    `with ${transport} transport for ${party}. Interests: ${interests}. ` +
+    `Plan a ${dayText} trip from ${origin} to ${dest}. ` +
+    `START DATE: ${startText}. END DATE: ${endText}. ` +
+    `Transport: ${transport}. Party: ${party}. Interests: ${interests}. ` +
     `Flight cabin: ${seatText}. Use search_flights with seat_class="${seat}".`
   );
 }
