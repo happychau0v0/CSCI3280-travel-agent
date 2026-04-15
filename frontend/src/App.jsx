@@ -304,6 +304,9 @@ function App() {
   // still picking their return flight. Prevents the done event from auto-navigating
   // to HOTELS until the return flight has been picked.
   const suppressHotelNavRef = useRef(false);
+  // When submit_trip_form fires, suppress ALL done-handler navigation so
+  // the user stays on HOME to review the pre-filled form.
+  const suppressDoneNavRef = useRef(false);
   // Replace-activity context: set when user clicks REPLACE, consumed by ChatPopover onSend.
   const pendingReplaceRef = useRef(null);
   // Guard against double-invocation of planDaysActivities (e.g. hotel pick fires
@@ -1209,8 +1212,12 @@ function App() {
               }
               subtitles.push(`Setting "${setting}" updated.`);
             } else if (type === "submit_form") {
-              // OBJ3 — LLM wants to pre-fill the trip form and start planning.
+              // OBJ3 — LLM wants to pre-fill the trip form for user review.
               // Always switch to HOME so the user sees the form being filled.
+              // Clear any buffered navigate_menu so the done handler doesn't
+              // yank the user to FLIGHTS/HOTELS before they click START PLANNING.
+              pendingNavigateRef.current = null;
+              suppressDoneNavRef.current = true;
               if (menu.state.panel !== "HOME") menu.setPanel("HOME");
               const prefill = payload?.prefill || {};
               if (Object.keys(prefill).length > 0) {
@@ -1369,7 +1376,12 @@ function App() {
         {
           const pending = pendingNavigateRef.current;
           pendingNavigateRef.current = null;
-          if (pending && pending.panel) {
+          const skipNav = suppressDoneNavRef.current;
+          suppressDoneNavRef.current = false;
+          if (skipNav) {
+            // submit_trip_form just fired — user should stay on HOME
+            // to review the pre-filled form and click START PLANNING.
+          } else if (pending && pending.panel) {
             menu.navigate(pending);
             cues.select();
           } else if (data.itinerary) {
