@@ -184,7 +184,7 @@ function App() {
   const [currentItinerary, setCurrentItinerary] = useState(initial.itinerary);
   // dayStatuses tracks loading/error state per day number during two-phase planning.
   // Key: day number (1-based), Value: "pending" | "loading" | "done" | "error"
-  const [dayStatuses, setDayStatuses] = useState({}); // eslint-disable-line no-unused-vars
+  const [dayStatuses, setDayStatuses] = useState({});
   const setDayStatus = (dayNum, status) =>
     setDayStatuses((prev) => ({ ...prev, [dayNum]: status }));
   const [planHistory, setPlanHistory] = useState(() => loadPlanHistory());
@@ -791,7 +791,7 @@ function App() {
     setDayStatus(day.day, "error");
   }
 
-  async function planDaysActivities(itinerary) { // eslint-disable-line no-unused-vars
+  async function planDaysActivities(itinerary) {
     // Reset all day statuses to pending before starting.
     const initial = {};
     (itinerary.days ?? []).forEach((d) => { initial[d.day] = "pending"; });
@@ -1083,12 +1083,10 @@ function App() {
                   selected_hotel: hotel,
                 }));
                 cues.chime();
+                // Trigger two-phase day planning after this stream completes.
                 pendingChainedSendRef.current = {
-                  text:
-                    `Set "${hotel.name}" as the base hotel in ${currentItineraryRef.current?.destination}. ` +
-                    `Flight arrives ${currentItineraryRef.current?.flight?.arrival_time} at ${currentItineraryRef.current?.flight?.to_iata} on ${currentItineraryRef.current?.flight?.date}. ` +
-                    `Plan the day-by-day itinerary with activities, meals, and directions.`,
-                  opts: { callRole: "days" },
+                  __planDays: true,
+                  hotel,
                 };
               }
             } else if (type === "replace_activity") {
@@ -1266,12 +1264,15 @@ function App() {
         // These are queued (not fired immediately) to avoid concurrent-request
         // races where the chained handleSend would start while this stream is
         // still running, causing message-state collisions.
-        {
-          const chained = pendingChainedSendRef.current;
+        if (pendingChainedSendRef.current) {
+          const pending = pendingChainedSendRef.current;
           pendingChainedSendRef.current = null;
-          if (chained) {
+          if (pending.__planDays) {
+            const snap = currentItineraryRef.current;
+            if (snap) planDaysActivities({ ...snap, selected_hotel: pending.hotel });
+          } else {
             // Small delay so the done-state UI settles before the next agent turn.
-            setTimeout(() => handleSend(chained.text, chained.opts), 50);
+            setTimeout(() => handleSend(pending.text, pending.opts), 50);
           }
         }
 
@@ -1681,12 +1682,11 @@ function App() {
               });
               cues.chime();
               if (autoReplan) {
-                // Fire Turn 3 so the LLM builds days around this hotel
-                const prompt =
-                  `Set "${hotel.name}" as the base hotel in ${currentItinerary?.destination}. ` +
-                  `Flight arrives ${currentItinerary?.flight?.arrival_time} at ${currentItinerary?.flight?.to_iata} on ${currentItinerary?.flight?.date}. ` +
-                  `Plan the day-by-day itinerary with activities, meals, and directions.`;
-                handleSend(prompt, { callRole: "days" });
+                // Fire two-phase day planning so the LLM builds days around this hotel
+                planDaysActivities({
+                  ...currentItinerary,
+                  selected_hotel: hotel,
+                });
               } else {
                 // Manual mode — just advance to DAYS panel
                 setPanelWithCue("DAYS");
@@ -1699,6 +1699,7 @@ function App() {
         {menu.state.panel === "DAYS" && (
           <PanelDays
             itinerary={currentItinerary}
+            dayStatuses={dayStatuses}
             listIndex={menu.state.listIndex}
             side={menu.state.side}
             activityIndex={activityIndex}
