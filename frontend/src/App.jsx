@@ -3,7 +3,6 @@ import ErrorBanner from "./components/ErrorBanner";
 import MenuShell from "./components/MenuShell";
 import Subtitle from "./components/Subtitle";
 import ChatPopover from "./components/ChatPopover";
-import AgentStatusBar from "./components/AgentStatusBar";
 import HistoryOverlay from "./components/HistoryOverlay";
 import SettingsOverlay, {
   loadTheme,
@@ -199,6 +198,7 @@ function App() {
   }, []);
   const [chatPopoverOpen, setChatPopoverOpen] = useState(false);
   const [chatPopoverInitial, setChatPopoverInitial] = useState("");
+  const [chatPopoverPromptLabel, setChatPopoverPromptLabel] = useState("");
   // Streaming text: accumulates LLM tokens as they arrive so the user sees
   // text within ~200ms of the first token, not after the full LLM round.
   const [streamingText, setStreamingText] = useState("");
@@ -218,15 +218,9 @@ function App() {
   // Activity cursor for DAYS right-side keyboard navigation.
   // Resets to 0 when the selected day changes.
   const [activityIndex, setActivityIndex] = useState(0);
-  // Agent status state used by the AgentStatusBar — addresses the
-  // round-7 "feels unresponsive" complaint with overlapping indicators.
+  // Agent status — drives the TabStrip indicator and isLoading guard
   const [agentState, setAgentState] = useState("idle"); // idle|working|done|error
   const [currentTool, setCurrentTool] = useState(null);
-  const [requestStartedAt, setRequestStartedAt] = useState(null);
-  // Per-tool timing log — [{name, elapsed_ms}] — reset each request
-  const [toolTimings, setToolTimings] = useState([]);
-  // Which call_role is active — used by AgentStatusBar for ETA display
-  const [currentCallRole, setCurrentCallRole] = useState(null);
   const [pendingInputRequest, _setPendingInputRequest] = useState(null);
   // OBJ3 — LLM can pre-fill the trip form and auto-trigger planning
   const [pendingFormPrefill, setPendingFormPrefill] = useState(null);
@@ -247,6 +241,8 @@ function App() {
   // Chained send queued by pick_flight/pick_hotel/replace_activity SSE handlers.
   // Fired AFTER the current stream's done event to avoid concurrent-request races.
   const pendingChainedSendRef = useRef(null);
+  // Replace-activity context: set when user clicks REPLACE, consumed by ChatPopover onSend.
+  const pendingReplaceRef = useRef(null);
   // Round 12 — undo / redo stacks for user-driven picks
   // (selected_flight and selected_hotel only). Each entry is a
   // {selected_flight, selected_hotel} snapshot taken BEFORE a pick
@@ -429,6 +425,7 @@ function App() {
     onOpenChat: () => {
       cues.select();
       setChatPopoverInitial("");
+      setChatPopoverPromptLabel("");
       setChatPopoverOpen(true);
     },
     onActivate: () => {
@@ -748,12 +745,8 @@ function App() {
         clearTimeout(autoReopenTimerRef.current);
         autoReopenTimerRef.current = null;
       }
-      const startedAt = Date.now();
-      setRequestStartedAt(startedAt);
       setAgentState("working");
       setCurrentTool(null);
-      setToolTimings([]);
-      setCurrentCallRole(callRole);
       subtitles.clear();
       // Reset streaming text state for this request.
       streamTokenBufRef.current = "";
@@ -819,14 +812,6 @@ function App() {
                   subtitles.push(label, { spoken: !alreadySpoken });
                 }
               }
-            } else if (type === "tool_end") {
-              // Record per-tool elapsed time for the benchmark display
-              if (payload?.name) {
-                setToolTimings((prev) => [
-                  ...prev,
-                  { name: payload.name, elapsed_ms: payload.elapsed_ms ?? null },
-                ]);
-              }
             } else if (type === "navigate") {
               // Round 11 — buffer instead of applying immediately.
               // The backend fires this during the navigate_menu
@@ -836,13 +821,17 @@ function App() {
               // panel during loading. Flush in the done branch.
               pendingNavigateRef.current = payload;
             } else if (type === "request_input") {
-              // The LLM is asking for a single structured value via
-              // an inline form row on HOME. Flag the pending request
-              // (PanelHome's effect focuses the matching row), ensure
-              // we're on HOME, and speak the prompt as a subtitle.
+              // The LLM is asking for a clarifying question. Flag the
+              // pending request for PanelHome field tracking, then open
+              // ChatPopover with the question visible — keeping the user
+              // on their current panel instead of force-navigating to HOME.
               setPendingInputRequest(payload);
-              if (menu.state.panel !== "HOME") menu.setPanel("HOME");
-              if (payload?.prompt) subtitles.push(payload.prompt);
+              if (payload?.prompt) {
+                setChatPopoverPromptLabel(payload.prompt);
+                setChatPopoverInitial("");
+                setChatPopoverOpen(true);
+                subtitles.push(payload.prompt);
+              }
               cues.select();
             } else if (type === "setting_change") {
               // OBJ3 — LLM toggled a UI setting directly.
@@ -1057,7 +1046,6 @@ function App() {
         );
         // ── Done state: brief ✓ READY flash, then collapse to idle
         setCurrentTool(null);
-        setCurrentCallRole(null);
         setAgentState("done");
         idleTimerRef.current = setTimeout(() => {
           setAgentState("idle");
@@ -1086,6 +1074,7 @@ function App() {
         const trimmedReply = (data.reply || "").trim();
         if (trimmedReply.endsWith("?") && !pendingInputRequestRef.current) {
           autoReopenTimerRef.current = setTimeout(() => {
+            setChatPopoverPromptLabel("");
             setChatPopoverOpen(true);
             autoReopenTimerRef.current = null;
           }, 2000);
@@ -1304,13 +1293,7 @@ function App() {
 
   return (
     <div className={`app panel-active-${menu.state.panel.toLowerCase()}`}>
-      {/* Only show the top-level error banner when the AgentStatusBar
-       *  ISN'T already rendering the same error. When agentState is
-       *  "error", AgentStatusBar shows a prominent red bar — stacking
-       *  a second banner on top is redundant and confusing (Bug #6). */}
-      {agentState !== "error" && (
-        <ErrorBanner error={error} onDismiss={() => setError(null)} />
-      )}
+      <ErrorBanner error={error} onDismiss={() => setError(null)} />
 
       {/* Background globe */}
       <Suspense fallback={<div className="globe-loading">Loading globe…</div>}>
@@ -1324,36 +1307,18 @@ function App() {
         />
       </Suspense>
 
-      {/* Prominent agent-working banner — pinned below the tab strip
-       *  via fixed positioning. The user's #1 round-7 complaint was
-       *  "feels unresponsive", so this is impossible to miss. */}
-      <AgentStatusBar
-        state={agentState}
-        currentTool={currentTool}
-        startedAt={requestStartedAt}
-        errorMessage={error?.message}
-        onDismissError={() => {
-          setError(null);
-          setAgentState("idle");
-        }}
-        toolTimings={toolTimings}
-        callRole={currentCallRole}
-        isReasoningModel={!!llmModel && llmModel.includes("reasoning") && !llmModel.includes("non-reasoning")}
-      />
-
       {/* NieR-style menu shell */}
       <MenuShell
         state={menu.state}
         onTabClick={setPanelWithCue}
         muted={muted}
         overlay={historyOpen ? "history" : settingsOpen ? "settings" : null}
+        agentState={agentState}
       >
         {menu.state.panel === "HOME" && (
           <PanelHome
             itinerary={currentItinerary}
             userLocation={userLocation}
-            agentState={agentState}
-            currentTool={currentTool}
             listIndex={menu.state.listIndex}
             isLoading={isLoading}
             pendingInputRequest={pendingInputRequest}
@@ -1481,6 +1446,7 @@ function App() {
               }
             }}
             side={menu.state.side}
+            theme={theme}
           />
         )}
         {menu.state.panel === "DAYS" && (
@@ -1523,18 +1489,18 @@ function App() {
               cues.tick?.();
             }}
             onReplaceActivity={(dayIdx, actIdx) => {
-              // Round 13 — ask the agent for a similar alternative.
-              // Fires a chat that the LLM can respond to with a
-              // replacement via replan.
+              // Ask the user what they want to replace the activity with
+              // before sending to the LLM — opens ChatPopover with context.
               const day = currentItinerary?.days?.[dayIdx];
               const act = day?.activities?.[actIdx];
               if (!act) return;
               const dest = currentItinerary?.destination || "the destination";
-              handleSend(
-                `Replace "${act.name}" on Day ${day.day} with a similar but different place in ${dest}. ` +
-                `Keep every other activity, keep the hotel anchor, update times if needed.`,
-                { callRole: "days" },
+              pendingReplaceRef.current = { actName: act.name, dayNum: day.day, dest };
+              setChatPopoverPromptLabel(
+                `What would you like to replace "${act.name}" with? (Leave empty for a similar alternative)`
               );
+              setChatPopoverInitial("");
+              setChatPopoverOpen(true);
             }}
             onSetActivityNote={(dayIdx, actIdx, note) => {
               // Round 16 — attach a personal note to an activity.
@@ -1651,6 +1617,7 @@ function App() {
               });
               cues.tick?.();
             }}
+            theme={theme}
           />
         )}
       </MenuShell>
@@ -1724,8 +1691,18 @@ function App() {
           // message). This avoids the double-truncation bug.
           const idx = editTurnIdxRef.current;
           editTurnIdxRef.current = null;
+          const replaceCtx = pendingReplaceRef.current;
+          pendingReplaceRef.current = null;
           if (idx != null) {
             handleSend(text, { truncateBefore: idx, callRole: "chat" });
+          } else if (replaceCtx) {
+            // User answered the "replace with what?" question
+            const { actName, dayNum, dest } = replaceCtx;
+            const preference = text.trim();
+            const msg = preference
+              ? `Replace "${actName}" on Day ${dayNum} with: ${preference}. Keep every other activity, keep the hotel anchor, update times if needed.`
+              : `Replace "${actName}" on Day ${dayNum} with a similar but different place in ${dest}. Keep every other activity, keep the hotel anchor, update times if needed.`;
+            handleSend(msg, { callRole: "days" });
           } else {
             handleSend(text, { ...opts, callRole: "chat" });
           }
@@ -1733,10 +1710,13 @@ function App() {
         onClose={() => {
           setChatPopoverOpen(false);
           setChatPopoverInitial("");
+          setChatPopoverPromptLabel("");
           editTurnIdxRef.current = null;
+          pendingReplaceRef.current = null;
         }}
         isLoading={isLoading}
         initialText={chatPopoverInitial}
+        promptLabel={chatPopoverPromptLabel}
         onRecallLast={() => lastUserMessage}
       />
     </div>

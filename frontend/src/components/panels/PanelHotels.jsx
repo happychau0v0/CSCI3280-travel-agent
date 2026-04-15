@@ -59,6 +59,7 @@ export default function PanelHotels({
   onPick,
   autoReplan = true,
   onToggleAutoReplan,
+  theme = "dark",
 }) {
   const hotelsRaw = itinerary?.hotels || [];
   const [priceFilter, setPriceFilter] = useState("any");
@@ -194,6 +195,7 @@ export default function PanelHotels({
           hotels={hotels}
           airport={airportPin}
           selectedIdx={selectedIdx}
+          theme={theme}
         />
       </div>
 

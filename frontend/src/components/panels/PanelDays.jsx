@@ -316,6 +316,7 @@ export default function PanelDays({
   onRemoveDay,
   favoriteKeys = new Set(),
   onToggleFavorite,
+  theme = "dark",
 }) {
   const days = itinerary?.days || [];
   const hotelName =
@@ -591,6 +592,7 @@ export default function PanelDays({
           activeActivityIdx={activeActivityIdx}
           liveRoute={liveRoute}
           liveRouteLoading={liveRouteLoading}
+          theme={theme}
         />
       </div>
 

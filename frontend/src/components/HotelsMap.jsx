@@ -84,7 +84,7 @@ function airportIcon(distant) {
   });
 }
 
-export default function HotelsMap({ hotels, airport = null, selectedIdx = 0 }) {
+export default function HotelsMap({ hotels, airport = null, selectedIdx = 0, theme = "dark" }) {
   const { markers, bounds, airportIsOutlier, distanceKm } = useMemo(() => {
     const markers = [];
     const hotelCoords = [];
@@ -138,7 +138,8 @@ export default function HotelsMap({ hotels, airport = null, selectedIdx = 0 }) {
         style={{ height: "100%", width: "100%" }}
       >
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          key={theme}
+          url={`https://{s}.basemaps.cartocdn.com/${theme === "light" ? "light_all" : "dark_all"}/{z}/{x}/{y}{r}.png`}
           subdomains="abcd"
         />
         {markers.map((m) => (

@@ -166,6 +166,7 @@ export default function DayMiniMap({
   activeActivityIdx = -1,
   liveRoute = null,
   liveRouteLoading = false,
+  theme = "dark",
 }) {
   const { points, polylines } = useMemo(() => {
     const pts = [];
@@ -274,7 +275,8 @@ export default function DayMiniMap({
         style={{ height: "100%", width: "100%" }}
       >
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          key={theme}
+          url={`https://{s}.basemaps.cartocdn.com/${theme === "light" ? "light_all" : "dark_all"}/{z}/{x}/{y}{r}.png`}
           subdomains="abcd"
         />
         {hasAirport && (
