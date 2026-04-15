@@ -163,11 +163,21 @@ export default function AgentStatusBar({
         )}
         {toolTimings.length > 0 && (
           <div className="status-timings">
-            {toolTimings.slice(-4).map(({ name, elapsed_ms }, i) => (
-              <span key={i} className={`status-timing-chip${elapsed_ms > 10000 ? " timing-slow" : elapsed_ms > 3000 ? " timing-warn" : ""}`}>
-                {friendlyTool(name)} {elapsed_ms != null ? formatMs(elapsed_ms) : "…"}
-              </span>
-            ))}
+            {(() => {
+              // Deduplicate by tool name — keep the last elapsed_ms per tool,
+              // then show the 4 most recently seen unique tools. This prevents
+              // "search_places 230ms / search_places 180ms / …" clutter when
+              // the same tool is called multiple times in a single turn.
+              const seen = new Map();
+              for (const { name, elapsed_ms } of toolTimings) {
+                seen.set(name, elapsed_ms);
+              }
+              return [...seen.entries()].slice(-4).map(([name, elapsed_ms]) => (
+                <span key={name} className={`status-timing-chip${elapsed_ms > 10000 ? " timing-slow" : elapsed_ms > 3000 ? " timing-warn" : ""}`}>
+                  {friendlyTool(name)} {elapsed_ms != null ? formatMs(elapsed_ms) : "…"}
+                </span>
+              ));
+            })()}
           </div>
         )}
       </div>
