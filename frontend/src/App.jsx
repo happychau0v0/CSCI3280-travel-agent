@@ -265,7 +265,7 @@ function App() {
   const [toolTimings, setToolTimings] = useState([]); // [{name, elapsed_ms}]
   const requestStartedAtRef = useRef(null); // Date.now() when request begins
   const [pendingInputRequest, _setPendingInputRequest] = useState(null);
-  // OBJ3 — LLM can pre-fill the trip form and auto-trigger planning
+  // OBJ3 — LLM can pre-fill the trip form; user must click START PLANNING to begin
   const [pendingFormPrefill, setPendingFormPrefill] = useState(null);
   // Tracks the in-flight done→idle setTimeout so a new request can
   // cancel it before it overwrites the new "working" state (B6).

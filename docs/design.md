@@ -268,7 +268,7 @@ not to do the research yourself.
 
 Available UI actions:
   request_input(field, prompt)                  — highlight and focus a form field
-  submit_trip_form(fields...)                   — pre-fill the form and start planning
+  submit_trip_form(fields...)                   — pre-fill the form for user review
   navigate_menu(panel)                          — switch to PLAN/FLIGHTS/HOTELS/DAYS
   toggle_setting(key, value)                    — change a user preference
   pick_flight(label?, index?)                   — select a flight option
