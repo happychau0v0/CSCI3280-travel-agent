@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { exportPdf } from "../../api/client";
 import { downloadKml, countKmlPlaces } from "../../utils/exportKml";
 
@@ -80,9 +81,14 @@ export default function PanelExport({ itinerary, visaAlert }) {
   }));
 
   async function handleExportPdf() {
-    setPdfError(null);
-    setPdfDone(false);
-    setPdfLoading(true);
+    // flushSync forces React to paint the loading state BEFORE the async
+    // fetch starts — without it React 18 batching can skip the intermediate
+    // loading render entirely if the request resolves quickly.
+    flushSync(() => {
+      setPdfError(null);
+      setPdfDone(false);
+      setPdfLoading(true);
+    });
     try {
       await exportPdf({
         itinerary,
