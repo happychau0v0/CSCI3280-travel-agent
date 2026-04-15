@@ -32,4 +32,29 @@ describe("splitSentences", () => {
     const out = splitSentences("```only-code```");
     expect(out).toEqual([]);
   });
+
+  it("strips unordered list markers", () => {
+    const out = splitSentences("- Visit Paris. - Try the wine.");
+    expect(out).toEqual(["Visit Paris.", "Try the wine."]);
+  });
+
+  it("strips numbered list markers", () => {
+    const out = splitSentences("1. Book flights. 2. Reserve hotels.");
+    expect(out).toEqual(["Book flights.", "Reserve hotels."]);
+  });
+
+  it("converts em-dashes to commas", () => {
+    const out = splitSentences("Paris — city of lights — awaits.");
+    expect(out).toEqual(["Paris, city of lights, awaits."]);
+  });
+
+  it("strips markdown headings", () => {
+    const out = splitSentences("## Day 1\nFly to Tokyo.");
+    expect(out).toEqual(["Fly to Tokyo."]);
+  });
+
+  it("strips bullet points with • character", () => {
+    const out = splitSentences("• Eiffel Tower. • Louvre Museum.");
+    expect(out).toEqual(["Eiffel Tower.", "Louvre Museum."]);
+  });
 });
