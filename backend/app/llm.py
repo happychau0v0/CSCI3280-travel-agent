@@ -312,10 +312,12 @@ async def _run_loop(
         system_content += BENCH_EVAL_ADDENDUM
 
     # Filter TOOL_DEFINITIONS to the allow-list for this role.
+    # Use `is not None` so an *empty* frozenset (e.g. day_themes) correctly
+    # produces an empty tool list rather than falling through to ALL tools.
     allowed = ROLE_ALLOWED_TOOLS.get(call_role) if call_role else None
     tools_for_role = (
         [t for t in TOOL_DEFINITIONS if t["function"]["name"] in allowed]
-        if allowed else list(TOOL_DEFINITIONS)
+        if allowed is not None else list(TOOL_DEFINITIONS)
     )
 
     # Scoped calls (plan/hotels/days) must NOT see prior conversation history —
