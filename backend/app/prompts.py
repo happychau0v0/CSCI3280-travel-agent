@@ -511,20 +511,28 @@ ALLOWED_TOOLS_CHAT: frozenset[str] = frozenset({
 ALLOWED_TOOLS_REPLACE: frozenset[str] = frozenset({
     "search_places",
 })
+ALLOWED_TOOLS_DAY_THEMES: frozenset[str] = frozenset()
+ALLOWED_TOOLS_DAY_DETAIL: frozenset[str] = frozenset({
+    "search_places", "get_directions", "get_weather",
+})
 
 ROLE_PROMPTS: dict[str, str] = {
-    "plan":    SYSTEM_PROMPT_PLAN,
-    "hotels":  SYSTEM_PROMPT_HOTELS,
-    "days":    SYSTEM_PROMPT_DAYS,
-    "chat":    SYSTEM_PROMPT_CHAT,
-    "replace": SYSTEM_PROMPT_REPLACE,
+    "plan":       SYSTEM_PROMPT_PLAN,
+    "hotels":     SYSTEM_PROMPT_HOTELS,
+    "days":       SYSTEM_PROMPT_DAYS,
+    "chat":       SYSTEM_PROMPT_CHAT,
+    "replace":    SYSTEM_PROMPT_REPLACE,
+    "day_themes": "",   # filled in Task 2
+    "day_detail": "",   # filled in Task 3
 }
 ROLE_ALLOWED_TOOLS: dict[str, frozenset[str]] = {
-    "plan":    ALLOWED_TOOLS_PLAN,
-    "hotels":  ALLOWED_TOOLS_HOTELS,
-    "days":    ALLOWED_TOOLS_DAYS,
-    "chat":    ALLOWED_TOOLS_CHAT,
-    "replace": ALLOWED_TOOLS_REPLACE,
+    "plan":       ALLOWED_TOOLS_PLAN,
+    "hotels":     ALLOWED_TOOLS_HOTELS,
+    "days":       ALLOWED_TOOLS_DAYS,
+    "chat":       ALLOWED_TOOLS_CHAT,
+    "replace":    ALLOWED_TOOLS_REPLACE,
+    "day_themes": ALLOWED_TOOLS_DAY_THEMES,
+    "day_detail": ALLOWED_TOOLS_DAY_DETAIL,
 }
 
 # [EVALUATION MODE] bracketed prefix marks this as a special instruction block
