@@ -181,11 +181,37 @@
           {% if act.user_note %}<div class="activity-note">◇ {{ act.user_note }}</div>{% endif %}
         </div>
       </li>
-      {% if act.transport_to_next and not loop.last %}
-      <li class="transport-row">
+      {% if not loop.last %}
+      {% set next_act = day.activities[loop.index] %}
+      {% set route = next_act._route if next_act is defined and next_act._route is defined else None %}
+      <li class="transport-row{% if route %} transport-detailed{% endif %}">
+        {% if route %}
+        <div class="transport-summary">
+          ↓ {{ route.duration }}{% if route.distance %} · {{ route.distance }}{% endif %}
+        </div>
+        {% if route.steps %}
+        <ol class="transport-steps-pdf">
+          {% for step in route.steps %}
+          <li class="transport-step-pdf transport-step-{{ step.type | lower }}">
+            {% if step.type == "TRANSIT" %}
+              🚇 {% if step.line %}{{ step.line }}{% endif %}{% if step.headsign %} → {{ step.headsign }}{% endif %}
+              {% if step.from %} · from {{ step.from }}{% endif %}{% if step.to %} to {{ step.to }}{% endif %}
+              {% if step.stop_count %} ({{ step.stop_count }} stop{{ "s" if step.stop_count > 1 else "" }}){% endif %}
+              {% if step.duration %} · {{ step.duration }}{% endif %}
+            {% elif step.type == "WALK" %}
+              🚶 {{ step.instruction }}{% if step.duration %} · {{ step.duration }}{% endif %}
+            {% else %}
+              → {{ step.instruction }}{% if step.duration %} · {{ step.duration }}{% endif %}
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ol>
+        {% endif %}
+        {% elif act.transport_to_next %}
         ↓ {{ act.transport_to_next.mode | upper }}
         {% if act.transport_to_next.duration %} · {{ act.transport_to_next.duration }}{% endif %}
         {% if act.transport_to_next.distance %} · {{ act.transport_to_next.distance }}{% endif %}
+        {% endif %}
       </li>
       {% endif %}
       {% endfor %}

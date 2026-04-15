@@ -20,6 +20,7 @@ from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel
 
 from app.config import GOOGLE_MAPS_API_KEY
+from app.tools.directions import get_directions
 
 log = logging.getLogger(__name__)
 
@@ -139,6 +140,35 @@ async def export_pdf(req: ExportRequest) -> Response:
 
     days_with_photos = await asyncio.gather(*[_enrich_day(d) for d in days])
 
+    # Fetch live route steps between consecutive activities for each day.
+    # Each destination activity gets a `_route` key with {duration, distance, steps}.
+    hotel_obj = itinerary.get("selected_hotel") or {}
+
+    async def _enrich_day_with_routes(day: dict) -> dict:
+        acts = list(day.get("activities", []))
+        if len(acts) < 2:
+            return day
+        enriched = list(acts)
+        for i in range(1, len(acts)):
+            dest = acts[i]
+            origin = acts[i - 1] if acts[i - 1].get("lat") and acts[i - 1].get("lng") else hotel_obj
+            if not (dest.get("lat") and dest.get("lng") and origin.get("lat") and origin.get("lng")):
+                continue
+            mode = (acts[i - 1].get("transport_to_next") or {}).get("mode", "TRANSIT")
+            try:
+                route = await get_directions(
+                    f"{origin['lat']},{origin['lng']}",
+                    f"{dest['lat']},{dest['lng']}",
+                    mode,
+                )
+            except Exception:
+                route = None
+            if route and route.get("duration"):
+                enriched[i] = {**enriched[i], "_route": route}
+        return {**day, "activities": enriched}
+
+    days_final = await asyncio.gather(*[_enrich_day_with_routes(d) for d in days_with_photos])
+
     # Read the CSS file to inline it into the template
     css_path = _TEMPLATES_DIR / "itinerary.css"
     css_content = css_path.read_text(encoding="utf-8") if css_path.exists() else ""
@@ -150,7 +180,7 @@ async def export_pdf(req: ExportRequest) -> Response:
             flight=flight,
             hotel=hotel,
             hotel_photo=hotel_photo_data_url,
-            days=days_with_photos,
+            days=days_final,
             phrasebook=phrasebook,
             selected_flight=selected_flight,
             selected_return_flight=selected_return_flight,

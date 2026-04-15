@@ -240,6 +240,33 @@ section h2 {
   font-style: italic;
 }
 
+.transport-detailed {
+  font-style: normal;
+  padding-bottom: 4pt;
+}
+
+.transport-summary {
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 2pt;
+}
+
+.transport-steps-pdf {
+  margin: 0;
+  padding-left: 12pt;
+  list-style: none;
+}
+
+.transport-step-pdf {
+  font-size: 8pt;
+  color: #666;
+  padding: 1pt 0;
+  line-height: 1.4;
+}
+
+.transport-step-transit { color: #0077cc; }
+.transport-step-walk    { color: #448844; }
+
 /* ── Checklist ───────────────────────────────── */
 .checklist-table {
   width: 100%;

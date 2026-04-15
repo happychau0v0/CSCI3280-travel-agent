@@ -17,8 +17,14 @@ ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
 
 ROUTES_FIELD_MASK = (
     "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,"
-    "routes.legs.steps.navigationInstruction,routes.legs.steps.distanceMeters,"
-    "routes.legs.steps.staticDuration"
+    "routes.legs.steps.travelMode,"
+    "routes.legs.steps.navigationInstruction,"
+    "routes.legs.steps.distanceMeters,"
+    "routes.legs.steps.staticDuration,"
+    "routes.legs.steps.transitDetails.stopDetails,"
+    "routes.legs.steps.transitDetails.transitLine,"
+    "routes.legs.steps.transitDetails.stopCount,"
+    "routes.legs.steps.transitDetails.headsign"
 )
 
 VALID_MODES = {"DRIVE", "WALK", "BICYCLE", "TRANSIT", "TWO_WHEELER"}
@@ -41,6 +47,35 @@ def _waypoint(location: str) -> dict[str, Any]:
 
 def _strip_html(text: str) -> str:
     return re.sub(r"<[^>]+>", "", text or "")
+
+
+def _parse_step(step: dict) -> dict:
+    """Return a structured step dict, with transit-specific fields when available."""
+    td = step.get("transitDetails", {})
+    if td:
+        line = td.get("transitLine", {})
+        stops = td.get("stopDetails", {})
+        return {
+            "type": "TRANSIT",
+            "line": line.get("name") or line.get("nameShort", ""),
+            "vehicle": line.get("vehicle", {}).get("type", ""),
+            "headsign": td.get("headsign", ""),
+            "from": stops.get("departureStop", {}).get("name", ""),
+            "to": stops.get("arrivalStop", {}).get("name", ""),
+            "stop_count": td.get("stopCount", 0),
+            "duration": _format_duration(step.get("staticDuration", "")),
+            "distance": _format_distance(step.get("distanceMeters", 0)),
+            "instruction": "",
+        }
+    travel_mode = step.get("travelMode", "")
+    step_type = "WALK" if travel_mode == "WALK" else ("DRIVE" if travel_mode == "DRIVE" else travel_mode or "WALK")
+    instr = _strip_html(step.get("navigationInstruction", {}).get("instructions", ""))
+    return {
+        "type": step_type,
+        "instruction": instr,
+        "duration": _format_duration(step.get("staticDuration", "")),
+        "distance": _format_distance(step.get("distanceMeters", 0)),
+    }
 
 
 def _format_duration(duration_str: str) -> str:
@@ -120,17 +155,11 @@ async def get_directions(
         return {"duration": "", "distance": "", "steps": [], "polyline": ""}
 
     route = routes[0]
-    steps = []
-    for leg in route.get("legs", []):
-        for step in leg.get("steps", []):
-            instr = step.get("navigationInstruction", {}).get("instructions", "")
-            steps.append(
-                {
-                    "instruction": _strip_html(instr),
-                    "distance": _format_distance(step.get("distanceMeters", 0)),
-                    "duration": _format_duration(step.get("staticDuration", "")),
-                }
-            )
+    steps = [
+        _parse_step(s)
+        for leg in route.get("legs", [])
+        for s in leg.get("steps", [])
+    ]
 
     return {
         "duration": _format_duration(route.get("duration", "")),

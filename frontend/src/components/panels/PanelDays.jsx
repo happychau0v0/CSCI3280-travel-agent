@@ -70,6 +70,11 @@ function isLikelyOutdoor(activity) {
   return /park|garden|temple|shrine|beach|hike|trail|tower|bridge|square|plaza|outdoor|viewpoint|waterfall|mountain|lake|river|cruise|walk/.test(blob);
 }
 
+const STEP_ICON = {
+  TRANSIT: "🚇", SUBWAY: "🚇", RAIL: "🚂", HEAVY_RAIL: "🚂",
+  WALK: "🚶", DRIVE: "🚗", BUS: "🚌", FERRY: "⛴", TRAM: "🚊",
+};
+
 function ActivityRow({
   activity,
   index,
@@ -79,6 +84,8 @@ function ActivityRow({
   isDragTarget,
   isFavorite,
   expandOverride,
+  liveRoute = null,
+  liveRouteLoading = false,
   onClick,
   onDragStart,
   onDragOver,
@@ -175,6 +182,43 @@ function ActivityRow({
           </button>
         )}
         <div className="activity-info">
+          {/* HOW TO GET HERE — live route fetched on activity click */}
+          {liveRouteLoading && (
+            <div className="live-route-steps live-route-loading">Fetching route…</div>
+          )}
+          {liveRoute && !liveRouteLoading && (
+            <div className="live-route-steps">
+              <div className="live-route-header">
+                <span className="live-route-title">HOW TO GET HERE</span>
+                <span className="live-route-summary">
+                  {liveRoute.duration}{liveRoute.distance ? ` · ${liveRoute.distance}` : ""}
+                </span>
+              </div>
+              {liveRoute.steps?.length > 0 && (
+                <ol className="live-route-step-list">
+                  {liveRoute.steps.map((step, si) => (
+                    <li key={si} className={`live-step live-step-${(step.type || "walk").toLowerCase()}`}>
+                      <span className="live-step-icon">
+                        {STEP_ICON[step.vehicle || step.type] || STEP_ICON[step.type] || "→"}
+                      </span>
+                      <span className="live-step-body">
+                        {step.type === "TRANSIT"
+                          ? [
+                              step.line,
+                              step.headsign ? `→ ${step.headsign}` : null,
+                              step.from ? `from ${step.from}` : null,
+                              step.to ? `to ${step.to}` : null,
+                              step.stop_count ? `(${step.stop_count} stop${step.stop_count > 1 ? "s" : ""})` : null,
+                            ].filter(Boolean).join(" ")
+                          : step.instruction}
+                        {step.duration && <span className="live-step-time"> · {step.duration}</span>}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          )}
           <strong>
             {isHotel && <span className="activity-hotel-tag">🏨 HOTEL </span>}
             {isAirport && <span className="activity-hotel-tag">✈ AIRPORT </span>}
@@ -240,7 +284,7 @@ function ActivityRow({
           )}
           {transport && (
             <div className={`transport${expanded ? " expanded" : ""}`}>
-              → {transport.mode?.toLowerCase?.() || "transit"}:{" "}
+              → planned {transport.mode?.toLowerCase?.() || "transit"}:{" "}
               {transport.duration}
               {transport.distance && ` (${transport.distance})`}
               {expanded && transport.steps?.length > 0 && (
@@ -665,6 +709,8 @@ export default function PanelDays({
               isActive={i === activeActivityIdx || (side === "right" && i === activityIndex)}
               isDragTarget={i === dragOverIdx && dragFromIdx !== i}
               expandOverride={expandAllOverride}
+              liveRoute={i === activeActivityIdx ? liveRoute : null}
+              liveRouteLoading={i === activeActivityIdx ? liveRouteLoading : false}
               onClick={() => setActiveActivityIdx(i)}
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}

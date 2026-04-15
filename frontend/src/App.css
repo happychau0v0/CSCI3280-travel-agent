@@ -5247,6 +5247,72 @@ body.theme-light .history-overlay-scroll::-webkit-scrollbar-thumb {
 }
 .route-duration-label::before { display: none !important; } /* hide tooltip arrow */
 
+/* ─── Live route steps (HOW TO GET HERE) in activity row ─── */
+.live-route-steps {
+  margin: 0 0 8px 0;
+  padding: 7px 10px;
+  border-left: 2px solid var(--accent);
+  background: rgba(0, 217, 255, 0.05);
+  font-size: 11px;
+  border-radius: 0 4px 4px 0;
+}
+
+.live-route-loading {
+  color: var(--accent);
+  font-family: var(--mono);
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
+.live-route-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 5px;
+}
+
+.live-route-title {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  opacity: 0.8;
+}
+
+.live-route-summary {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--fg);
+}
+
+.live-route-step-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.live-step {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--fg);
+  opacity: 0.85;
+}
+
+.live-step-icon { flex-shrink: 0; font-size: 12px; }
+
+.live-step-body { flex: 1; line-height: 1.4; }
+
+.live-step-time { color: var(--accent); opacity: 0.7; }
+
+.live-step-transit { color: var(--fg); }
+.live-step-walk    { opacity: 0.7; }
+.live-step-drive   { opacity: 0.7; }
+
 /* ─── Itinerary card (rendered inside drawer) ────────────── */
 
 .itinerary-card {
