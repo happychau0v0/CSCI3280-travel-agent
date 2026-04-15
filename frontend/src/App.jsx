@@ -751,8 +751,15 @@ function App() {
               if (!streamDisplayTimerRef.current) {
                 streamDisplayTimerRef.current = setTimeout(() => {
                   streamDisplayTimerRef.current = null;
-                  // Show the last ~150 chars so the subtitle fits one line.
-                  const buf = streamTokenBufRef.current;
+                  // Strip JSON fences before displaying — the LLM emits the
+                  // itinerary block first, subtitle sentence after. Without
+                  // stripping, raw JSON scrolls through the subtitle bar live.
+                  // Two passes: first removes closed fences, second removes
+                  // an open fence that's still being generated (no closing ```).
+                  const buf = streamTokenBufRef.current
+                    .replace(/```json[\s\S]*?```/g, "")
+                    .replace(/```json[\s\S]*/g, "")
+                    .trim();
                   setStreamingText(buf.length > 150 ? "…" + buf.slice(-147) : buf);
                 }, 200);
               }
