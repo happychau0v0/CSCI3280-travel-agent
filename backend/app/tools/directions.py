@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
+from typing import Any
 
 import httpx
 
@@ -20,6 +22,21 @@ ROUTES_FIELD_MASK = (
 )
 
 VALID_MODES = {"DRIVE", "WALK", "BICYCLE", "TRANSIT", "TWO_WHEELER"}
+
+
+_LAT_LNG_RE = re.compile(r"^(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)$")
+
+
+def _waypoint(location: str) -> dict[str, Any]:
+    """Build a Routes API waypoint object.
+
+    If *location* looks like 'lat,lng', use the latLng struct;
+    otherwise treat it as a free-text address.
+    """
+    m = _LAT_LNG_RE.match(location.strip())
+    if m:
+        return {"location": {"latLng": {"latitude": float(m.group(1)), "longitude": float(m.group(2))}}}
+    return {"address": location}
 
 
 def _strip_html(text: str) -> str:
@@ -71,12 +88,15 @@ async def get_directions(
     if travel_mode not in VALID_MODES:
         travel_mode = "TRANSIT"
 
-    body = {
-        "origin": {"address": origin},
-        "destination": {"address": destination},
+    body: dict[str, Any] = {
+        "origin": _waypoint(origin),
+        "destination": _waypoint(destination),
         "travelMode": travel_mode,
         "polylineQuality": "OVERVIEW",
     }
+    # Routes API requires departureTime for TRANSIT mode.
+    if travel_mode == "TRANSIT":
+        body["departureTime"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     headers = {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY,
@@ -88,6 +108,14 @@ async def get_directions(
     data = resp.json()
 
     routes = data.get("routes", [])
+    if not routes and travel_mode == "TRANSIT":
+        # TRANSIT may return no routes outside service hours; retry with DRIVE.
+        body["travelMode"] = "DRIVE"
+        del body["departureTime"]
+        resp = await _http.post(ROUTES_URL, json=body, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
+        routes = data.get("routes", [])
     if not routes:
         return {"duration": "", "distance": "", "steps": [], "polyline": ""}
 
