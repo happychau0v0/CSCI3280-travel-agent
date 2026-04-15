@@ -24,11 +24,12 @@ class Message(BaseModel):
 ALLOWED_MODELS = {
     "grok-4.20-0309-non-reasoning",
     "grok-4.20-0309-reasoning",
-    "grok-4.20-multi-agent-0309",
+    # "grok-4.20-multi-agent-0309" removed — xAI rejects this variant on
+    # the chat completions endpoint with "Multi Agent requests are not allowed".
     "gemini-3.1-pro-preview",
 }
 
-ALLOWED_ROLES = {None, "plan", "hotels", "days", "chat"}
+ALLOWED_ROLES = {None, "plan", "hotels", "days", "chat", "replace"}
 
 
 class ChatRequest(BaseModel):
