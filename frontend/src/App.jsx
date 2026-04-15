@@ -111,6 +111,17 @@ function loadTripDates() {
   }
 }
 
+function loadFormDates() {
+  try {
+    const raw = localStorage.getItem("travel-trip-form");
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    return p.start_date && p.end_date ? { start_date: p.start_date, end_date: p.end_date } : null;
+  } catch {
+    return null;
+  }
+}
+
 function loadFavorites() {
   try {
     const raw = localStorage.getItem(FAVORITES_KEY);
@@ -436,12 +447,16 @@ function App() {
     },
     onActivate: () => {
       cues.select();
+      if (isLoading) return;
       const panel = menu.state.panel;
       const idx = menu.state.listIndex;
       // Space key activates the current row — pick flight or hotel
       if (panel === "FLIGHTS") {
         const opt = currentItinerary?.flight?.options?.[idx];
-        if (opt) {
+        const alreadyPicked = currentItinerary?.selected_flight &&
+          (currentItinerary.selected_flight === opt ||
+           currentItinerary.selected_flight?.airline === opt?.airline);
+        if (opt && !alreadyPicked) {
           pushPickSnapshot();
           setCurrentItinerary({ ...currentItinerary, selected_flight: opt });
           cues.chime();
@@ -996,7 +1011,16 @@ function App() {
               delete base.selected_flight;
             }
 
-            return { ...base, ...newData };
+            // Smart days merge: if the LLM returned a partial days array
+            // (e.g. only the changed day during a replace_activity replan),
+            // preserve the unchanged days instead of wiping them.
+            let mergedData = newData;
+            if (newData.days && base.days?.length && newData.days.length < base.days.length) {
+              const updatedMap = new Map(newData.days.map((d) => [d.day, d]));
+              mergedData = { ...newData, days: base.days.map((d) => updatedMap.get(d.day) ?? d) };
+            }
+
+            return { ...base, ...mergedData };
           });
           cues.chime();
           // Persist to history. Use currentItinerary spread with newData
@@ -1382,6 +1406,7 @@ function App() {
             currency={currency}
             visaAlert={visaAlert}
             side={menu.state.side}
+            isLoading={isLoading}
             onSelect={selectListItem}
             onPick={(i, tab) => {
               const isReturn = tab === "return";
@@ -1577,32 +1602,45 @@ function App() {
               });
               cues.chime?.();
             }}
-            onAddDay={() => {
-              // Append a new empty day.
-              setCurrentItinerary((prev) => {
-                if (!prev) return prev;
-                const days = prev.days || [];
-                const lastDay = days[days.length - 1];
-                const nextDayNum = (lastDay?.day || 0) + 1;
-                let nextDate = "";
-                if (lastDay?.date) {
-                  try {
-                    const d = new Date(lastDay.date);
-                    d.setDate(d.getDate() + 1);
-                    nextDate = d.toISOString().slice(0, 10);
-                  } catch { /* ignore */ }
-                }
-                const newDay = {
-                  day: nextDayNum,
-                  date: nextDate,
-                  theme: "Custom Day",
-                  activities: [],
-                  source: "manual",
-                };
-                return { ...prev, days: [...days, newDay] };
-              });
-              cues.chime?.();
-            }}
+            onAddDay={(() => {
+              // Disable Add Day when the trip dates are fixed (start + end date
+              // both set in the planning form), and we already have all the days.
+              const formDates = loadFormDates();
+              const expectedDays = formDates
+                ? Math.round(
+                    (new Date(formDates.end_date) - new Date(formDates.start_date)) / 86400000
+                  ) + 1
+                : null;
+              const currentDayCount = currentItinerary?.days?.length ?? 0;
+              const canAdd = !expectedDays || currentDayCount < expectedDays;
+              if (!canAdd) return undefined;
+              return () => {
+                // Append a new empty day.
+                setCurrentItinerary((prev) => {
+                  if (!prev) return prev;
+                  const days = prev.days || [];
+                  const lastDay = days[days.length - 1];
+                  const nextDayNum = (lastDay?.day || 0) + 1;
+                  let nextDate = "";
+                  if (lastDay?.date) {
+                    try {
+                      const d = new Date(lastDay.date);
+                      d.setDate(d.getDate() + 1);
+                      nextDate = d.toISOString().slice(0, 10);
+                    } catch { /* ignore */ }
+                  }
+                  const newDay = {
+                    day: nextDayNum,
+                    date: nextDate,
+                    theme: "Custom Day",
+                    activities: [],
+                    source: "manual",
+                  };
+                  return { ...prev, days: [...days, newDay] };
+                });
+                cues.chime?.();
+              };
+            })()}
             onRemoveDay={(dayIdx) => {
               setCurrentItinerary((prev) => {
                 if (!prev?.days || prev.days.length <= 1) return prev;
@@ -1746,6 +1784,7 @@ function App() {
           setChatPopoverOptions(null);
           editTurnIdxRef.current = null;
           pendingReplaceRef.current = null;
+          setPendingInputRequest(null);
         }}
         isLoading={isLoading}
         initialText={chatPopoverInitial}
