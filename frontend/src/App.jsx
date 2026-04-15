@@ -458,7 +458,13 @@ function App() {
            currentItinerary.selected_flight?.airline === opt?.airline);
         if (opt && !alreadyPicked) {
           pushPickSnapshot();
-          setCurrentItinerary({ ...currentItinerary, selected_flight: opt });
+          setCurrentItinerary({
+            ...currentItinerary,
+            selected_flight: opt,
+            hotels: undefined,
+            selected_hotel: null,
+            days: undefined,
+          });
           cues.chime();
           const label = [
             opt.airline,
@@ -474,7 +480,7 @@ function App() {
         const hotel = currentItinerary?.hotels?.[idx];
         if (hotel) {
           pushPickSnapshot();
-          setCurrentItinerary({ ...currentItinerary, selected_hotel: hotel });
+          setCurrentItinerary({ ...currentItinerary, selected_hotel: hotel, days: undefined });
           cues.chime();
           handleSend(
             `Set "${hotel.name}" as the base hotel. ` +
@@ -1448,10 +1454,19 @@ function App() {
                 f.departure_time && f.arrival_time ? `${f.departure_time}→${f.arrival_time}` : null,
                 f.price_low ? `HK$${f.price_low}` : null,
               ].filter(Boolean).join(", ") : null;
+              // Helper: strip downstream data that must be regenerated after
+              // a new flight is picked — hotels/days/picks are now stale.
+              const itinWithNewFlight = (extra = {}) => ({
+                ...currentItinerary,
+                hotels: undefined,
+                selected_hotel: null,
+                days: undefined,
+                ...extra,
+              });
               if (isReturn) {
                 // Return pick → save return flight, clear background suppression.
-                // If hotel data already arrived, navigate now; otherwise the done
-                // event will navigate once the in-flight search completes.
+                // Hotels/days were already cleared when the outbound was picked;
+                // just update the return flight here.
                 setCurrentItinerary({ ...currentItinerary, selected_return_flight: opt });
                 cues.chime();
                 suppressHotelNavRef.current = false;
@@ -1464,7 +1479,7 @@ function App() {
                 // Outbound pick with return options → start hotel search in background
                 // immediately, but suppress navigation until return flight is picked.
                 // PanelFlights useEffect auto-switches to RETURN tab.
-                setCurrentItinerary({ ...currentItinerary, selected_flight: opt });
+                setCurrentItinerary(itinWithNewFlight({ selected_flight: opt }));
                 cues.chime();
                 suppressHotelNavRef.current = true;
                 handleSend(
@@ -1473,7 +1488,7 @@ function App() {
                 );
               } else {
                 // One-way trip → save + fire hotel search immediately
-                setCurrentItinerary({ ...currentItinerary, selected_flight: opt });
+                setCurrentItinerary(itinWithNewFlight({ selected_flight: opt }));
                 cues.chime();
                 handleSend(
                   `Selected flight: ${flightLabel(opt)}. Now find hotels.`,
@@ -1507,10 +1522,12 @@ function App() {
                 return;
               }
               pushPickSnapshot();
-              // Stamp the hotel pick locally
+              // Stamp the hotel pick locally and clear stale days —
+              // a new days plan will be generated for this hotel.
               setCurrentItinerary({
                 ...currentItinerary,
                 selected_hotel: hotel,
+                days: undefined,
               });
               cues.chime();
               if (autoReplan) {
