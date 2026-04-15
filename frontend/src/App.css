@@ -1148,7 +1148,7 @@ li[tabindex]:focus-visible {
 .plan-history-card {
   padding: 10px 12px;
   border: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--bg-elevated);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1157,7 +1157,7 @@ li[tabindex]:focus-visible {
 
 .plan-history-card:hover {
   border-color: var(--accent);
-  background: rgba(0, 217, 255, 0.06);
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-elevated));
 }
 
 .plan-history-card-head {
