@@ -173,6 +173,14 @@ li[tabindex]:focus-visible {
   min-height: 0;
 }
 
+/* Side-focus indicators — accent border-left on the active column */
+.side-focus-left .panel-grid-left {
+  border-left: 2px solid var(--accent);
+}
+.side-focus-right .panel-grid-right {
+  border-left: 2px solid var(--accent);
+}
+
 .panel-grid-top-band {
   grid-column: 2;
   grid-row: 1;
@@ -524,24 +532,12 @@ li[tabindex]:focus-visible {
 
 /* Hotel option row with thumb */
 .hotel-option-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  padding: 10px 12px;
-}
-
-.hotel-option-thumb {
-  flex: 0 0 auto;
-  width: 56px;
-  height: 56px;
-  object-fit: cover;
-  border-radius: 4px;
-  border: 1px solid var(--border);
+  /* No flex — let .panel-list-item's column layout handle spacing */
 }
 
 .hotel-option-body {
-  flex: 1 1 auto;
   min-width: 0;
+  text-align: left;
 }
 
 .hotel-option-name {
@@ -668,6 +664,10 @@ li[tabindex]:focus-visible {
   background: rgba(0, 0, 0, 0.3);
   cursor: zoom-in;
   overflow: hidden;
+  /* Prevent browser smart-zoom (double-tap / double-click on macOS) from
+     corrupting the panel layout when clicking the hero photo. */
+  touch-action: manipulation;
+  -webkit-user-drag: none;
 }
 
 .photo-gallery-hero img {
@@ -675,6 +675,10 @@ li[tabindex]:focus-visible {
   height: 100%;
   object-fit: cover;
   display: block;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
 }
 
 .photo-gallery-thumbs {
@@ -693,6 +697,7 @@ li[tabindex]:focus-visible {
   cursor: pointer;
   overflow: hidden;
   transition: border-color 0.15s ease;
+  touch-action: manipulation;
 }
 
 .photo-gallery-thumb.active {
@@ -970,6 +975,29 @@ li[tabindex]:focus-visible {
   align-items: flex-start;
   padding-top: 5px;
   padding-bottom: 6px;
+}
+
+/* Errored field — red left accent on the row, no layout shift */
+.panel-list-item.home-form-row.has-error {
+  border-left: 2px solid var(--danger);
+}
+
+.panel-list-item.home-form-row.has-error .home-form-input {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* Consolidated error summary above the PLAN button */
+.trip-plan-errors {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 12px;
+  border-left: 2px solid var(--danger);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--danger);
 }
 
 .home-form-prompt {
@@ -2300,6 +2328,7 @@ li[tabindex]:focus-visible {
   font-family: var(--mono);
 }
 
+
 .home-summary-line {
   font-size: 14px;
   color: var(--text-h);
@@ -3054,20 +3083,23 @@ li[tabindex]:focus-visible {
   color: #c4b5fd;
 }
 
-/* AgentStatusBar — prominent working banner pinned below the tab strip */
+/* AgentStatusBar — compact banner pinned to the top-right corner.
+ * Sits in the empty column-3 / row-1 space on FLIGHTS/HOTELS/DAYS.
+ * On HOME the history card shifts down to make room (see .home-card-tr rule). */
 
 .agent-status-bar {
   position: fixed;
   top: 56px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 0;
+  left: auto;
+  transform: none;
   z-index: 100;
   display: flex;
   align-items: center;
-  gap: 16px;
-  min-width: 480px;
-  max-width: 80vw;
-  padding: 14px 20px;
+  gap: 12px;
+  min-width: 220px;
+  max-width: min(300px, 28vw);
+  padding: 8px 14px;
   background: var(--status-bar-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -3077,8 +3109,17 @@ li[tabindex]:focus-visible {
 }
 
 @keyframes status-slide-in {
-  from { opacity: 0; transform: translate(-50%, -8px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* On HOME the history card occupies the same top-right spot.
+ * Reserve space for the status bar only while it is mounted (non-idle). */
+.panel-active-home .home-card-tr {
+  transition: margin-top 0.25s ease;
+}
+.panel-active-home:has(.agent-status-bar) .home-card-tr {
+  margin-top: 72px;
 }
 
 .agent-status-bar.status-working {
@@ -3806,6 +3847,7 @@ body.theme-light .tab-strip {
 .tab-label {
   font-size: 11px;
 }
+
 
 /* Footer hint strip — bottom of screen */
 
@@ -4711,6 +4753,46 @@ body.theme-light .history-overlay-scroll::-webkit-scrollbar-thumb {
 }
 
 .flight-source-badge.estimate {
+  color: var(--text-dim);
+  border-color: var(--border);
+  background: transparent;
+}
+
+/* ── Visa alert badge ─────────────────────────────────────────── */
+.visa-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid;
+  margin-left: 8px;
+  cursor: default;
+  vertical-align: middle;
+  position: relative;
+}
+
+.visa-badge--free {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.5);
+  background: rgba(74, 222, 128, 0.1);
+}
+
+.visa-badge--arrival {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.5);
+  background: rgba(251, 191, 36, 0.1);
+}
+
+.visa-badge--required {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.visa-badge--unknown {
   color: var(--text-dim);
   border-color: var(--border);
   background: transparent;

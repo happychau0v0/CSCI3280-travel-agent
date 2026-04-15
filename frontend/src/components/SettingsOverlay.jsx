@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { COUNTRIES } from "../data/countries";
 
 /**
  * SettingsOverlay — full-screen dimmed settings panel.
@@ -29,6 +30,12 @@ const PREF_FIELDS = [
     ],
   },
   { key: "travel_style", label: "TRAVEL STYLE", type: "text", placeholder: "relaxed, adventurous" },
+  {
+    key: "passport_country",
+    label: "PASSPORT",
+    type: "select",
+    options: [["", "Select passport..."], ...COUNTRIES.map((c) => [c.value, c.label])],
+  },
 ];
 
 const STORAGE_KEY = "travel-prefs";
@@ -36,9 +43,11 @@ const STORAGE_KEY = "travel-prefs";
 function loadPrefs() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
+    const parsed = raw ? JSON.parse(raw) : {};
+    // Default passport to HK if not yet set
+    return { passport_country: "HK", ...parsed };
   } catch {
-    return {};
+    return { passport_country: "HK" };
   }
 }
 
@@ -62,6 +71,7 @@ export function preferencesForApi(prefs) {
   if (prefs.dietary?.trim()) out.dietary = prefs.dietary.trim();
   if (prefs.budget) out.budget = prefs.budget;
   if (prefs.travel_style?.trim()) out.travel_style = prefs.travel_style.trim();
+  if (prefs.passport_country) out.passport_country = prefs.passport_country;
   return Object.keys(out).length > 0 ? out : null;
 }
 

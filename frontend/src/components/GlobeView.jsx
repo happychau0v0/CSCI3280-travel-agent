@@ -136,12 +136,26 @@ export default function GlobeView({
   // Fly to the midpoint of the first arc when arcs change (i.e. when a flight
   // is added). Offset eastward when the drawer is open so the destination
   // isn't covered. Skipped when `focus` is set — panel-driven focus wins.
+  //
+  // Antimeridian fix: simple (start+end)/2 gives the wrong hemisphere for
+  // routes that cross ±180° (e.g. HKG +114° → YVR −123° averages to −4.5°
+  // in the Atlantic instead of +175.5° in the Pacific). Detect the crossing
+  // and add/subtract 360° so the midpoint always uses the shorter arc.
   useEffect(() => {
     if (!globeRef.current || arcs.length === 0) return;
     if (focus) return;
     const arc = arcs[0];
     const midLat = (arc.startLat + arc.endLat) / 2;
-    let midLng = (arc.startLng + arc.endLng) / 2;
+    const lngDiff = arc.endLng - arc.startLng;
+    let rawMidLng;
+    if (lngDiff > 180) {
+      rawMidLng = (arc.startLng + arc.endLng - 360) / 2;
+    } else if (lngDiff < -180) {
+      rawMidLng = (arc.startLng + arc.endLng + 360) / 2;
+    } else {
+      rawMidLng = (arc.startLng + arc.endLng) / 2;
+    }
+    let midLng = rawMidLng;
     if (drawerOpen) midLng -= 25; // shift the focus left of the drawer
     globeRef.current.pointOfView({ lat: midLat, lng: midLng, altitude: 2.4 }, 2000);
   }, [arcs, drawerOpen, focus]);

@@ -3,7 +3,7 @@ import { photoSrc } from "../api/client";
 
 /**
  * PhotoGallery — a grid of small square thumbnails with click-to-
- * enlarge. Drops the round-8 banner-aspect letterbox crops.
+ * cycle. Drops the round-8 banner-aspect letterbox crops.
  *
  * Props:
  *   photos: array of relative photo URL paths (from places.py's
@@ -15,7 +15,7 @@ import { photoSrc } from "../api/client";
  *   - First photo is the "hero" at ~3:2 aspect
  *   - Remaining photos are 80×80 square thumbs in a flex row
  *   - Clicking any thumbnail swaps it into the hero slot
- *   - Clicking the hero opens a full-screen lightbox modal
+ *   - Clicking the hero advances to the next photo
  *
  * Falls back to a placeholder when photos is empty/null. Also guards
  * against broken image URLs via onError.
@@ -27,7 +27,6 @@ export default function PhotoGallery({
 }) {
   const validPhotos = (photos || []).filter(Boolean).slice(0, maxCount);
   const [activeIdx, setActiveIdx] = useState(0);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   // Reset to first photo when the photo set changes (e.g. user clicks
   // a different hotel). Without this, activeIdx stays stale and the
@@ -35,28 +34,6 @@ export default function PhotoGallery({
   useEffect(() => {
     setActiveIdx(0);
   }, [validPhotos.length, validPhotos[0]]);
-
-  // Round 20 — arrow key navigation while the lightbox is open.
-  useEffect(() => {
-    if (!lightboxOpen) return undefined;
-    const handler = (e) => {
-      if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        e.stopPropagation();
-        setActiveIdx((i) => (i - 1 + validPhotos.length) % validPhotos.length);
-      } else if (e.key === "ArrowRight") {
-        e.preventDefault();
-        e.stopPropagation();
-        setActiveIdx((i) => (i + 1) % validPhotos.length);
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        setLightboxOpen(false);
-      }
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [lightboxOpen, validPhotos.length]);
 
   if (validPhotos.length === 0) {
     return (
@@ -74,7 +51,7 @@ export default function PhotoGallery({
       <button
         type="button"
         className="photo-gallery-hero"
-        onClick={() => setLightboxOpen(true)}
+        onClick={() => setActiveIdx((i) => (i + 1) % validPhotos.length)}
         aria-label={`${altPrefix} photo ${heroIdx + 1} of ${validPhotos.length}`}
       >
         <img
@@ -107,59 +84,6 @@ export default function PhotoGallery({
               />
             </button>
           ))}
-        </div>
-      )}
-      {lightboxOpen && (
-        <div
-          className="photo-gallery-lightbox"
-          onClick={() => setLightboxOpen(false)}
-          role="dialog"
-          aria-label="Photo lightbox"
-          data-testid="photo-lightbox"
-        >
-          <img src={heroSrc} alt={`${altPrefix} ${heroIdx + 1}`} />
-          {validPhotos.length > 1 && (
-            <>
-              <button
-                type="button"
-                className="photo-gallery-lightbox-nav prev"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setActiveIdx((i) => (i - 1 + validPhotos.length) % validPhotos.length);
-                }}
-                aria-label="Previous photo"
-                data-testid="photo-lightbox-prev"
-              >
-                ‹
-              </button>
-              <button
-                type="button"
-                className="photo-gallery-lightbox-nav next"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setActiveIdx((i) => (i + 1) % validPhotos.length);
-                }}
-                aria-label="Next photo"
-                data-testid="photo-lightbox-next"
-              >
-                ›
-              </button>
-              <div className="photo-gallery-lightbox-count">
-                {heroIdx + 1} / {validPhotos.length}
-              </div>
-            </>
-          )}
-          <button
-            type="button"
-            className="photo-gallery-lightbox-close"
-            onClick={(e) => {
-              e.stopPropagation();
-              setLightboxOpen(false);
-            }}
-            aria-label="Close lightbox"
-          >
-            ✕
-          </button>
         </div>
       )}
     </div>

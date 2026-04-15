@@ -297,8 +297,10 @@ export default function PanelHome({
   rowDispatchRef,
   formPrefill = null,
   onFormPrefilled,
+  side = "left",
 }) {
   const [form, setForm] = useState(() => loadForm());
+  const [formErrors, setFormErrors] = useState({});
   // Per-row refs keyed by field key so we can focus a specific input
   // when request_input arrives or when the user clicks a row.
   const rowRefs = useRef({});
@@ -364,11 +366,13 @@ export default function PanelHome({
     const next = { ...form, [key]: val };
     setForm(next);
     saveForm(next);
+    if (formErrors[key]) setFormErrors((e) => { const n = { ...e }; delete n[key]; return n; });
   };
   const update = (key) => (e) => {
     const next = { ...form, [key]: e.target.value };
     setForm(next);
     saveForm(next);
+    if (formErrors[key]) setFormErrors((e) => { const n = { ...e }; delete n[key]; return n; });
   };
 
   const handleResolveSubmit = () => {
@@ -391,7 +395,37 @@ export default function PanelHome({
   };
 
   const prompt = useMemo(() => buildPrompt(form), [form]);
-  const handlePlan = () => onPlan?.(prompt);
+
+  const validateForm = () => {
+    const errors = {};
+    if (!form.destination?.trim()) {
+      errors.destination = "Required";
+    }
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (!form.start_date) {
+      errors.start_date = "Required";
+    } else if (form.start_date < todayStr) {
+      errors.start_date = "Must be today or later";
+    }
+    if (!form.end_date) {
+      errors.end_date = "Required";
+    } else if (form.start_date && form.end_date < form.start_date) {
+      errors.end_date = "Must be on or after start date";
+    }
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handlePlan = () => {
+    if (!validateForm()) return;
+    setFormErrors({});
+    onPlan?.(prompt);
+  };
+
+  // Clear all errors once planning starts (isLoading flips to true)
+  useEffect(() => {
+    if (isLoading) setFormErrors({});
+  }, [isLoading]);
 
   // Register a row activator for the Space hotkey — focus the row
   // matching the current listIndex so the user can start typing
@@ -422,7 +456,7 @@ export default function PanelHome({
   const planLabel = hasItinerary ? "REPLAN →" : "START PLANNING →";
 
   return (
-    <section className="panel panel-grid panel-home" aria-label="Home dashboard">
+    <section className={`panel panel-grid panel-home side-focus-${side}`} aria-label="Home dashboard">
       {/* TOP-LEFT — live status */}
       <button
         type="button"
@@ -443,7 +477,7 @@ export default function PanelHome({
         </div>
       </button>
 
-      {/* TOP-CENTER — next trip summary + R14 template chips */}
+      {/* TOP-CENTER — next trip summary + R14 template chips. */}
       <div className="home-summary-top">
         <div className="home-card-label">🌏 NEXT TRIP</div>
         {itinerary?.destination ? (
@@ -516,7 +550,8 @@ export default function PanelHome({
             const rowClass =
               `panel-list-item home-form-row home-form-row-${field.type}` +
               (isActive ? " active" : "") +
-              (isFocused ? " field-pending" : "");
+              (isFocused ? " field-pending" : "") +
+              (formErrors[field.key] ? " has-error" : "");
             return (
               <li
                 key={field.key}
@@ -610,16 +645,23 @@ export default function PanelHome({
             );
           })}
         </ul>
+        {Object.keys(formErrors).length > 0 && (
+          <div className="trip-plan-errors" role="alert">
+            {Object.values(formErrors).map((msg, i) => (
+              <span key={i}>✗ {msg}</span>
+            ))}
+          </div>
+        )}
         <button
           type="button"
           className="trip-plan-btn"
           onClick={handlePlan}
-          disabled={isLoading || !form.destination?.trim()}
+          disabled={isLoading}
           data-testid="trip-plan-btn"
         >
           {isLoading ? "PLANNING…" : planLabel}
         </button>
-        {!isLoading && !form.destination?.trim() && (
+        {!isLoading && !form.destination?.trim() && Object.keys(formErrors).length === 0 && (
           <div className="trip-plan-hint" data-testid="trip-plan-hint">
             ↑ Type a destination above to get started
           </div>

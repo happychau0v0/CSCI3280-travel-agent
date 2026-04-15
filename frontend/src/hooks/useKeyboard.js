@@ -5,11 +5,11 @@ import { PANELS, PANELS_WITH_LIST } from "./useMenuState";
  * Document-level hotkey dispatcher for the NieR-style menu shell.
  *
  * Navigation model:
- *   - Tab          — advance to next panel (HOME→FLIGHTS→HOTELS→DAYS→HOME)
- *   - 1-4          — jump directly to that panel
- *   - ↑/↓          — move list cursor on list-bearing panels (always)
+ *   - Tab          — toggle focus between left and right column within the current panel
+ *   - 1-4          — jump directly to that panel (resets side to left)
+ *   - ↑/↓          — move left-list cursor; on DAYS right side move activity cursor
  *   - Space        — pick the focused item on FLIGHTS or HOTELS
- *   - ←/→          — not used for panel navigation (reserved for sub-components)
+ *   - ←/→          — reserved for sub-components
  *
  * Overlays (H, S, ?, P, L, F, C) are open-only — Esc closes them.
  * The hook is disabled entirely while any overlay is open so each overlay
@@ -21,7 +21,11 @@ export function useKeyboard({
   state,
   setPanel,
   setListIndex,
+  setSide,
   listSize,
+  activityListSize = 0,
+  activityIndex = 0,
+  setActivityIndex,
   onOpenChat,
   onActivate,
   onBack,
@@ -61,16 +65,20 @@ export function useKeyboard({
       }
 
       switch (e.key) {
-        // Tab advances to the next panel (wraps around).
+        // Tab toggles focus between left and right column within the current panel.
         case "Tab":
           e.preventDefault();
-          setPanel(PANELS[(PANELS.indexOf(state.panel) + 1) % PANELS.length]);
+          setSide(state.side === "left" ? "right" : "left");
           break;
 
-        // ↑/↓ always move the list cursor on list-bearing panels.
-        // Don't preventDefault at the boundary so native scroll takes over.
+        // ↑/↓: on DAYS right side → navigate activities; otherwise → move left list cursor.
         case "ArrowUp":
-          if (PANELS_WITH_LIST.has(state.panel) && listSize > 0) {
+          if (state.side === "right" && state.panel === "DAYS" && activityListSize > 0) {
+            if (activityIndex > 0) {
+              e.preventDefault();
+              setActivityIndex?.(activityIndex - 1);
+            }
+          } else if (PANELS_WITH_LIST.has(state.panel) && listSize > 0) {
             if (state.listIndex > 0) {
               e.preventDefault();
               setListIndex(state.listIndex - 1);
@@ -79,7 +87,12 @@ export function useKeyboard({
           break;
 
         case "ArrowDown":
-          if (PANELS_WITH_LIST.has(state.panel) && listSize > 0) {
+          if (state.side === "right" && state.panel === "DAYS" && activityListSize > 0) {
+            if (activityIndex < activityListSize - 1) {
+              e.preventDefault();
+              setActivityIndex?.(activityIndex + 1);
+            }
+          } else if (PANELS_WITH_LIST.has(state.panel) && listSize > 0) {
             if (state.listIndex < listSize - 1) {
               e.preventDefault();
               setListIndex(state.listIndex + 1);
@@ -208,9 +221,14 @@ export function useKeyboard({
     enabled,
     state.panel,
     state.listIndex,
+    state.side,
     listSize,
+    activityListSize,
+    activityIndex,
     setPanel,
     setListIndex,
+    setSide,
+    setActivityIndex,
     onOpenChat,
     onActivate,
     onBack,

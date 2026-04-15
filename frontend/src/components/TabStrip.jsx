@@ -8,9 +8,8 @@ const TAB_LABELS = {
 };
 
 /**
- * Top-of-screen NieR-style tab strip. Shows the seven panel tabs with
- * the active one highlighted. Each tab has a small numeric badge for
- * the corresponding hotkey (1-7).
+ * Top-of-screen NieR-style tab strip. Shows the panel tabs on the left.
+ * Agent status is shown separately in the AgentStatusBar (top-right corner).
  */
 export default function TabStrip({ activePanel, scope, onTabClick }) {
   return (

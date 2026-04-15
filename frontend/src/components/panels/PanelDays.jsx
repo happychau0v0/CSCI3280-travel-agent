@@ -303,6 +303,8 @@ function ActivityRow({
 export default function PanelDays({
   itinerary,
   listIndex,
+  side = "left",
+  activityIndex = 0,
   onSelect,
   onReorderActivities,
   onRemoveActivity,
@@ -442,7 +444,7 @@ export default function PanelDays({
       : null;
 
   return (
-    <section className="panel panel-grid panel-days" aria-label="Days">
+    <section className={`panel panel-grid panel-days side-focus-${side}`} aria-label="Days">
       {/* TOP band — day summary + R15 forecast strip */}
       <header className="panel-grid-top-band home-summary-top">
         <div className="home-card-label">
@@ -630,7 +632,7 @@ export default function PanelDays({
               index={i}
               isHotel={hotelName && act.name === hotelName}
               isAirport={/airport/i.test(act.name || "")}
-              isActive={i === activeActivityIdx}
+              isActive={i === activeActivityIdx || (side === "right" && i === activityIndex)}
               isDragTarget={i === dragOverIdx && dragFromIdx !== i}
               expandOverride={expandAllOverride}
               onClick={() => setActiveActivityIdx(i)}

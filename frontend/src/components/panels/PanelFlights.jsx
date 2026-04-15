@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { formatDisplayPrice } from "../SettingsOverlay";
+import VisaAlertBanner from "../VisaAlertBanner";
 
 /**
  * FLIGHTS panel — shares the .panel-grid layout with HOME/HOTELS/DAYS.
@@ -57,6 +58,8 @@ export default function PanelFlights({
   itinerary,
   listIndex,
   currency = "HKD",
+  visaAlert = null,
+  side = "left",
   onSelect,
   onPick,
   onSkipFlight,
@@ -115,7 +118,7 @@ export default function PanelFlights({
   const legDate = activeTab === "return" ? (flight.return_date || "—") : (flight.date || "—");
 
   return (
-    <section className="panel panel-grid panel-flights" aria-label="Flights">
+    <section className={`panel panel-grid panel-flights side-focus-${side}`} aria-label="Flights">
       {/* TOP band — route summary */}
       <header className="panel-grid-top-band home-summary-top">
         <div className="home-card-label">
@@ -126,6 +129,7 @@ export default function PanelFlights({
           >
             {isLive ? "LIVE" : "ESTIMATE"}
           </span>
+          <VisaAlertBanner visaAlert={visaAlert} />
           {flight.seat_class_label && flight.seat_class !== "economy" && (
             <span
               className="flight-source-badge"

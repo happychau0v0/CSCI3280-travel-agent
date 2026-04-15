@@ -6,14 +6,15 @@ import { useCallback, useState } from "react";
  * State shape:
  *   {
  *     panel:     "HOME" | "FLIGHTS" | "HOTELS" | "DAYS",
- *     listIndex: number,   // which item in the left list is highlighted
- *     filter:    object | null,  // optional sort/filter set by the LLM
+ *     listIndex: number,          // which item in the left list is highlighted
+ *     side:      "left" | "right", // which column has keyboard focus
+ *     filter:    object | null,   // optional sort/filter set by the LLM
  *   }
  *
  * Navigation:
- *   - Tab cycles panels forward (HOME → FLIGHTS → HOTELS → DAYS → HOME).
- *   - 1–4 jump directly to a panel.
- *   - ↑/↓ always move the list cursor on list-bearing panels.
+ *   - Tab toggles focus between left and right column within the current panel.
+ *   - 1–4 jump directly to a panel (resets side to "left").
+ *   - ↑/↓ move the left-list cursor; on DAYS right side they move the activity cursor.
  *   - Space activates the focused item (pick flight / hotel).
  *
  * Mutated by:
@@ -30,6 +31,7 @@ export const PANELS_WITH_LIST = new Set(["HOME", "FLIGHTS", "HOTELS", "DAYS"]);
 const INITIAL_STATE = {
   panel: "HOME",
   listIndex: 0,
+  side: "left",
   filter: null,
 };
 
@@ -42,8 +44,13 @@ export function useMenuState() {
       ...s,
       panel,
       listIndex: 0,
+      side: "left",   // always start on left column when switching panels
       filter: null,
     }));
+  }, []);
+
+  const setSide = useCallback((side) => {
+    setState((s) => ({ ...s, side }));
   }, []);
 
   const setListIndex = useCallback((index) => {
@@ -57,6 +64,7 @@ export function useMenuState() {
         ...s,
         panel: PANELS.includes(panel) ? panel : s.panel,
         listIndex: 0,
+        side: "left",
         filter: filter || null,
       }));
       // Item resolution by name (e.g. "non-stop", "Park Hyatt") is handled
@@ -71,6 +79,7 @@ export function useMenuState() {
     state,
     setPanel,
     setListIndex,
+    setSide,
     navigate,
     reset,
   };
