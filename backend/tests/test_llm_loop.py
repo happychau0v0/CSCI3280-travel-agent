@@ -127,18 +127,31 @@ async def test_max_tool_rounds_halts_runaway_loop():
 async def test_region_error_swaps_to_fallback_model_on_round_zero():
     """A 403 / region error on round 0 must transparently retry with the fallback."""
 
-    fallback_response = _completion(_msg(content="from fallback", tool_calls=None))
-
     region_err = openai.APIConnectionError(
         message="403 region not available",
         request=SimpleNamespace(method="POST", url="https://api.x.ai/v1/chat/completions"),
     )
 
+    # Now that on_event triggers the streaming path, the mock must return an
+    # async generator (not a plain _completion object) on the second call.
+    async def _fallback_stream():
+        yield SimpleNamespace(
+            choices=[SimpleNamespace(
+                delta=SimpleNamespace(content="from fallback", tool_calls=None)
+            )]
+        )
+
+    calls: list[dict] = []
+
+    async def fake_create(*args, **kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            raise region_err
+        return _fallback_stream()
+
     fake_client = SimpleNamespace(
         chat=SimpleNamespace(
-            completions=SimpleNamespace(
-                create=AsyncMock(side_effect=[region_err, fallback_response])
-            )
+            completions=SimpleNamespace(create=fake_create)
         )
     )
 
@@ -157,9 +170,9 @@ async def test_region_error_swaps_to_fallback_model_on_round_zero():
         )
 
     assert result["reply"] == "from fallback"
+    assert len(calls) == 2
     # Second call should have used the fallback model.
-    second_call_kwargs = fake_client.chat.completions.create.await_args_list[1].kwargs
-    assert second_call_kwargs["model"] == "fallback-model"
+    assert calls[1]["model"] == "fallback-model"
     # A model_fallback event should have been emitted.
     assert any(t == "model_fallback" for t, _ in events)
 
@@ -196,3 +209,77 @@ def test_extract_itinerary_returns_none_when_absent():
     assert _extract_itinerary("just a text reply, no json") is None
     assert _extract_itinerary("") is None
     assert _extract_itinerary(None) is None
+
+
+# ─── per-role model routing ───────────────────────────────────────────────
+
+
+def _make_fake_client(model_calls: list):
+    """Return an AsyncMock client that records which model was requested."""
+
+    async def fake_create(**kwargs):
+        model_calls.append(kwargs.get("model"))
+        return _completion(_msg(content="done"))
+
+    fake_client = AsyncMock()
+    fake_client.chat.completions.create = fake_create
+    return fake_client
+
+
+@pytest.mark.asyncio
+async def test_role_default_model_applies_when_no_preferred_model():
+    """call_role='plan' with no preferred_model → role default (non-reasoning)."""
+    model_calls: list[str] = []
+    fake_client = _make_fake_client(model_calls)
+
+    with patch.object(llm, "_get_client", return_value=fake_client), \
+         patch.object(llm, "_get_fallback_client", return_value=fake_client), \
+         patch.object(llm, "LLM_MODEL", "grok-4.20-0309-non-reasoning"):
+        await llm._run_loop(
+            [{"role": "user", "content": "hi"}],
+            preferred_model=None,
+            call_role="plan",
+        )
+
+    assert model_calls, "client was never called"
+    assert model_calls[0] == llm.ROLE_DEFAULT_MODELS["plan"]
+    assert "non-reasoning" in model_calls[0]
+
+
+@pytest.mark.asyncio
+async def test_explicit_preferred_model_overrides_role_default():
+    """Explicit preferred_model overrides the role default."""
+    model_calls: list[str] = []
+    fake_client = _make_fake_client(model_calls)
+
+    with patch.object(llm, "_get_client", return_value=fake_client), \
+         patch.object(llm, "_get_fallback_client", return_value=fake_client), \
+         patch.object(llm, "LLM_MODEL", "grok-4.20-0309-non-reasoning"):
+        await llm._run_loop(
+            [{"role": "user", "content": "hi"}],
+            preferred_model="grok-4.20-0309-reasoning",
+            call_role="plan",
+        )
+
+    assert model_calls, "client was never called"
+    assert model_calls[0] == "grok-4.20-0309-reasoning"
+
+
+@pytest.mark.asyncio
+async def test_role_default_overrides_global_llm_model():
+    """When LLM_MODEL is reasoning but call_role has a default, role default wins."""
+    model_calls: list[str] = []
+    fake_client = _make_fake_client(model_calls)
+
+    with patch.object(llm, "_get_client", return_value=fake_client), \
+         patch.object(llm, "_get_fallback_client", return_value=fake_client), \
+         patch.object(llm, "LLM_MODEL", "grok-4.20-0309-reasoning"):
+        await llm._run_loop(
+            [{"role": "user", "content": "hi"}],
+            preferred_model=None,
+            call_role="hotels",
+        )
+
+    assert model_calls, "client was never called"
+    assert model_calls[0] == llm.ROLE_DEFAULT_MODELS["hotels"]
+    assert "non-reasoning" in model_calls[0]
