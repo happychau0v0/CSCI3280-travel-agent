@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import AirportCombobox from "../AirportCombobox";
 import PlanHistoryPanel from "../PlanHistoryPanel";
 import { formatDisplayPrice } from "../SettingsOverlay";
 
@@ -79,8 +80,8 @@ function SelectField({ value, options, onChange, fieldKey, isFocused, callbackRe
 const STORAGE_KEY = "travel-trip-form";
 
 const FIELDS = [
-  { key: "origin", label: "ORIGIN", type: "text", placeholder: "Hong Kong" },
-  { key: "destination", label: "DESTINATION", type: "text", placeholder: "Tokyo, Japan" },
+  { key: "origin",      label: "ORIGIN",      type: "airport", placeholder: "Hong Kong Intl (HKG)" },
+  { key: "destination", label: "DESTINATION", type: "airport", placeholder: "Tokyo Narita (NRT)" },
   { key: "start_date", label: "START DATE", type: "date" },
   { key: "end_date", label: "END DATE", type: "date" },
   {
@@ -175,12 +176,16 @@ const TEMPLATES = [
   },
 ];
 
+const DEFAULT_FORM = {
+  origin: "Hong Kong International Airport (HKG)",
+};
+
 function loadForm() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
+    return raw ? { ...DEFAULT_FORM, ...JSON.parse(raw) } : { ...DEFAULT_FORM };
   } catch {
-    return {};
+    return { ...DEFAULT_FORM };
   }
 }
 
@@ -281,8 +286,6 @@ function computeTripCostHkd(itinerary) {
 export default function PanelHome({
   itinerary,
   userLocation,
-  agentState = "idle",
-  currentTool = null,
   listIndex = 0,
   isLoading = false,
   pendingInputRequest = null,
@@ -460,20 +463,13 @@ export default function PanelHome({
       {/* TOP-LEFT — live status */}
       <button
         type="button"
-        className={`home-card home-card-tl agent-${agentState}`}
+        className="home-card home-card-tl"
         onClick={() => onJumpTo?.("HOME")}
         data-testid="home-card-live"
       >
         <div className="home-card-label">📍 LIVE</div>
         <div className="home-card-value">
           {userLocation?.city || userLocation?.formatted || "GPS unavailable"}
-        </div>
-        <div className="home-card-sub">
-          {agentState === "working"
-            ? `AGENT WORKING${currentTool ? ` · ${currentTool}` : ""}`
-            : agentState === "error"
-              ? "AGENT ERROR"
-              : "AGENT IDLE"}
         </div>
       </button>
 
@@ -563,6 +559,19 @@ export default function PanelHome({
                 }}
               >
                 <span className="panel-list-label">{field.label}</span>
+                {field.type === "airport" && (
+                  <AirportCombobox
+                    value={value || ""}
+                    onChange={(label) => {
+                      const next = { ...form, [field.key]: label };
+                      setForm(next);
+                      saveForm(next);
+                    }}
+                    placeholder={field.placeholder}
+                    disabled={isLoading}
+                    inputRef={setRowRef(field.key)}
+                  />
+                )}
                 {field.type === "text" && (
                   <input
                     ref={setRowRef(field.key)}
