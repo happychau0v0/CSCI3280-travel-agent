@@ -74,8 +74,11 @@ TURN 1 — Flights (triggered by "Plan a trip to {destination}...")
   `request_input("start_date", "When would you like to depart?")` and
   STOP immediately — do NOT call search_flights, geocode_city, or any
   other tool until the user provides confirmed dates. Same for
-  destination: if it says "somewhere" or is vague, call
-  `request_input("destination", "Where would you like to go?")` first.
+  destination: if it says "somewhere", is vague, or is a COUNTRY/REGION
+  instead of a specific city (e.g. "Australia", "Europe", "Southeast Asia",
+  "UK", "USA", "China", "Japan") — call
+  `request_input("destination", "Which city in {country} for your trip? (e.g. {example_cities})")` first.
+  NEVER pick a default city for the user. A country is NOT a valid destination — always ask.
 - Call these in ONE batch: `geocode_city(destination)`,
   `search_flights(origin, destination, date, seat_class?)`,
   `get_day_windows(trip_days, start_date)`,

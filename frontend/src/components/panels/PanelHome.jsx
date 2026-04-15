@@ -472,6 +472,7 @@ export default function PanelHome({
                     onChange={update(field.key)}
                     onKeyDown={handleFieldKeyDown(field.key)}
                     onFocus={() => onJumpTo && onJumpTo("HOME", i)}
+                    onBlur={(e) => { e.target.scrollLeft = 0; }}
                     placeholder={field.placeholder}
                     className="home-form-input"
                     data-testid={`home-input-${field.key}`}
