@@ -486,7 +486,8 @@ function App() {
           setCurrentItinerary({ ...currentItinerary, selected_hotel: hotel, days: undefined });
           cues.chime();
           handleSend(
-            `Set "${hotel.name}" as the base hotel. ` +
+            `Set "${hotel.name}" as the base hotel in ${currentItinerary?.destination}. ` +
+            `Flight arrives ${currentItinerary?.flight?.arrival_time} at ${currentItinerary?.flight?.to_iata} on ${currentItinerary?.flight?.date}. ` +
             `Plan the day-by-day itinerary with activities, meals, and directions.`,
           );
         }
@@ -951,6 +952,7 @@ function App() {
                 pendingChainedSendRef.current = {
                   text:
                     `Set "${hotel.name}" as the base hotel in ${currentItineraryRef.current?.destination}. ` +
+                    `Flight arrives ${currentItineraryRef.current?.flight?.arrival_time} at ${currentItineraryRef.current?.flight?.to_iata} on ${currentItineraryRef.current?.flight?.date}. ` +
                     `Plan the day-by-day itinerary with activities, meals, and directions.`,
                   opts: { callRole: "days" },
                 };
@@ -1547,6 +1549,7 @@ function App() {
                 // Fire Turn 3 so the LLM builds days around this hotel
                 const prompt =
                   `Set "${hotel.name}" as the base hotel in ${currentItinerary?.destination}. ` +
+                  `Flight arrives ${currentItinerary?.flight?.arrival_time} at ${currentItinerary?.flight?.to_iata} on ${currentItinerary?.flight?.date}. ` +
                   `Plan the day-by-day itinerary with activities, meals, and directions.`;
                 handleSend(prompt, { callRole: "days" });
               } else {
