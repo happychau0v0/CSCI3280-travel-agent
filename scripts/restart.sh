@@ -161,8 +161,8 @@ setup_tailscale() {
   if [[ -z "$ts_host" ]]; then return 0; fi
 
   echo "→ configuring Tailscale HTTPS serve for ${ts_host}"
-  sudo tailscale serve --bg --https=443  / "http://localhost:${FRONTEND_PORT}" &>/dev/null || true
-  sudo tailscale serve --bg --https="${BACKEND_PORT}" / "http://localhost:${BACKEND_PORT}" &>/dev/null || true
+  sudo tailscale serve --bg --https 443 "http://localhost:${FRONTEND_PORT}" || true
+  sudo tailscale serve --bg --https "${BACKEND_PORT}" "http://localhost:${BACKEND_PORT}" || true
   echo "✅ Tailscale serve active"
   echo "   frontend → https://${ts_host}/"
   echo "   backend  → https://${ts_host}:${BACKEND_PORT}/"
