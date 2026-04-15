@@ -2142,10 +2142,11 @@ function App() {
             handleSend(msg, { callRole: "replace" });
           } else if (pendingInputRequestRef.current) {
             // User answered a request_input question (e.g., clicked an airport option).
-            // Mirror onResolveInput: clear the request and send with the plan role.
+            // Route back to "chat" so the UI agent sees the full conversation context
+            // and can follow up with submit_trip_form once all required fields are gathered.
             const req = pendingInputRequestRef.current;
             setPendingInputRequest(null);
-            handleSend(`${req.field}: ${text}`, { callRole: "plan" });
+            handleSend(`${req.field}: ${text}`, { callRole: "chat" });
           } else {
             handleSend(text, { ...opts, callRole: "chat" });
           }
