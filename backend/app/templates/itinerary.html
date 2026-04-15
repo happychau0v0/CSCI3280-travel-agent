@@ -133,11 +133,18 @@
 {% if hotel %}
 <section>
   <h2>Hotel</h2>
-  <div class="hotel-name">{{ hotel.name }}</div>
-  <div class="hotel-meta">
-    {% if hotel.address %}{{ hotel.address }}{% endif %}
-    {% if hotel.rating %} · ★ {{ "%.1f"|format(hotel.rating) }}{% endif %}
-    {% if hotel.price_level %} · {{ hotel.price_level | replace("PRICE_LEVEL_", "") | title }}{% endif %}
+  <div class="hotel-block">
+    {% if hotel_photo %}
+    <img class="hotel-photo" src="{{ hotel_photo }}" alt="{{ hotel.name }}" />
+    {% endif %}
+    <div class="hotel-info">
+      <div class="hotel-name">{{ hotel.name }}</div>
+      <div class="hotel-meta">
+        {% if hotel.address %}{{ hotel.address }}{% endif %}
+        {% if hotel.rating %} · ★ {{ "%.1f"|format(hotel.rating) }}{% endif %}
+        {% if hotel.price_level %} · {{ hotel.price_level | replace("PRICE_LEVEL_", "") | title }}{% endif %}
+      </div>
+    </div>
   </div>
 </section>
 {% endif %}
@@ -166,6 +173,9 @@
         <div class="activity-body">
           <div class="activity-name">{{ act.name }}</div>
           {% if act.address %}<div class="activity-address">{{ act.address }}</div>{% endif %}
+          {% if act._photo_data_url %}
+          <img class="activity-photo" src="{{ act._photo_data_url }}" alt="{{ act.name }}" />
+          {% endif %}
           {% if act.description %}<div class="activity-desc">{{ act.description }}</div>{% endif %}
           {% if act.duration_min %}<div class="activity-desc dim">{{ act.duration_min }} min</div>{% endif %}
           {% if act.user_note %}<div class="activity-note">◇ {{ act.user_note }}</div>{% endif %}

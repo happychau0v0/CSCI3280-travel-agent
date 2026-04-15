@@ -114,6 +114,25 @@ section h2 {
 .dim { color: #777; }
 
 /* ── Hotel ───────────────────────────────────── */
+.hotel-block {
+  display: flex;
+  gap: 14pt;
+  align-items: flex-start;
+}
+
+.hotel-photo {
+  width: 160pt;
+  height: 100pt;
+  object-fit: cover;
+  border-radius: 3pt;
+  flex-shrink: 0;
+  border: 1px solid #ddd;
+}
+
+.hotel-info {
+  flex: 1;
+}
+
 .hotel-name {
   font-size: 12pt;
   font-weight: bold;
@@ -181,6 +200,17 @@ section h2 {
 .activity-address {
   font-size: 9pt;
   color: #555;
+}
+
+.activity-photo {
+  width: 100%;
+  max-width: 240pt;
+  height: 80pt;
+  object-fit: cover;
+  border-radius: 2pt;
+  border: 1px solid #ddd;
+  margin: 3pt 0;
+  display: block;
 }
 
 .activity-desc {
