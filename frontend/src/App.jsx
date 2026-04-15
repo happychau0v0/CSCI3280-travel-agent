@@ -791,6 +791,11 @@ function App() {
     setDayStatus(day.day, "error");
   }
 
+  function handleRetryDay(day) {
+    const snap = currentItineraryRef.current;
+    if (snap) planOneDayDetail(day, snap);
+  }
+
   async function planDaysActivities(itinerary) {
     // Reset all day statuses to pending before starting.
     const initial = {};
@@ -1700,6 +1705,7 @@ function App() {
           <PanelDays
             itinerary={currentItinerary}
             dayStatuses={dayStatuses}
+            onRetryDay={handleRetryDay}
             listIndex={menu.state.listIndex}
             side={menu.state.side}
             activityIndex={activityIndex}
