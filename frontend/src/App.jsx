@@ -238,6 +238,9 @@ function App() {
   // navigate_menu tool_start), which yanks the user to an empty
   // HOTELS panel before the itinerary data has landed.
   const pendingNavigateRef = useRef(null);
+  // Chained send queued by pick_flight/pick_hotel/replace_activity SSE handlers.
+  // Fired AFTER the current stream's done event to avoid concurrent-request races.
+  const pendingChainedSendRef = useRef(null);
   // Round 12 — undo / redo stacks for user-driven picks
   // (selected_flight and selected_hotel only). Each entry is a
   // {selected_flight, selected_hotel} snapshot taken BEFORE a pick
@@ -831,6 +834,8 @@ function App() {
               subtitles.push("Filling in your trip details...");
             } else if (type === "pick_flight") {
               // Chat mode — LLM picked a flight on the user's behalf.
+              // Queue the hotels replan to fire AFTER this stream's done event
+              // to avoid concurrent-request races.
               const { label, index } = payload || {};
               const opts = currentItineraryRef.current?.flight?.options;
               const opt = label
@@ -853,12 +858,14 @@ function App() {
                 ]
                   .filter(Boolean)
                   .join(", ");
-                handleSend(`Selected flight: ${lbl}. Now find hotels.`, {
-                  callRole: "hotels",
-                });
+                pendingChainedSendRef.current = {
+                  text: `Selected flight: ${lbl}. Now find hotels.`,
+                  opts: { callRole: "hotels" },
+                };
               }
             } else if (type === "pick_hotel") {
               // Chat mode — LLM picked a hotel on the user's behalf.
+              // Queue the days replan to fire AFTER this stream's done event.
               const { name, index } = payload || {};
               const hotels = currentItineraryRef.current?.hotels;
               const hotel = name
@@ -873,21 +880,21 @@ function App() {
                   selected_hotel: hotel,
                 }));
                 cues.chime();
-                if (autoReplan) {
-                  handleSend(
+                pendingChainedSendRef.current = {
+                  text:
                     `Set "${hotel.name}" as the base hotel. ` +
-                      `Plan the day-by-day itinerary with activities, meals, and directions.`,
-                    { callRole: "days" },
-                  );
-                }
+                    `Plan the day-by-day itinerary with activities, meals, and directions.`,
+                  opts: { callRole: "days" },
+                };
               }
             } else if (type === "replace_activity") {
               // Chat mode — LLM wants to replace a day activity.
+              // Queue the days replan to fire AFTER this stream's done event.
               const { day, activity_name, query } = payload || {};
               const q = query
                 ? `Replace "${activity_name}" on day ${day} with: ${query}`
                 : `Replace "${activity_name}" on day ${day} with a suitable alternative`;
-              handleSend(q, { callRole: "days" });
+              pendingChainedSendRef.current = { text: q, opts: { callRole: "days" } };
             } else if (type === "partial_itinerary") {
               // Progressive disclosure — show raw tool results before the LLM
               // finishes generating its closing text. The `done` event's final
@@ -1013,6 +1020,19 @@ function App() {
           idleTimerRef.current = null;
         }, 1500);
 
+        // Flush any pick_flight / pick_hotel / replace_activity chained send.
+        // These are queued (not fired immediately) to avoid concurrent-request
+        // races where the chained handleSend would start while this stream is
+        // still running, causing message-state collisions.
+        {
+          const chained = pendingChainedSendRef.current;
+          pendingChainedSendRef.current = null;
+          if (chained) {
+            // Small delay so the done-state UI settles before the next agent turn.
+            setTimeout(() => handleSend(chained.text, chained.opts), 50);
+          }
+        }
+
         // Auto-reopen the chat popover on a follow-up question. If the
         // LLM's reply ends with "?", schedule the popover to pop after
         // a short delay so the TTS finishes first. Skipped when a
@@ -1046,7 +1066,6 @@ function App() {
       llmModel,
       saveCurrentPlanToHistory,
       setPendingInputRequest,
-      autoReplan,
       pushPickSnapshot,
     ],
   );
