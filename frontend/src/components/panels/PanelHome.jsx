@@ -415,6 +415,9 @@ export default function PanelHome({
     } else if (form.start_date && form.end_date < form.start_date) {
       errors.end_date = "Must be on or after start date";
     }
+    if (!form.transport) {
+      errors.transport = "Required";
+    }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
