@@ -743,7 +743,8 @@ export default function PanelDays({
                 }
               />
               {pendingReplacement?.day === (days[selectedIdx]?.day) &&
-               pendingReplacement?.old_name === act.name && (
+               pendingReplacement?.old_name === act.name &&
+               onConfirmReplacement && onCancelReplacement && (
                 <li className="replace-preview">
                   <div className="replace-preview-label">↻ Proposed replacement</div>
                   <div className="replace-preview-name">{pendingReplacement.activity.name}</div>
