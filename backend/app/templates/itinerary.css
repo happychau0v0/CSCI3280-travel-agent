@@ -44,7 +44,10 @@ body {
 /* ── Sections ────────────────────────────────── */
 section {
   margin-bottom: 18pt;
-  page-break-inside: avoid;
+  /* Do NOT set page-break-inside: avoid here — a multi-page section
+     (e.g. the day-by-day block) causes weasyprint to emit a blank page
+     when it can't fit the section on one page but the avoid is set.
+     Avoidance is applied only to the smaller child blocks below. */
 }
 
 section h2 {
@@ -86,6 +89,7 @@ section h2 {
   width: 100%;
   border-collapse: collapse;
   font-size: 10pt;
+  page-break-inside: avoid;
 }
 
 .flight-table th {
@@ -118,6 +122,7 @@ section h2 {
   display: flex;
   gap: 14pt;
   align-items: flex-start;
+  page-break-inside: avoid;
 }
 
 .hotel-photo {
