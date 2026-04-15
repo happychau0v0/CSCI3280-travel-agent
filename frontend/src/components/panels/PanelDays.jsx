@@ -373,6 +373,8 @@ export default function PanelDays({
   favoriteKeys = new Set(),
   onToggleFavorite,
   theme = "dark",
+  dayStatuses = {},
+  onRetryDay = null,
 }) {
   const days = itinerary?.days || [];
   const hotelName =
@@ -622,6 +624,17 @@ export default function PanelDays({
                 {(day.activities || []).length} stops
                 {day.weather?.condition && <> · {weatherIcon(day.weather)}</>}
               </span>
+              {dayStatuses[day.day] === "loading" && (
+                <span className="day-status-loading" aria-label="Planning this day…">⋯</span>
+              )}
+              {dayStatuses[day.day] === "error" && (
+                <button
+                  className="day-status-retry"
+                  onClick={(e) => { e.stopPropagation(); onRetryDay && onRetryDay(day); }}
+                >
+                  Retry
+                </button>
+              )}
               {onRemoveDay && days.length > 1 && (
                 <button
                   type="button"

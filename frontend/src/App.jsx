@@ -178,10 +178,22 @@ function buildHistoryEntry(itinerary, messages) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Activity time cascade helpers — imported from utils/cascadeTimes.js
+// ---------------------------------------------------------------------------
+import { cascadeActivityTimes } from "./utils/cascadeTimes";
+
+// ---------------------------------------------------------------------------
+
 function App() {
   const initial = loadState();
   const [messages, setMessages] = useState(initial.messages);
   const [currentItinerary, setCurrentItinerary] = useState(initial.itinerary);
+  // dayStatuses tracks loading/error state per day number during two-phase planning.
+  // Key: day number (1-based), Value: "pending" | "loading" | "done" | "error"
+  const [dayStatuses, setDayStatuses] = useState({});
+  const setDayStatus = (dayNum, status) =>
+    setDayStatuses((prev) => ({ ...prev, [dayNum]: status }));
   const [planHistory, setPlanHistory] = useState(() => loadPlanHistory());
   const [favorites, setFavorites] = useState(() => loadFavorites());
   const favoriteKeys = useMemo(() => new Set(favorites.map((f) => f.key)), [favorites]);
@@ -261,6 +273,9 @@ function App() {
   const suppressHotelNavRef = useRef(false);
   // Replace-activity context: set when user clicks REPLACE, consumed by ChatPopover onSend.
   const pendingReplaceRef = useRef(null);
+  // Guard against double-invocation of planDaysActivities (e.g. hotel pick fires
+  // while a previous planning run is still in-flight).
+  const isPlanningDaysRef = useRef(false);
   // Round 12 — undo / redo stacks for user-driven picks
   // (selected_flight and selected_hotel only). Each entry is a
   // {selected_flight, selected_hotel} snapshot taken BEFORE a pick
@@ -709,6 +724,148 @@ function App() {
     });
   }, []);
 
+  function buildThemeMessage(itinerary) {
+    const { destination, flight, days } = itinerary;
+    const totalDays = days?.length ?? 0;
+    const arrivalTime = itinerary.selected_flight?.arrival_time ?? "unknown";
+    const arrivalIata = flight?.to_iata ?? "";
+    const returnFlight = flight?.return_options?.[0];
+    const departureTime = returnFlight?.departure_time ?? null;
+    const departureIata = flight?.from_iata ?? arrivalIata;
+    const lastDate = days?.[totalDays - 1]?.date ?? "";
+
+    let msg = `Plan themes for a ${totalDays}-day trip to ${destination}. `;
+    msg += `Day 1 (${days?.[0]?.date ?? ""}): flight arrives at ${arrivalTime} at ${arrivalIata}. `;
+    if (departureTime) {
+      msg += `Day ${totalDays} (${lastDate}): flight departs at ${departureTime} from ${departureIata}. `;
+    } else {
+      msg += `Day ${totalDays} (${lastDate}): departure day — plan a morning before the airport. `;
+    }
+    msg += `Assign each day a distinct geographic theme and 3-5 specific neighborhood names to focus on.`;
+    return msg;
+  }
+
+  function buildDayDetailMessage(day, itinerary) {
+    const { destination, selected_hotel, days } = itinerary;
+    const totalDays = days?.length ?? 0;
+    const hotel = selected_hotel;
+    const areas = day.suggested_areas?.join(", ") ?? destination;
+
+    let msg = `Plan activities for Day ${day.day} of ${totalDays} (${day.date}) in ${destination}. `;
+    msg += `Theme: ${day.theme}. Focus areas: ${areas}. `;
+    msg += `Base hotel: ${hotel?.name} at lat ${hotel?.lat}, lng ${hotel?.lng}. `;
+
+    if (day.key_constraints?.arrival_time) {
+      msg += `Flight arrives at ${day.key_constraints.airport_iata} at ${day.key_constraints.arrival_time} — first activity must be airport arrival. `;
+    }
+    if (day.key_constraints?.departure_time) {
+      msg += `Flight departs ${day.key_constraints.airport_iata} at ${day.key_constraints.departure_time} — plan to finish activities 3 hours before. `;
+    }
+    return msg.trim();
+  }
+
+  async function planOneDayDetail(day, itinerary) {
+    setDayStatus(day.day, "loading");
+    const message = buildDayDetailMessage(day, itinerary);
+    let delay = 2000;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const result = await streamChat({
+          message,
+          preferences,
+          userLocation,
+          tripDates,
+          llmModel,
+          callRole: "day_detail",
+        });
+        if (result?.itinerary?.days?.length) {
+          setCurrentItinerary((prev) => {
+            if (!prev) return prev;
+            const incoming = result.itinerary.days;
+            const updatedMap = new Map(incoming.map((d) => [d.day, d]));
+            const merged = (prev.days ?? []).map((d) => updatedMap.get(d.day) ?? d);
+            return { ...prev, days: merged };
+          });
+          setDayStatus(day.day, "done");
+          return;
+        }
+      } catch (err) {
+        if (err?.message?.includes("429") && attempt < 2) {
+          await new Promise((r) => setTimeout(r, delay));
+          delay *= 2;
+          continue;
+        }
+      }
+      break;
+    }
+    setDayStatus(day.day, "error");
+  }
+
+  function handleRetryDay(day) {
+    const snap = currentItineraryRef.current;
+    if (snap) planOneDayDetail(day, snap);
+  }
+
+  async function planDaysActivities(itinerary) {
+    if (isPlanningDaysRef.current) return;
+    isPlanningDaysRef.current = true;
+    try {
+      // Reset all day statuses to pending before starting.
+      const initial = {};
+      (itinerary.days ?? []).forEach((d) => { initial[d.day] = "pending"; });
+      setDayStatuses(initial);
+
+      // Phase 1: theme pass — assign each day a theme + suggested areas.
+      let themedItinerary = itinerary;
+      try {
+        const themesResult = await streamChat({
+          message: buildThemeMessage(itinerary),
+          preferences,
+          userLocation,
+          tripDates,
+          llmModel,
+          callRole: "day_themes",
+        });
+        if (themesResult?.itinerary?.days?.length) {
+          const themeMap = new Map(
+            (themesResult.itinerary.days ?? []).map((d) => [d.day, d])
+          );
+          setCurrentItinerary((prev) => {
+            const merged = (prev?.days ?? []).map((d) => ({
+              ...d,
+              ...(themeMap.get(d.day) ?? {}),
+            }));
+            return { ...(prev ?? {}), days: merged };
+          });
+          themedItinerary = {
+            ...itinerary,
+            days: (itinerary.days ?? []).map((d) => ({
+              ...d,
+              ...(themeMap.get(d.day) ?? {}),
+            })),
+          };
+        }
+      } catch {
+        // Theme pass failed — continue without themes (detail queries use destination only).
+      }
+
+      // Phase 2: per-day detail queries, sliding window of CONCURRENCY=7.
+      // Requests dispatched in day order so earlier days display first.
+      const days = themedItinerary.days ?? [];
+      const CONCURRENCY = 7;
+      const promises = [];
+      for (let i = 0; i < days.length; i++) {
+        if (i >= CONCURRENCY) await promises[i - CONCURRENCY];
+        promises.push(planOneDayDetail(days[i], themedItinerary));
+      }
+      await Promise.all(promises);
+
+      setPanelWithCue("DAYS");
+    } finally {
+      isPlanningDaysRef.current = false;
+    }
+  }
+
   const handleSend = useCallback(
     async (text, { editLast = false, truncateBefore = null, reset = false, callRole = null } = {}) => {
       const userMsg = { role: "user", content: text };
@@ -947,22 +1104,27 @@ function App() {
                   selected_hotel: hotel,
                 }));
                 cues.chime();
+                // Trigger two-phase day planning after this stream completes.
                 pendingChainedSendRef.current = {
-                  text:
-                    `Set "${hotel.name}" as the base hotel in ${currentItineraryRef.current?.destination}. ` +
-                    `Flight arrives ${currentItineraryRef.current?.flight?.arrival_time} at ${currentItineraryRef.current?.flight?.to_iata} on ${currentItineraryRef.current?.flight?.date}. ` +
-                    `Plan the day-by-day itinerary with activities, meals, and directions.`,
-                  opts: { callRole: "days" },
+                  __planDays: true,
+                  hotel,
                 };
               }
             } else if (type === "replace_activity") {
               // Chat mode — LLM wants to replace a day activity.
               // Queue the days replan to fire AFTER this stream's done event.
               const { day, activity_name, query } = payload || {};
-              const dest = currentItinerary?.destination || "the destination";
+              const dest = currentItineraryRef.current?.destination || "the destination";
+              // Look up the original activity to pass its timing to the LLM.
+              const origDay = currentItineraryRef.current?.days?.find((d) => d.day === day);
+              const origAct = origDay?.activities?.find((a) => a.name === activity_name);
+              const timeContext =
+                origAct?.time
+                  ? ` Original activity time: ${origAct.time}, duration: ${origAct.duration_min ?? 60} min. Keep the same start time and duration unless the replacement logically requires otherwise.`
+                  : "";
               const q = query
-                ? `Day ${day}, replace "${activity_name}" with: ${query}. Destination city: ${dest}.`
-                : `Day ${day}, replace "${activity_name}" with a different but similar place in ${dest}.`;
+                ? `Day ${day}, replace "${activity_name}" with: ${query}. Destination city: ${dest}.${timeContext}`
+                : `Day ${day}, replace "${activity_name}" with a different but similar place in ${dest}.${timeContext}`;
               pendingChainedSendRef.current = { text: q, opts: { callRole: "replace" } };
             } else if (type === "partial_itinerary") {
               // Progressive disclosure — show raw tool results before the LLM
@@ -1006,11 +1168,19 @@ function App() {
               if (!prev?.days) return prev;
               const days = prev.days.map((d) => {
                 if (d.day !== dayNum) return d;
-                const activities = d.activities.map((a) =>
+                let activities = d.activities.map((a) =>
                   a.name === old_name
                     ? { ...a, ...newAct, time: newAct.time ?? a.time, duration_min: newAct.duration_min ?? a.duration_min }
                     : a
                 );
+                // Cascade start times for activities after the replaced one
+                // so downstream times stay consistent if duration changed.
+                const changedIdx = activities.findIndex(
+                  (a) => a.name === (newAct.name ?? old_name)
+                );
+                if (changedIdx >= 0) {
+                  activities = cascadeActivityTimes(activities, changedIdx);
+                }
                 return { ...d, activities };
               });
               return { ...prev, days };
@@ -1130,12 +1300,15 @@ function App() {
         // These are queued (not fired immediately) to avoid concurrent-request
         // races where the chained handleSend would start while this stream is
         // still running, causing message-state collisions.
-        {
-          const chained = pendingChainedSendRef.current;
+        if (pendingChainedSendRef.current) {
+          const pending = pendingChainedSendRef.current;
           pendingChainedSendRef.current = null;
-          if (chained) {
+          if (pending.__planDays) {
+            const snap = currentItineraryRef.current;
+            if (snap) planDaysActivities({ ...snap, selected_hotel: pending.hotel });
+          } else {
             // Small delay so the done-state UI settles before the next agent turn.
-            setTimeout(() => handleSend(chained.text, chained.opts), 50);
+            setTimeout(() => handleSend(pending.text, pending.opts), 50);
           }
         }
 
@@ -1545,12 +1718,11 @@ function App() {
               });
               cues.chime();
               if (autoReplan) {
-                // Fire Turn 3 so the LLM builds days around this hotel
-                const prompt =
-                  `Set "${hotel.name}" as the base hotel in ${currentItinerary?.destination}. ` +
-                  `Flight arrives ${currentItinerary?.flight?.arrival_time} at ${currentItinerary?.flight?.to_iata} on ${currentItinerary?.flight?.date}. ` +
-                  `Plan the day-by-day itinerary with activities, meals, and directions.`;
-                handleSend(prompt, { callRole: "days" });
+                // Fire two-phase day planning so the LLM builds days around this hotel
+                planDaysActivities({
+                  ...currentItinerary,
+                  selected_hotel: hotel,
+                });
               } else {
                 // Manual mode — just advance to DAYS panel
                 setPanelWithCue("DAYS");
@@ -1563,6 +1735,8 @@ function App() {
         {menu.state.panel === "DAYS" && (
           <PanelDays
             itinerary={currentItinerary}
+            dayStatuses={dayStatuses}
+            onRetryDay={handleRetryDay}
             listIndex={menu.state.listIndex}
             side={menu.state.side}
             activityIndex={activityIndex}
@@ -1606,7 +1780,13 @@ function App() {
               const act = day?.activities?.[actIdx];
               if (!act) return;
               const dest = currentItinerary?.destination || "the destination";
-              pendingReplaceRef.current = { actName: act.name, dayNum: day.day, dest };
+              pendingReplaceRef.current = {
+                actName: act.name,
+                dayNum: day.day,
+                dest,
+                actTime: act.time,
+                actDuration: act.duration_min,
+              };
               setChatPopoverPromptLabel(
                 `What would you like to replace "${act.name}" with? (Leave empty for a similar alternative)`
               );
@@ -1822,11 +2002,15 @@ function App() {
           } else if (replaceCtx) {
             // User answered the "replace with what?" question — use the
             // lightweight replace role (1 search_places call, surgical swap).
-            const { actName, dayNum, dest } = replaceCtx;
+            const { actName, dayNum, dest, actTime, actDuration } = replaceCtx;
             const preference = text.trim();
+            const timeContext =
+              actTime
+                ? ` Original activity time: ${actTime}, duration: ${actDuration ?? 60} min. Keep the same start time and duration unless the replacement logically requires otherwise.`
+                : "";
             const msg = preference
-              ? `Day ${dayNum}, replace "${actName}" with: ${preference}. Destination city: ${dest}.`
-              : `Day ${dayNum}, replace "${actName}" with a different but similar place in ${dest}.`;
+              ? `Day ${dayNum}, replace "${actName}" with: ${preference}. Destination city: ${dest}.${timeContext}`
+              : `Day ${dayNum}, replace "${actName}" with a different but similar place in ${dest}.${timeContext}`;
             handleSend(msg, { callRole: "replace" });
           } else if (pendingInputRequestRef.current) {
             // User answered a request_input question (e.g., clicked an airport option).

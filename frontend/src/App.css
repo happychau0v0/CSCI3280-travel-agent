@@ -6081,3 +6081,24 @@ body.theme-light .history-overlay-scroll::-webkit-scrollbar-thumb {
   border-radius: 3px;
   background: rgba(255, 107, 107, 0.05);
 }
+
+/* Per-day loading/error status indicators (two-phase day planning) */
+.day-status-loading {
+  font-size: 0.75rem;
+  opacity: 0.6;
+  margin-left: 0.4rem;
+  animation: day-status-blink 1s step-start infinite;
+}
+.day-status-retry {
+  font-size: 0.7rem;
+  margin-left: 0.4rem;
+  color: var(--accent, #e55);
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 1px 5px;
+  cursor: pointer;
+}
+@keyframes day-status-blink {
+  50% { opacity: 0; }
+}
