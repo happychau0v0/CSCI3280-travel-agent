@@ -209,8 +209,17 @@ function App() {
   // dayStatuses tracks loading/error state per day number during two-phase planning.
   // Key: day number (1-based), Value: "pending" | "loading" | "done" | "error"
   const [dayStatuses, setDayStatuses] = useState({});
-  const setDayStatus = (dayNum, status) =>
+  // dayStartTimes tracks when each day's detail call began (Date.now() ms).
+  // Cleared when status leaves "loading". Passed to PanelDays for elapsed display.
+  const [dayStartTimes, setDayStartTimes] = useState({});
+  const setDayStatus = (dayNum, status) => {
     setDayStatuses((prev) => ({ ...prev, [dayNum]: status }));
+    if (status === "loading") {
+      setDayStartTimes((prev) => ({ ...prev, [dayNum]: Date.now() }));
+    } else {
+      setDayStartTimes((prev) => { const n = { ...prev }; delete n[dayNum]; return n; });
+    }
+  };
   const [planHistory, setPlanHistory] = useState(() => loadPlanHistory());
   const [favorites, setFavorites] = useState(() => loadFavorites());
   const favoriteKeys = useMemo(() => new Set(favorites.map((f) => f.key)), [favorites]);
@@ -300,6 +309,8 @@ function App() {
   // Guard against double-invocation of planDaysActivities (e.g. hotel pick fires
   // while a previous planning run is still in-flight).
   const isPlanningDaysRef = useRef(false);
+  // Prevents double-navigation to DAYS when first day completes mid-planning.
+  const navigatedToDaysRef = useRef(false);
   // Round 12 — undo / redo stacks for user-driven picks
   // (selected_flight and selected_hotel only). Each entry is a
   // {selected_flight, selected_hotel} snapshot taken BEFORE a pick
@@ -805,12 +816,28 @@ function App() {
     const totalDays = days?.length ?? 0;
     const hotel = selected_hotel;
     const areas = day.suggested_areas?.join(", ") ?? destination;
+    // Map form transport value to get_directions mode enum (DRIVE|WALK|BICYCLE|TRANSIT).
+    const modeMap = { transit: "TRANSIT", driving: "DRIVE", walking: "WALK", mixed: "TRANSIT" };
     const transport = local_transport_mode ?? "transit";
+    const directionsMode = modeMap[transport] ?? "TRANSIT";
 
     let msg = `Plan activities for Day ${day.day} of ${totalDays} (${day.date}) in ${destination}. `;
-    msg += `Transport mode: ${transport}. `;
-    msg += `Theme: ${day.theme ?? "General sightseeing"}. Focus areas: ${areas}. `;
+    msg += `Transport mode: use mode="${directionsMode}" for ALL get_directions calls — do not use any other mode. `;
+    if (day.theme) {
+      msg += `Theme: ${day.theme}. Focus areas: ${areas}. `;
+    } else {
+      msg += `Focus areas: ${areas}. `;
+    }
     msg += `Base hotel: ${hotel?.name} at lat ${hotel?.lat}, lng ${hotel?.lng}. `;
+
+    // Tell the LLM which areas other days are covering so it avoids duplicate attractions.
+    const otherDays = (days ?? []).filter((d) => d.day !== day.day && d.suggested_areas?.length);
+    if (otherDays.length) {
+      const otherAreas = otherDays
+        .map((d) => `Day ${d.day}: ${d.suggested_areas.join(", ")}`)
+        .join(" | ");
+      msg += `Other days cover: ${otherAreas}. Do NOT include attractions from those areas — each day must use unique places. `;
+    }
 
     if (day.key_constraints?.arrival_time) {
       msg += `Flight arrives at ${day.key_constraints.airport_iata} at ${day.key_constraints.arrival_time} — first activity must be airport arrival. `;
@@ -844,6 +871,11 @@ function App() {
             return { ...prev, days: merged };
           });
           setDayStatus(day.day, "done");
+          // Navigate to DAYS as soon as any day completes — don't wait for all.
+          if (!navigatedToDaysRef.current) {
+            navigatedToDaysRef.current = true;
+            setPanelWithCue("DAYS");
+          }
           return;
         }
       } catch (err) {
@@ -852,6 +884,7 @@ function App() {
           delay *= 2;
           continue;
         }
+        console.error(`Day ${day.day} detail failed (attempt ${attempt + 1}):`, err?.message);
       }
       break;
     }
@@ -896,6 +929,10 @@ function App() {
   async function planDaysActivities(itinerary) {
     if (isPlanningDaysRef.current) return;
     isPlanningDaysRef.current = true;
+    navigatedToDaysRef.current = false;
+    setAgentState("working");
+    setCurrentTool("day_themes");
+    requestStartedAtRef.current = Date.now();
     try {
       // Day stubs ({day, date}) are seeded at PLAN time from the form dates
       // and survive through flight/hotel picks. If missing here, something
@@ -910,6 +947,10 @@ function App() {
         d.day != null ? d : { ...d, day: i + 1 }
       );
       itinerary = { ...itinerary, days: normalizedDays };
+
+      const totalDays = itinerary.days.length;
+      const dest = itinerary.destination ?? "your destination";
+      subtitles.push(`Planning your ${totalDays}-day trip to ${dest}…`);
 
       // Reset all day statuses to pending before starting.
       const initial = {};
@@ -928,30 +969,32 @@ function App() {
           callRole: "day_themes",
         });
         if (themesResult?.itinerary?.days?.length) {
-          const themeMap = new Map(
-            (themesResult.itinerary.days ?? []).map((d) => [d.day, d])
-          );
+          const themes = themesResult.itinerary.days;
+          // Match by day number first, fall back to date string in case the LLM
+          // numbered days differently than our 1-based stubs.
+          const themeByDay = new Map(themes.map((d) => [d.day, d]));
+          const themeByDate = new Map(themes.map((d) => [d.date, d]));
+          const getTheme = (d) => themeByDay.get(d.day) ?? themeByDate.get(d.date) ?? {};
           setCurrentItinerary((prev) => {
-            const merged = (prev?.days ?? []).map((d) => ({
-              ...d,
-              ...(themeMap.get(d.day) ?? {}),
-            }));
+            const merged = (prev?.days ?? []).map((d) => ({ ...d, ...getTheme(d) }));
             return { ...(prev ?? {}), days: merged };
           });
           themedItinerary = {
             ...itinerary,
-            days: (itinerary.days ?? []).map((d) => ({
-              ...d,
-              ...(themeMap.get(d.day) ?? {}),
-            })),
+            days: (itinerary.days ?? []).map((d) => ({ ...d, ...getTheme(d) })),
           };
+        } else {
+          console.warn("day_themes returned no days — proceeding without themes");
         }
-      } catch {
-        // Theme pass failed — continue without themes (detail queries use destination only).
+      } catch (err) {
+        // Theme pass failed — continue without themes (detail queries use destination as fallback).
+        console.warn("day_themes pass failed:", err?.message);
       }
 
       // Phase 2: per-day detail queries, sliding window of CONCURRENCY=7.
       // Requests dispatched in day order so earlier days display first.
+      setCurrentTool("day_detail");
+      subtitles.push(`Researching activities for ${themedItinerary.days.length} days…`, { spoken: true });
       const days = themedItinerary.days ?? [];
       const CONCURRENCY = 7;
       const promises = [];
@@ -961,9 +1004,19 @@ function App() {
       }
       await Promise.all(promises);
 
-      setPanelWithCue("DAYS");
+      // Only navigate if at least one day has activities — if every call
+      // failed (e.g. backend error), stay on HOTELS so the user keeps context.
+      const snap = currentItineraryRef.current;
+      const anyDone = snap?.days?.some((d) => d.activities?.length);
+      if (anyDone) {
+        subtitles.push(`Your ${totalDays}-day itinerary for ${dest} is ready.`);
+        setPanelWithCue("DAYS");
+      }
     } finally {
       isPlanningDaysRef.current = false;
+      setCurrentTool(null);
+      setAgentState("done");
+      setTimeout(() => setAgentState("idle"), 1500);
     }
   }
 
@@ -1804,6 +1857,7 @@ function App() {
           <PanelDays
             itinerary={currentItinerary}
             dayStatuses={dayStatuses}
+            dayStartTimes={dayStartTimes}
             onRetryDay={handleRetryDay}
             pendingReplacement={pendingReplacement}
             onConfirmReplacement={handleConfirmReplacement}

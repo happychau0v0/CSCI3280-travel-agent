@@ -29,7 +29,7 @@ ALLOWED_MODELS = {
     "gemini-3.1-pro-preview",
 }
 
-ALLOWED_ROLES = {None, "plan", "hotels", "days", "chat", "replace"}
+ALLOWED_ROLES = {None, "plan", "hotels", "days", "chat", "replace", "day_themes", "day_detail"}
 
 
 class ChatRequest(BaseModel):

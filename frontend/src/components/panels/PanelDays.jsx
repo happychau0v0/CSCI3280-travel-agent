@@ -374,6 +374,7 @@ export default function PanelDays({
   onToggleFavorite,
   theme = "dark",
   dayStatuses = {},
+  dayStartTimes = {},
   onRetryDay = null,
   pendingReplacement = null,
   onConfirmReplacement = null,
@@ -383,6 +384,15 @@ export default function PanelDays({
   const hotelName =
     itinerary?.selected_hotel?.name || itinerary?.hotels?.[0]?.name || null;
   const [activeActivityIdx, setActiveActivityIdx] = useState(-1);
+
+  // Tick every second while any day is loading so elapsed times update.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const anyLoading = Object.values(dayStatuses).some((s) => s === "loading");
+    if (!anyLoading) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [dayStatuses]);
 
   // Live route state — fetched from /api/directions when user clicks an activity.
   // Null when no activity is selected or fetch failed.
@@ -628,7 +638,11 @@ export default function PanelDays({
                 {day.weather?.condition && <> · {weatherIcon(day.weather)}</>}
               </span>
               {dayStatuses[day.day] === "loading" && (
-                <span className="day-status-loading" aria-label="Planning this day…">⋯</span>
+                <span className="day-status-loading" aria-label="Planning this day…">
+                  {dayStartTimes[day.day]
+                    ? `${Math.floor((Date.now() - dayStartTimes[day.day]) / 1000)}s`
+                    : "⋯"}
+                </span>
               )}
               {dayStatuses[day.day] === "error" && (
                 <button
