@@ -257,6 +257,9 @@ flushes it 50ms **after** the chat stream's `done` event. This prevents
 concurrent-request races where the planning call would start while the chat
 stream is still live.
 
+**`submit_trip_form` fills only — user must confirm:**
+As of the Task 1 UX change, `submit_trip_form` pre-fills the PLAN form and navigates to the PLAN panel, but does **not** auto-start planning. The `onFormPrefilled` callback in `App.jsx` no longer calls `handleSend`; instead the user reviews the pre-filled values and clicks START PLANNING themselves. This prevents the agent from silently firing expensive LLM calls without the user's explicit intent.
+
 **System prompt for chat role:**
 ```
 You are a UI control agent for a travel planning app. Your job is to
