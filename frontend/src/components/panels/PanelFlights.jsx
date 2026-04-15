@@ -293,8 +293,15 @@ export default function PanelFlights({
             </button>
 
             {(() => {
+              // Use the backend-provided deep link (includes correct dates).
+              // Fall back to a constructed URL that includes dates if available.
+              const flightDate = activeTab === "return" ? (flight.return_date || flight.date) : flight.date;
+              const retDate = activeTab === "return" ? flight.date : flight.return_date;
+              const dateQ = flightDate ? `+on+${encodeURIComponent(flightDate)}` : "";
+              const retQ = retDate ? `+return+${encodeURIComponent(retDate)}` : "";
+              const tripType = retDate ? "round+trip+flights" : "Flights";
               const gUrl = flight.google_flights_url
-                || `https://www.google.com/travel/flights?q=Flights+from+${encodeURIComponent(fromIata)}+to+${encodeURIComponent(toIata)}`;
+                || `https://www.google.com/travel/flights?q=${tripType}+from+${encodeURIComponent(fromIata)}+to+${encodeURIComponent(toIata)}${dateQ}${retQ}`;
               return (
                 <a
                   href={gUrl}
