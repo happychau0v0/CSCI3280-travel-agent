@@ -942,10 +942,11 @@ function App() {
               // Chat mode — LLM wants to replace a day activity.
               // Queue the days replan to fire AFTER this stream's done event.
               const { day, activity_name, query } = payload || {};
+              const dest = currentItinerary?.destination || "the destination";
               const q = query
-                ? `Replace "${activity_name}" on day ${day} with: ${query}`
-                : `Replace "${activity_name}" on day ${day} with a suitable alternative`;
-              pendingChainedSendRef.current = { text: q, opts: { callRole: "days" } };
+                ? `Day ${day}, replace "${activity_name}" with: ${query}. Destination city: ${dest}.`
+                : `Day ${day}, replace "${activity_name}" with a different but similar place in ${dest}.`;
+              pendingChainedSendRef.current = { text: q, opts: { callRole: "replace" } };
             } else if (type === "partial_itinerary") {
               // Progressive disclosure — show raw tool results before the LLM
               // finishes generating its closing text. The `done` event's final
@@ -979,6 +980,26 @@ function App() {
         const assistantMsg = { role: "assistant", content: data.reply };
         setMessages((prev) => [...prev, assistantMsg]);
         if (data.itinerary) {
+          // Surgical single-activity replacement: the replace role emits
+          // {"replace": {"day": N, "old_name": "...", "activity": {...}}}
+          // instead of the full days array. Swap only the matching activity.
+          if (data.itinerary.replace) {
+            const { day: dayNum, old_name, activity: newAct } = data.itinerary.replace;
+            setCurrentItinerary((prev) => {
+              if (!prev?.days) return prev;
+              const days = prev.days.map((d) => {
+                if (d.day !== dayNum) return d;
+                const activities = d.activities.map((a) =>
+                  a.name === old_name
+                    ? { ...a, ...newAct, time: newAct.time ?? a.time, duration_min: newAct.duration_min ?? a.duration_min }
+                    : a
+                );
+                return { ...d, activities };
+              });
+              return { ...prev, days };
+            });
+            cues.chime();
+          } else {
           // Multi-turn additive merge: each LLM turn only emits fields
           // for its step (Turn 1: flight, Turn 2: hotels, Turn 3: days).
           // We spread the new data ON TOP of the LATEST state (via
@@ -1030,6 +1051,7 @@ function App() {
             { ...(currentItineraryRef.current || {}), ...data.itinerary },
             [...baseMessages, userMsg, assistantMsg],
           );
+          } // end else (non-replace itinerary update)
         }
 
         // Round 11 — flush any buffered navigate_menu target now
@@ -1766,13 +1788,14 @@ function App() {
           if (idx != null) {
             handleSend(text, { truncateBefore: idx, callRole: "chat" });
           } else if (replaceCtx) {
-            // User answered the "replace with what?" question
+            // User answered the "replace with what?" question — use the
+            // lightweight replace role (1 search_places call, surgical swap).
             const { actName, dayNum, dest } = replaceCtx;
             const preference = text.trim();
             const msg = preference
-              ? `Replace "${actName}" on Day ${dayNum} with: ${preference}. Keep every other activity, keep the hotel anchor, update times if needed.`
-              : `Replace "${actName}" on Day ${dayNum} with a similar but different place in ${dest}. Keep every other activity, keep the hotel anchor, update times if needed.`;
-            handleSend(msg, { callRole: "days" });
+              ? `Day ${dayNum}, replace "${actName}" with: ${preference}. Destination city: ${dest}.`
+              : `Day ${dayNum}, replace "${actName}" with a different but similar place in ${dest}.`;
+            handleSend(msg, { callRole: "replace" });
           } else {
             handleSend(text, { ...opts, callRole: "chat" });
           }

@@ -430,6 +430,27 @@ Examples:
 Reply with ONE short friendly sentence (no JSON, no markdown).
 """
 
+SYSTEM_PROMPT_REPLACE = """You are the ACTIVITY REPLACER for a travel planning app.
+The user wants to swap ONE specific activity in their itinerary with something different.
+
+RULES:
+- Call search_places ONCE to find a suitable replacement. Pass the destination city as location.
+- Pick the single best result from search_places.
+- Keep the SAME time and duration_min as the original activity.
+- Copy place_id, lat, lng, address, photo_url VERBATIM from the search_places result.
+- Write a brief 10-15 word description from your own knowledge.
+- Do NOT touch any other activities, days, hotels, or flights.
+- Do NOT call navigate_menu.
+
+OUTPUT: Emit exactly one ```json block in this format:
+```json
+{"itinerary": {"replace": {"day": <day_number>, "old_name": "<exact name of the activity being replaced>", "activity": {"time": "<HH:MM>", "name": "<place name>", "duration_min": <N>, "address": "<address>", "place_id": "<id>", "lat": <lat>, "lng": <lng>, "photo_url": "<url>", "description": "<10-15 words>"}}}}
+```
+Then write ONE short sentence (10-20 words) confirming what was swapped.
+NEVER reply with only a JSON block — always include the confirmation sentence after it.
+NEVER use markdown in reply text (outside the json block).
+"""
+
 # Tool allow-lists per call role. These are enforced in llm._run_loop to prevent
 # the LLM from calling tools outside its designated scope.
 ALLOWED_TOOLS_PLAN: frozenset[str] = frozenset({
@@ -446,18 +467,23 @@ ALLOWED_TOOLS_CHAT: frozenset[str] = frozenset({
     "request_input", "submit_trip_form", "navigate_menu", "toggle_setting",
     "pick_flight", "pick_hotel", "replace_activity", "search_airports",
 })
+ALLOWED_TOOLS_REPLACE: frozenset[str] = frozenset({
+    "search_places",
+})
 
 ROLE_PROMPTS: dict[str, str] = {
-    "plan":   SYSTEM_PROMPT_PLAN,
-    "hotels": SYSTEM_PROMPT_HOTELS,
-    "days":   SYSTEM_PROMPT_DAYS,
-    "chat":   SYSTEM_PROMPT_CHAT,
+    "plan":    SYSTEM_PROMPT_PLAN,
+    "hotels":  SYSTEM_PROMPT_HOTELS,
+    "days":    SYSTEM_PROMPT_DAYS,
+    "chat":    SYSTEM_PROMPT_CHAT,
+    "replace": SYSTEM_PROMPT_REPLACE,
 }
 ROLE_ALLOWED_TOOLS: dict[str, frozenset[str]] = {
-    "plan":   ALLOWED_TOOLS_PLAN,
-    "hotels": ALLOWED_TOOLS_HOTELS,
-    "days":   ALLOWED_TOOLS_DAYS,
-    "chat":   ALLOWED_TOOLS_CHAT,
+    "plan":    ALLOWED_TOOLS_PLAN,
+    "hotels":  ALLOWED_TOOLS_HOTELS,
+    "days":    ALLOWED_TOOLS_DAYS,
+    "chat":    ALLOWED_TOOLS_CHAT,
+    "replace": ALLOWED_TOOLS_REPLACE,
 }
 
 # [EVALUATION MODE] bracketed prefix marks this as a special instruction block
