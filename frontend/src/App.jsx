@@ -266,6 +266,9 @@ function App() {
   const suppressHotelNavRef = useRef(false);
   // Replace-activity context: set when user clicks REPLACE, consumed by ChatPopover onSend.
   const pendingReplaceRef = useRef(null);
+  // Guard against double-invocation of planDaysActivities (e.g. hotel pick fires
+  // while a previous planning run is still in-flight).
+  const isPlanningDaysRef = useRef(false);
   // Round 12 — undo / redo stacks for user-driven picks
   // (selected_flight and selected_hotel only). Each entry is a
   // {selected_flight, selected_hotel} snapshot taken BEFORE a pick
@@ -717,7 +720,7 @@ function App() {
   function buildThemeMessage(itinerary) {
     const { destination, flight, days } = itinerary;
     const totalDays = days?.length ?? 0;
-    const arrivalTime = flight?.arrival_time ?? "unknown";
+    const arrivalTime = itinerary.selected_flight?.arrival_time ?? "unknown";
     const arrivalIata = flight?.to_iata ?? "";
     const returnFlight = flight?.return_options?.[0];
     const departureTime = returnFlight?.departure_time ?? null;
@@ -797,57 +800,63 @@ function App() {
   }
 
   async function planDaysActivities(itinerary) {
-    // Reset all day statuses to pending before starting.
-    const initial = {};
-    (itinerary.days ?? []).forEach((d) => { initial[d.day] = "pending"; });
-    setDayStatuses(initial);
-
-    // Phase 1: theme pass — assign each day a theme + suggested areas.
-    let themedItinerary = itinerary;
+    if (isPlanningDaysRef.current) return;
+    isPlanningDaysRef.current = true;
     try {
-      const themesResult = await streamChat({
-        message: buildThemeMessage(itinerary),
-        preferences,
-        userLocation,
-        tripDates,
-        llmModel,
-        callRole: "day_themes",
-      });
-      if (themesResult?.itinerary?.days?.length) {
-        const themeMap = new Map(
-          (themesResult.itinerary.days ?? []).map((d) => [d.day, d])
-        );
-        setCurrentItinerary((prev) => {
-          const merged = (prev?.days ?? []).map((d) => ({
-            ...d,
-            ...(themeMap.get(d.day) ?? {}),
-          }));
-          return { ...(prev ?? {}), days: merged };
+      // Reset all day statuses to pending before starting.
+      const initial = {};
+      (itinerary.days ?? []).forEach((d) => { initial[d.day] = "pending"; });
+      setDayStatuses(initial);
+
+      // Phase 1: theme pass — assign each day a theme + suggested areas.
+      let themedItinerary = itinerary;
+      try {
+        const themesResult = await streamChat({
+          message: buildThemeMessage(itinerary),
+          preferences,
+          userLocation,
+          tripDates,
+          llmModel,
+          callRole: "day_themes",
         });
-        themedItinerary = {
-          ...itinerary,
-          days: (itinerary.days ?? []).map((d) => ({
-            ...d,
-            ...(themeMap.get(d.day) ?? {}),
-          })),
-        };
+        if (themesResult?.itinerary?.days?.length) {
+          const themeMap = new Map(
+            (themesResult.itinerary.days ?? []).map((d) => [d.day, d])
+          );
+          setCurrentItinerary((prev) => {
+            const merged = (prev?.days ?? []).map((d) => ({
+              ...d,
+              ...(themeMap.get(d.day) ?? {}),
+            }));
+            return { ...(prev ?? {}), days: merged };
+          });
+          themedItinerary = {
+            ...itinerary,
+            days: (itinerary.days ?? []).map((d) => ({
+              ...d,
+              ...(themeMap.get(d.day) ?? {}),
+            })),
+          };
+        }
+      } catch {
+        // Theme pass failed — continue without themes (detail queries use destination only).
       }
-    } catch {
-      // Theme pass failed — continue without themes (detail queries use destination only).
-    }
 
-    // Phase 2: per-day detail queries, sliding window of CONCURRENCY=7.
-    // Requests dispatched in day order so earlier days display first.
-    const days = themedItinerary.days ?? [];
-    const CONCURRENCY = 7;
-    const promises = [];
-    for (let i = 0; i < days.length; i++) {
-      if (i >= CONCURRENCY) await promises[i - CONCURRENCY];
-      promises.push(planOneDayDetail(days[i], themedItinerary));
-    }
-    await Promise.all(promises);
+      // Phase 2: per-day detail queries, sliding window of CONCURRENCY=7.
+      // Requests dispatched in day order so earlier days display first.
+      const days = themedItinerary.days ?? [];
+      const CONCURRENCY = 7;
+      const promises = [];
+      for (let i = 0; i < days.length; i++) {
+        if (i >= CONCURRENCY) await promises[i - CONCURRENCY];
+        promises.push(planOneDayDetail(days[i], themedItinerary));
+      }
+      await Promise.all(promises);
 
-    setPanelWithCue("DAYS");
+      setPanelWithCue("DAYS");
+    } finally {
+      isPlanningDaysRef.current = false;
+    }
   }
 
   const handleSend = useCallback(
