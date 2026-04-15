@@ -1447,7 +1447,34 @@ Overall status is `"ok"` only if all three services are `"ok"`. Otherwise `"degr
 
 ---
 
-## 10. Known Limitations & Gaps
+## 10. Static Data Files
+
+### `backend/app/data/visa_hk.json`
+
+Visa requirement lookup table for **HKSAR passport** holders (used by `GET /visa/check?passport=HK`).
+
+**Generation process (2026-04-15):**
+
+1. **Seeded by LLM** — Claude (`claude-sonnet-4-6`) was prompted to produce a complete country list using the Henley Passport Index and the HKSAR Immigration Department's official visa-free PDF as primary sources.
+2. **Human + AI review** — Each entry was cross-checked against official sources (HKSAR Immigration Dept PDF, bilateral agreement pages, individual country immigration authority websites).
+3. **5 corrections applied** on 2026-04-15:
+
+| Code | Country | Error | Correction |
+|------|---------|-------|------------|
+| `RU` | Russia | `visa_required` — bilateral agreement in force since 2009 was missed | `visa_free`, 14 days, unlimited entries |
+| `KR` | South Korea | Entry missing entirely | Added: `visa_free`, 90 days, K-ETA note |
+| `AU` | Australia | Note referenced eVisitor subclass 651 (Europeans only) | Corrected to ETA subclass 601 |
+| `AZ` | Azerbaijan | `visa_on_arrival` — temporary visa-free regime started Feb 2026 | `visa_free`, with validity-period note |
+| `IL` | Israel | No mention of mandatory ETA-IL (required since 1 Jan 2025) | Added ETA-IL note with portal and fee |
+
+**Maintenance notes:**
+- Visa policies change frequently. Re-verify any entry against [HKSAR Immigration Dept](https://www.immd.gov.hk/eng/service/travel_document/visa_free_access.html) before a production release.
+- To add a new passport (e.g. British National Overseas), create `visa_{iso2_lower}.json` with the same schema and add a branch in `backend/app/routers/visa.py`.
+- The `_comment` key in the JSON is ignored by the endpoint (filtered in `check_visa()`).
+
+---
+
+## 11. Known Limitations & Gaps
 
 | # | Area | Description |
 |---|------|-------------|
