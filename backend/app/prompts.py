@@ -539,6 +539,9 @@ TOOL RULES:
 - MUST call: search_places for EACH suggested area in the prompt (e.g. search_places("things to do in Asakusa Tokyo"))
 - MUST call: get_directions for every consecutive pair of activities — batch ALL direction calls in Round 1.
   transport_to_next MUST be populated for every activity except the very last one.
+  The mode for get_directions MUST match the transport mode stated in the prompt:
+    transit → mode="TRANSIT", driving → mode="DRIVE", walking → mode="WALK", mixed → mode="TRANSIT"
+  Never omit mode — always pass it explicitly.
 - MAY call: get_weather(destination, date) — once in Round 1
 - MUST NOT call: get_place_details, search_flights, request_input, navigate_menu
 
