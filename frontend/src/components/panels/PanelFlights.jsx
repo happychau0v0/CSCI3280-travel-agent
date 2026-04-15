@@ -205,8 +205,11 @@ export default function PanelFlights({
                 )}
               </span>
               <span className="panel-list-value">
-                {opt.airline && (
+                {(opt.airline || opt.flight_number) && (
                   <span style={{ color: "var(--text-dim)", marginRight: 6 }}>
+                    {opt.flight_number && (
+                      <strong style={{ marginRight: 4 }}>{opt.flight_number}</strong>
+                    )}
                     {opt.airline}
                   </span>
                 )}
@@ -247,6 +250,9 @@ export default function PanelFlights({
               </div>
               <div className="flight-timeline-line">
                 <div className="flight-timeline-airline">
+                  {selected.flight_number && (
+                    <strong style={{ marginRight: 6 }}>{selected.flight_number}</strong>
+                  )}
                   {selected.airline || "—"} · {selected.seat_class_label || "Economy"}
                 </div>
                 {selected.stops > 0 && selected.stop_cities?.length > 0 && (
@@ -256,7 +262,12 @@ export default function PanelFlights({
                 )}
               </div>
               <div className="flight-timeline-row">
-                <div className="flight-timeline-time">{selected.arrival_time || "—"}</div>
+                <div className="flight-timeline-time">
+                  {selected.arrival_time || "—"}
+                  {selected.next_day_arrival && (
+                    <sup title="Arrives the following calendar day" style={{ fontSize: "0.65em", marginLeft: 2, color: "var(--accent)" }}>+1</sup>
+                  )}
+                </div>
                 <div className="flight-timeline-dot" />
                 <div className="flight-timeline-info">
                   {toIata} {toName}

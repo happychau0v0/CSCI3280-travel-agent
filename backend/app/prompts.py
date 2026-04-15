@@ -615,6 +615,8 @@ class FlightOption(BaseModel):
     label: str | None = None
     stops: int | None = None
     airline: str | None = None
+    flight_number: str | None = None       # e.g. "CX100"; None for estimator options
+    next_day_arrival: bool = False          # True when arrival is the following calendar day
     price_low: float | None = None
     price_high: float | None = None
     duration_min: int | None = None

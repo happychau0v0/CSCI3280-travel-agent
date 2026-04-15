@@ -47,6 +47,26 @@ from app.tools.airports import lookup_alternates as lookup_airport_alternates
 
 logger = logging.getLogger(__name__)
 
+# ─── Flight-name parsing ───────────────────────────────────────────────────
+# fast_flights returns f.name as e.g. "Cathay Pacific CX 100".
+# We split on the trailing IATA-style code so we can expose a clean
+# airline name AND a trackable flight number separately.
+_FLIGHT_CODE_RE = re.compile(r"\b([A-Z0-9]{2,3}\s*\d{1,4})\s*$")
+
+
+def _split_airline_and_code(name: str) -> tuple[str, str | None]:
+    """Split 'Cathay Pacific CX 100' → ('Cathay Pacific', 'CX100').
+
+    Returns (original_name, None) when no standard IATA code is found
+    (estimator-generated paths, charter names, etc.).
+    """
+    m = _FLIGHT_CODE_RE.search(name or "")
+    if not m:
+        return name, None
+    code = m.group(1).replace(" ", "")  # "CX 100" → "CX100"
+    airline = name[: m.start()].strip()  # "Cathay Pacific"
+    return airline, code
+
 # ─── Patch fast-flights to use a hard socket-level timeout ───────────────
 #
 # fast_flights.core.fetch creates primp.Client with timeout=None, so the
@@ -378,9 +398,13 @@ def _try_fast_flights(from_iata: str, to_iata: str, date: str, seat_class: str =
 
     flights = []
     for f in (result.flights or [])[:20]:
+        raw_airline, flight_code = _split_airline_and_code(f.name)
+        ahead = (getattr(f, "arrival_time_ahead", "") or "").strip()
         flights.append(
             {
-                "airline": f.name,
+                "airline": raw_airline,
+                "flight_number": flight_code,       # e.g. "CX100"; None if not parseable
+                "next_day_arrival": bool(ahead),    # True when arrival is the next calendar day
                 "price_str": f.price,
                 "price_num": _parse_price(f.price),
                 "duration_str": f.duration,
@@ -431,6 +455,8 @@ def _options_from_live(live: list[dict]) -> list[dict]:
             "duration_min": flight["duration_min"],
             "stops": flight["stops"],
             "airline": flight["airline"],
+            "flight_number": flight.get("flight_number"),        # "CX100" or None
+            "next_day_arrival": flight.get("next_day_arrival", False),
             # HH:MM local times. Round 9 uses these in get_day_windows
             # to compute flight-aware activity windows per day.
             "departure_time": _normalize_time(dep),

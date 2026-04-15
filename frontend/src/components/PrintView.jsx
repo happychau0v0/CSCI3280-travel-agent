@@ -76,10 +76,10 @@ export default function PrintView({ open, itinerary, currency = "HKD", onClose }
               <h2>FLIGHT</h2>
               <p>
                 {flight.from_iata} → {flight.to_iata} · {flight.date || "date TBA"}
-                {picked?.airline && ` · ${picked.airline}`}
+                {picked?.airline && ` · ${picked.flight_number ? `${picked.airline} ${picked.flight_number}` : picked.airline}`}
                 {picked?.price_low && ` · ${formatDisplayPrice(picked.price_low, currency)}`}
                 {picked?.departure_time && ` · dep ${picked.departure_time}`}
-                {picked?.arrival_time && ` · arr ${picked.arrival_time}`}
+                {picked?.arrival_time && ` · arr ${picked.arrival_time}${picked.next_day_arrival ? " (+1 day)" : ""}`}
               </p>
             </section>
           )}
