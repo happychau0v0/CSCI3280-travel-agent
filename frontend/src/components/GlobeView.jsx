@@ -44,11 +44,11 @@ export default function GlobeView({
   explodeTrigger = 0,
 }) {
   const globeRef = useRef(null);
+  const globeCanvasRef = useRef(null);
   const prevFocusRef = useRef(null);
   const animationFrameRef = useRef(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [countries, setCountries] = useState({ features: [] });
-  const [isExploding, setIsExploding] = useState(false);
 
   const globeMaterial = useMemo(() => buildGlobeMaterial(theme), [theme]);
 
@@ -222,9 +222,16 @@ export default function GlobeView({
     return () => clearTimeout(reArm);
   }, [focus]);
 
-  // Explode-and-reform particle animation — fires whenever explodeTrigger increments.
-  // 2500 particles are sampled on the globe surface, fly radially outward, float briefly,
-  // then converge back and fade out — creating a "shattering and rebuilding" effect.
+  // Globe-explode animation — fires whenever explodeTrigger increments.
+  //
+  // Sequence:
+  //   1. Particles burst outward from the globe surface at constant velocity and
+  //      fade to nothing — no reform, they just keep going.
+  //   2. While particles fly, the globe is hidden and the camera instantly jumps
+  //      to a very far altitude so the scene is "empty".
+  //   3. After a short delay the globe reappears and the camera zooms in from
+  //      that far position, creating the illusion of a brand-new globe arriving
+  //      from deep space.
   useEffect(() => {
     if (!explodeTrigger || !globeRef.current) return;
     const scene = globeRef.current.scene?.();
@@ -232,7 +239,7 @@ export default function GlobeView({
 
     const GLOBE_R = 100;
     const N = 2500;
-    const origPos = new Float32Array(N * 3);
+    const origPos   = new Float32Array(N * 3);
     const velocities = new Float32Array(N * 3);
 
     for (let i = 0; i < N; i++) {
@@ -244,6 +251,7 @@ export default function GlobeView({
       origPos[i * 3]     = GLOBE_R * nx;
       origPos[i * 3 + 1] = GLOBE_R * ny;
       origPos[i * 3 + 2] = GLOBE_R * nz;
+      // Slightly randomised outward direction so the burst has texture
       const speed = 0.7 + Math.random() * 0.6;
       const jitter = 0.25;
       velocities[i * 3]     = nx * speed + (Math.random() - 0.5) * jitter;
@@ -266,61 +274,80 @@ export default function GlobeView({
     const particles = new THREE.Points(geometry, mat);
     scene.add(particles);
 
-    // Hide the globe sphere and its data layers while particles are visible.
-    setIsExploding(true);
-    globeMaterial.transparent = true;
-    globeMaterial.opacity = 0;
+    // Hide the ThreeGlobe group immediately (sphere + hex dots + arcs + atmosphere).
+    const globeGroup = scene.children.find((c) => c.isGroup);
+    if (globeGroup) globeGroup.visible = false;
 
-    const EXPLODE = 900, FLOAT = 400, REFORM = 1200, TOTAL = EXPLODE + FLOAT + REFORM;
-    const MAX_DIST = 200;
-    const easeOut   = (t) => 1 - Math.pow(1 - t, 3);
-    const easeInOut = (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    // Also hide the canvas wrapper so the globe is fully invisible before reveal.
+    const canvas = globeCanvasRef.current;
+    if (canvas) {
+      canvas.style.transition = "none";
+      canvas.style.opacity    = "0";
+    }
 
+    // Instantly move the camera to a very far altitude while everything is hidden.
+    const pov = globeRef.current.pointOfView();
+    const targetLat = pov?.lat ?? 20;
+    const targetLng = pov?.lng ?? 0;
+    globeRef.current.pointOfView({ lat: targetLat, lng: targetLng, altitude: 18.0 }, 0);
+
+    // After the burst has spread, reveal the globe as a tiny distant speck and
+    // zoom the camera in — the globe fades in AND grows simultaneously.
+    const GLOBE_REVEAL_DELAY = 800;  // ms — let particles spread first
+    const ZOOM_IN_DURATION   = 3800; // ms — long fly-in from deep space
+    const FADE_IN_DURATION   = 3000; // ms — opacity 0 → 1 (starts at reveal)
+    const revealTimer = setTimeout(() => {
+      if (globeGroup) globeGroup.visible = true;
+      // Fade the canvas in over FADE_IN_DURATION via CSS transition
+      if (canvas) {
+        canvas.style.transition = `opacity ${FADE_IN_DURATION}ms ease-in`;
+        canvas.style.opacity    = "1";
+      }
+      const c = globeRef.current?.controls?.();
+      if (c) c.autoRotate = false;
+      globeRef.current?.pointOfView(
+        { lat: targetLat, lng: targetLng, altitude: 2.0 },
+        ZOOM_IN_DURATION,
+      );
+      // Re-arm auto-rotate after the fly-in settles
+      setTimeout(() => {
+        const ctrl = globeRef.current?.controls?.();
+        if (ctrl) ctrl.autoRotate = true;
+      }, ZOOM_IN_DURATION + 400);
+    }, GLOBE_REVEAL_DELAY);
+
+    // Particle loop — constant outward velocity, linear fade to black.
+    const PARTICLE_DURATION = 1400; // particles fade out over this many ms
+    const MAX_DIST = 700;           // maximum travel distance (plenty past camera far-plane)
     let startTime = null;
     const frame = (time) => {
       if (!startTime) startTime = time;
       const elapsed = time - startTime;
-
-      let explodeT = 0, reformT = 0;
-      if (elapsed < EXPLODE) {
-        explodeT = easeOut(elapsed / EXPLODE);
-      } else if (elapsed < EXPLODE + FLOAT) {
-        explodeT = 1;
-      } else {
-        explodeT = 1;
-        reformT = easeInOut((elapsed - EXPLODE - FLOAT) / REFORM);
-      }
+      const t = Math.min(elapsed / PARTICLE_DURATION, 1);
 
       for (let i = 0; i < N; i++) {
-        const ox = origPos[i * 3], oy = origPos[i * 3 + 1], oz = origPos[i * 3 + 2];
-        const vx = velocities[i * 3], vy = velocities[i * 3 + 1], vz = velocities[i * 3 + 2];
-        const ex = ox + vx * MAX_DIST * explodeT;
-        const ey = oy + vy * MAX_DIST * explodeT;
-        const ez = oz + vz * MAX_DIST * explodeT;
-        pos[i * 3]     = ex + (ox - ex) * reformT;
-        pos[i * 3 + 1] = ey + (oy - ey) * reformT;
-        pos[i * 3 + 2] = ez + (oz - ez) * reformT;
+        const dist = t * MAX_DIST;
+        pos[i * 3]     = origPos[i * 3]     + velocities[i * 3]     * dist;
+        pos[i * 3 + 1] = origPos[i * 3 + 1] + velocities[i * 3 + 1] * dist;
+        pos[i * 3 + 2] = origPos[i * 3 + 2] + velocities[i * 3 + 2] * dist;
       }
       geometry.attributes.position.needsUpdate = true;
-      mat.opacity = reformT > 0.6 ? 0.95 * (1 - (reformT - 0.6) / 0.4) : 0.95;
+      mat.opacity = 0.95 * (1 - t);  // linear fade — particles vanish as they travel
 
-      if (elapsed < TOTAL) {
+      if (t < 1) {
         animationFrameRef.current = requestAnimationFrame(frame);
       } else {
         scene.remove(particles);
         geometry.dispose();
         mat.dispose();
         animationFrameRef.current = null;
-        // Restore globe visibility
-        globeMaterial.opacity = 1;
-        globeMaterial.transparent = false;
-        setIsExploding(false);
       }
     };
 
     animationFrameRef.current = requestAnimationFrame(frame);
 
     return () => {
+      clearTimeout(revealTimer);
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -328,12 +355,13 @@ export default function GlobeView({
       scene.remove(particles);
       geometry.dispose();
       mat.dispose();
-      // Restore globe visibility on early unmount
-      globeMaterial.opacity = 1;
-      globeMaterial.transparent = false;
-      setIsExploding(false);
+      if (globeGroup) globeGroup.visible = true;
+      if (canvas) {
+        canvas.style.transition = "none";
+        canvas.style.opacity    = "1";
+      }
     };
-  }, [explodeTrigger, globeMaterial, theme]);
+  }, [explodeTrigger, theme]);
 
   // Build the rings dataset from points that have ring=true
   const ringsData = useMemo(
@@ -345,7 +373,7 @@ export default function GlobeView({
   );
 
   return (
-    <div className="globe-canvas">
+    <div className="globe-canvas" ref={globeCanvasRef}>
       <Globe
         ref={globeRef}
         width={size.w}
@@ -353,17 +381,17 @@ export default function GlobeView({
         backgroundColor="rgba(0,0,0,0)"
         globeImageUrl={null}
         globeMaterial={globeMaterial}
-        showAtmosphere={!isExploding}
+        showAtmosphere={true}
         atmosphereColor={theme === "light" ? "#2bbfb0" : "#4cc9f0"}
         atmosphereAltitude={0.25}
         // Hexagonal country polygons — the dot-matrix look
-        hexPolygonsData={isExploding ? [] : countries.features}
+        hexPolygonsData={countries.features}
         hexPolygonResolution={3}
         hexPolygonMargin={0.35}
         hexPolygonUseDots={true}
         hexPolygonColor={() => theme === "light" ? "rgba(26, 155, 143, 0.9)" : "rgba(0, 217, 255, 0.75)"}
         // Arcs (flight paths)
-        arcsData={isExploding ? [] : arcs}
+        arcsData={arcs}
         arcStartLat={(d) => d.startLat}
         arcStartLng={(d) => d.startLng}
         arcEndLat={(d) => d.endLat}
@@ -376,7 +404,7 @@ export default function GlobeView({
         arcDashAnimateTime={2500}
         arcLabel={(d) => d.label || ""}
         // Points (origin / destination / activities)
-        pointsData={isExploding ? [] : points}
+        pointsData={points}
         pointLat={(d) => d.lat}
         pointLng={(d) => d.lng}
         pointColor={(d) => d.color || "#00d9ff"}
@@ -384,7 +412,7 @@ export default function GlobeView({
         pointRadius={(d) => d.size || 0.4}
         pointLabel={(d) => d.label || ""}
         // Pulsing rings on key points (origin/destination)
-        ringsData={isExploding ? [] : ringsData}
+        ringsData={ringsData}
         ringColor={(d) => () => d.color}
         ringMaxRadius={3}
         ringPropagationSpeed={2}
