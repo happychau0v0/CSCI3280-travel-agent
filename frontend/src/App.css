@@ -5861,8 +5861,7 @@ body.theme-light .history-overlay-scroll::-webkit-scrollbar-thumb {
 }
 
 .export-card--disabled {
-  opacity: 0.45;
-  pointer-events: none;
+  opacity: 0.55;
 }
 
 .export-card-icon {

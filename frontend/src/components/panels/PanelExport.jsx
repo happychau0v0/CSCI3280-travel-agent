@@ -124,7 +124,7 @@ export default function PanelExport({ itinerary, visaAlert }) {
               type="button"
               className="export-btn"
               onClick={handleExportPdf}
-              disabled={!hasItinerary || pdfLoading}
+              disabled={pdfLoading}
             >
               {pdfLoading ? "Generating…" : pdfDone ? "✓ Downloaded" : "Download PDF"}
             </button>
@@ -155,7 +155,6 @@ export default function PanelExport({ itinerary, visaAlert }) {
               type="button"
               className="export-btn"
               onClick={handleExportKml}
-              disabled={!hasItinerary || kmlPlaces === 0}
             >
               {kmlDone ? "✓ Downloaded" : `Download KML${kmlPlaces > 0 ? ` (${kmlPlaces} places)` : ""}`}
             </button>
