@@ -333,12 +333,14 @@ function App() {
       localStorage.removeItem(STATE_KEY);
       localStorage.removeItem(TRIP_DATES_KEY);
       localStorage.removeItem("travel-trip-form");
+      localStorage.removeItem(PLAN_HISTORY_KEY);
     } catch {
       /* ignore */
     }
     setMessages([]);
     setCurrentItinerary(null);
     setError(null);
+    setPlanHistory([]);
     menu.reset();
   }, [menu]);
 
@@ -1333,6 +1335,8 @@ function App() {
         onTabClick={setPanelWithCue}
         muted={muted}
         overlay={historyOpen ? "history" : settingsOpen ? "settings" : null}
+        agentState={agentState}
+        currentTool={currentTool}
       >
         {menu.state.panel === "HOME" && (
           <PanelHome

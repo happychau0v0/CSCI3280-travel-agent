@@ -19,6 +19,8 @@ export default function MenuShell({
   onTabClick,
   muted,
   overlay = null,
+  agentState = "idle",
+  currentTool = null,
   children,
 }) {
   return (
@@ -27,6 +29,8 @@ export default function MenuShell({
         activePanel={state.panel}
         scope={state.scope}
         onTabClick={onTabClick}
+        agentState={agentState}
+        currentTool={currentTool}
       />
       <main className={`panel-slot scope-${state.scope}`}>{children}</main>
       <FooterHints

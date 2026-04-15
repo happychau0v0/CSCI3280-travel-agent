@@ -7,12 +7,29 @@ const TAB_LABELS = {
   DAYS: "DAYS",
 };
 
+const TOOL_LABELS = {
+  _thinking: "THINKING",
+  search_flights: "FLIGHTS",
+  search_places: "PLACES",
+  get_place_details: "DETAILS",
+  get_directions: "ROUTING",
+  get_weather: "WEATHER",
+  geocode_city: "GEOCODE",
+  get_day_windows: "WINDOWS",
+  get_phrasebook: "PHRASES",
+};
+
+function compactTool(tool) {
+  if (!tool) return null;
+  return TOOL_LABELS[tool] || tool.replace(/_/g, " ").toUpperCase().slice(0, 16);
+}
+
 /**
- * Top-of-screen NieR-style tab strip. Shows the seven panel tabs with
- * the active one highlighted. Each tab has a small numeric badge for
- * the corresponding hotkey (1-7).
+ * Top-of-screen NieR-style tab strip. Shows the panel tabs on the left;
+ * a compact agent-working indicator fills the empty right-side space.
  */
-export default function TabStrip({ activePanel, scope, onTabClick }) {
+export default function TabStrip({ activePanel, scope, onTabClick, agentState = "idle", currentTool = null }) {
+  const toolLabel = compactTool(currentTool);
   return (
     <nav className="tab-strip" aria-label="Menu sections">
       {PANELS.map((panel, i) => {
@@ -32,6 +49,16 @@ export default function TabStrip({ activePanel, scope, onTabClick }) {
           </button>
         );
       })}
+
+      {agentState === "working" && (
+        <div className="tab-strip-working" aria-live="polite">
+          <span className="tab-strip-working-icon">◢</span>
+          <span className="tab-strip-working-label">
+            WORKING{toolLabel ? ` · ${toolLabel}` : ""}
+          </span>
+          <span className="tab-strip-working-bar" />
+        </div>
+      )}
     </nav>
   );
 }

@@ -74,7 +74,8 @@ export default function AgentStatusBar({
     return () => clearInterval(id);
   }, [state, startedAt]);
 
-  if (state === "idle") return null;
+  // "working" state is now handled inline in the TabStrip — no standalone bar needed.
+  if (state === "idle" || state === "working") return null;
 
   if (state === "error") {
     return (

@@ -981,11 +981,25 @@ li[tabindex]:focus-visible {
   padding-bottom: 6px;
 }
 
-.home-form-error {
-  flex: 1 0 100%;
-  margin-top: 3px;
-  font-size: 10px;
+/* Errored field — red left accent on the row, no layout shift */
+.panel-list-item.home-form-row.has-error {
+  border-left: 2px solid var(--danger);
+}
+
+.panel-list-item.home-form-row.has-error .home-form-input {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* Consolidated error summary above the PLAN button */
+.trip-plan-errors {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 12px;
+  border-left: 2px solid var(--danger);
   font-family: var(--mono);
+  font-size: 10px;
   letter-spacing: 0.06em;
   color: var(--danger);
 }
@@ -3074,24 +3088,27 @@ li[tabindex]:focus-visible {
 
 /* AgentStatusBar — prominent working banner pinned below the tab strip */
 
+/* AgentStatusBar — only used for done/error flash states now.
+ * The working state is handled inline in the TabStrip via .tab-strip-working. */
 .agent-status-bar {
   position: fixed;
-  top: 8px;
-  right: 24px;
+  top: 0;
+  right: 0;
   left: auto;
   transform: none;
   z-index: 200;
   display: flex;
   align-items: center;
   gap: 12px;
-  max-width: 420px;
-  padding: 8px 14px;
+  max-width: 480px;
+  height: 56px;
+  padding: 0 20px;
   background: var(--status-bar-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   font-family: var(--mono);
   pointer-events: auto;
-  animation: status-slide-in 0.25s ease;
+  animation: status-slide-in 0.2s ease;
 }
 
 @keyframes status-slide-in {
@@ -3823,6 +3840,56 @@ body.theme-light .tab-strip {
 
 .tab-label {
   font-size: 11px;
+}
+
+/* Inline agent-working indicator in the tab strip right side */
+.tab-strip-working {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.tab-strip-working-icon {
+  font-size: 10px;
+  animation: status-icon-pulse 1.6s ease-in-out infinite;
+}
+
+.tab-strip-working-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-strip-working-bar {
+  flex: 0 0 80px;
+  height: 2px;
+  background: rgba(0, 217, 255, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.tab-strip-working-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  animation: tab-working-sweep 1.4s ease-in-out infinite;
+  transform-origin: left;
+}
+
+@keyframes tab-working-sweep {
+  0%   { transform: scaleX(0); transform-origin: left; }
+  50%  { transform: scaleX(1); transform-origin: left; }
+  51%  { transform: scaleX(1); transform-origin: right; }
+  100% { transform: scaleX(0); transform-origin: right; }
 }
 
 /* Footer hint strip — bottom of screen */
