@@ -38,6 +38,7 @@ import logging
 import math
 import os
 import re
+import threading
 from datetime import datetime, timezone
 from urllib.parse import quote_plus
 
@@ -45,6 +46,30 @@ from app.tools.airports import lookup as lookup_airport
 from app.tools.airports import lookup_alternates as lookup_airport_alternates
 
 logger = logging.getLogger(__name__)
+
+# ─── Patch fast-flights to use a hard socket-level timeout ───────────────
+#
+# fast_flights.core.fetch creates primp.Client with timeout=None, so the
+# underlying TCP socket can block indefinitely — asyncio.wait_for only
+# cancels the asyncio side; the thread keeps running. We replace `fetch`
+# at import time with a version that sets timeout=2.5 s on the Client so
+# the thread itself terminates promptly when Google Flights is blocked.
+try:
+    import fast_flights.core as _ff_core
+    from fast_flights.primp import Client as _PrimpClient
+
+    def _fetch_with_timeout(params: dict):  # type: ignore[no-untyped-def]
+        # 8 s is enough for a normal Google Flights response (3-7 s typical)
+        # while still bounding hangs from stalled connections or body transfers.
+        client = _PrimpClient(impersonate="chrome_126", verify=False, timeout=8.0)
+        res = client.get("https://www.google.com/travel/flights", params=params)
+        assert res.status_code == 200, f"{res.status_code} Result: {res.text_markdown}"
+        return res
+
+    _ff_core.fetch = _fetch_with_timeout  # type: ignore[attr-defined]
+    logger.debug("fast-flights fetch patched with 2.5 s socket timeout")
+except Exception as _e:
+    logger.debug("Could not patch fast-flights timeout: %s", _e)
 
 # Env vars that proxy clients (Clash, Shadowsocks, V2Ray, corporate proxies)
 # set to route Python's HTTP traffic through a local SOCKS/HTTP forwarder.
@@ -57,6 +82,11 @@ _PROXY_ENV_VARS = (
     "ALL_PROXY",
     "all_proxy",
 )
+
+# macOS setenv/unsetenv are NOT thread-safe. Concurrent calls from
+# asyncio.to_thread will deadlock when two searches run in parallel.
+# This lock serializes the env mutation + fast_flights call.
+_env_lock = threading.Lock()
 
 
 # ─── Estimator ────────────────────────────────────────────────────────────
@@ -307,6 +337,10 @@ def _try_fast_flights(from_iata: str, to_iata: str, date: str, seat_class: str =
     Saving and restoring is fine because we're inside a thread spawned by
     asyncio.to_thread — the env mutation doesn't leak into other concurrent
     calls during the brief window the proxy is unset.
+
+    Note: _env_lock serializes concurrent calls to prevent the macOS
+    setenv/unsetenv C-level deadlock when asyncio.gather runs multiple
+    searches in parallel threads.
     """
     try:
         from fast_flights import FlightData, Passengers, get_flights
@@ -314,22 +348,23 @@ def _try_fast_flights(from_iata: str, to_iata: str, date: str, seat_class: str =
         logger.info("fast-flights not installed; using estimator")
         return []
 
-    saved = {key: os.environ.pop(key, None) for key in _PROXY_ENV_VARS}
-    try:
-        result = get_flights(
-            flight_data=[FlightData(date=date, from_airport=from_iata, to_airport=to_iata)],
-            trip="one-way",
-            passengers=Passengers(adults=1),
-            seat=seat_class,
-            fetch_mode="common",
-        )
-    except Exception as e:
-        logger.info("fast-flights failed: %s", e)
-        return []
-    finally:
-        for key, value in saved.items():
-            if value is not None:
-                os.environ[key] = value
+    with _env_lock:
+        saved = {key: os.environ.pop(key, None) for key in _PROXY_ENV_VARS}
+        try:
+            result = get_flights(
+                flight_data=[FlightData(date=date, from_airport=from_iata, to_airport=to_iata)],
+                trip="one-way",
+                passengers=Passengers(adults=1),
+                seat=seat_class,
+                fetch_mode="common",
+            )
+        except Exception as e:
+            logger.info("fast-flights failed: %s", e)
+            return []
+        finally:
+            for key, value in saved.items():
+                if value is not None:
+                    os.environ[key] = value
 
     flights = []
     for f in (result.flights or [])[:20]:
@@ -547,15 +582,18 @@ async def search_flights(
     deep_link = _google_flights_url(from_iata, to_iata, date)
 
     # Best-effort live data via fast-flights (offloaded to a thread).
-    # Hard cap at 6s — fast-flights/primp occasionally hangs indefinitely
-    # on long-haul or rate-limited routes (Vancouver, London). On timeout
-    # we fall through to the estimator so the user always gets options.
+    # The primp.Client patch above sets a 2.5 s socket-level timeout so
+    # the thread terminates on its own. The asyncio.wait_for here is a
+    # belt-and-suspenders guard in case the patch doesn't fire (e.g.,
+    # primp version mismatch). We catch both TimeoutError and
+    # CancelledError because Python 3.11+ may raise either depending on
+    # how the cancellation propagates through to_thread.
     try:
         live = await asyncio.wait_for(
             asyncio.to_thread(_try_fast_flights, from_iata, to_iata, date, seat_class),
-            timeout=6.0,
+            timeout=10.0,  # 2 s margin over the 8 s primp socket timeout
         )
-    except asyncio.TimeoutError:
+    except (TimeoutError, asyncio.CancelledError):
         logger.info("fast-flights timed out for %s→%s, using estimator", from_iata, to_iata)
         live = []
 
