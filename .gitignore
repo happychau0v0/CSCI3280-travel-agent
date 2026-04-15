@@ -44,3 +44,4 @@ Thumbs.db
 backend/logs/
 backend/tests/fixtures/llm_outputs/dump_*.txt
 .playwright-mcp/
+.worktrees/
