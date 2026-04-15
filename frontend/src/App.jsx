@@ -1011,6 +1011,9 @@ function App() {
       if (anyDone) {
         subtitles.push(`Your ${totalDays}-day itinerary for ${dest} is ready.`);
         setPanelWithCue("DAYS");
+        // Re-save to plan history now that days are filled. The earlier
+        // save (during hotels turn) only captured empty day stubs.
+        saveCurrentPlanToHistory(snap, messages);
       }
     } finally {
       isPlanningDaysRef.current = false;
