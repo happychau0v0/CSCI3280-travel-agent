@@ -1,20 +1,13 @@
 /**
- * Bottom-of-screen NieR-style hint strip showing context-relevant
- * hotkeys. The hint set depends on which panel is active and whether
- * an overlay is open.
- *
- * The leading FOCUS: TABS / FOCUS: LIST badge tells the user whether
- * arrow keys cycle tabs or are absorbed by the panel list. It only
- * appears on main menu contexts (not while an overlay owns the
- * keyboard).
+ * Bottom-of-screen NieR-style hint strip showing context-relevant hotkeys.
+ * The hint set depends on which panel is active and whether an overlay is open.
  */
 
 const HINT_SETS = {
   HOME: [
     { key: "1-4", label: "Tab" },
-    { key: "← →", label: "Switch" },
+    { key: "Tab", label: "Next" },
     { key: "↑ ↓", label: "Field" },
-    { key: "Tab", label: "Focus" },
     { key: "Space", label: "Edit" },
     { key: "Enter", label: "Submit" },
     { key: "T", label: "Speak" },
@@ -24,9 +17,8 @@ const HINT_SETS = {
   ],
   FLIGHTS: [
     { key: "1-4", label: "Tab" },
-    { key: "← →", label: "Switch" },
+    { key: "Tab", label: "Next" },
     { key: "↑ ↓", label: "Item" },
-    { key: "Tab", label: "Focus" },
     { key: "Space", label: "Pick" },
     { key: "⌘Z", label: "Undo" },
     { key: "T", label: "Speak" },
@@ -36,9 +28,8 @@ const HINT_SETS = {
   ],
   HOTELS: [
     { key: "1-4", label: "Tab" },
-    { key: "← →", label: "Switch" },
+    { key: "Tab", label: "Next" },
     { key: "↑ ↓", label: "Item" },
-    { key: "Tab", label: "Focus" },
     { key: "Space", label: "Pick" },
     { key: "⌘Z", label: "Undo" },
     { key: "T", label: "Speak" },
@@ -48,9 +39,8 @@ const HINT_SETS = {
   ],
   DAYS: [
     { key: "1-4", label: "Tab" },
-    { key: "← →", label: "Switch" },
+    { key: "Tab", label: "Next" },
     { key: "↑ ↓", label: "Day" },
-    { key: "Tab", label: "Focus" },
     { key: "T", label: "Speak" },
     { key: "H", label: "History" },
     { key: "S", label: "Settings" },
@@ -71,47 +61,21 @@ const HINT_SETS = {
 
 export default function FooterHints({
   muted = false,
-  scope = "tabs",
   panel = "HOME",
   overlay = null, // null | "history" | "settings"
 }) {
   let hints;
-  let showScopeBadge = true;
 
   if (overlay === "history") {
     hints = HINT_SETS.HISTORY_OVERLAY;
-    showScopeBadge = false;
   } else if (overlay === "settings") {
     hints = HINT_SETS.SETTINGS_OVERLAY;
-    showScopeBadge = false;
   } else {
     hints = HINT_SETS[panel] || HINT_SETS.HOME;
   }
 
-  const scopeLabel = scope === "list" ? "LIST"
-                   : scope === "detail" ? "DETAIL"
-                   : "TABS";
-
-  // In detail scope, override the hint set with a minimal one that
-  // tells the user how to get back. Browser Tab owns focus.
-  if (scope === "detail" && !overlay) {
-    hints = [
-      { key: "Tab", label: "Next" },
-      { key: "Shift+Tab", label: "Prev" },
-      { key: "Enter", label: "Activate" },
-      { key: "Esc", label: "Back" },
-      { key: "T", label: "Speak" },
-    ];
-  }
-
   return (
     <div className="footer-hints" aria-label="Keyboard hints">
-      {showScopeBadge && (
-        <span className={`hint hint-scope hint-scope-${scope}`}>
-          <span className="hint-label">FOCUS</span>
-          <kbd className="hint-key">{scopeLabel}</kbd>
-        </span>
-      )}
       {hints.map((h) => (
         <span key={`${h.key}-${h.label}`} className="hint">
           <kbd className="hint-key">{h.key}</kbd>

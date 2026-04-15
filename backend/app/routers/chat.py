@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -112,6 +113,8 @@ async def post_chat_stream(req: ChatRequest):
     if req.call_role not in ALLOWED_ROLES:
         raise HTTPException(status_code=400, detail=f"Unknown call_role: {req.call_role}")
 
+    sid = secrets.token_hex(4)  # 8-char hex — unique per request, correlates all events
+
     async def event_generator():
         async for event in llm.chat_stream(
             messages,
@@ -121,6 +124,7 @@ async def post_chat_stream(req: ChatRequest):
             bench_eval=req.bench_eval,
             preferred_model=req.preferred_model,
             call_role=req.call_role,
+            sid=sid,
         ):
             yield _format_sse(event)
 

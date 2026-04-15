@@ -384,6 +384,85 @@ TOOL_DEFINITIONS: list[dict] = [
     {
         "type": "function",
         "function": {
+            "name": "pick_flight",
+            "description": (
+                "Select a flight option from the FLIGHTS panel. Use when the user "
+                "says 'pick the first flight', 'book the cheapest option', or similar. "
+                "Pass either label/airline name OR zero-based index — not both."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "label": {
+                        "type": "string",
+                        "description": "Airline name or flight label to match, e.g. 'Cathay Pacific'",
+                    },
+                    "index": {
+                        "type": "integer",
+                        "description": "Zero-based index of the flight option (0 = first listed)",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "pick_hotel",
+            "description": (
+                "Select a hotel from the HOTELS panel. Use when the user says "
+                "'pick that hotel', 'book the Park Hyatt', or similar. "
+                "Pass either name OR zero-based index — not both."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Hotel name to match, e.g. 'Park Hyatt Tokyo'",
+                    },
+                    "index": {
+                        "type": "integer",
+                        "description": "Zero-based index of the hotel (0 = first listed)",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "replace_activity",
+            "description": (
+                "Replace a specific activity in the day itinerary. Use when the user "
+                "says 'swap the lunch on day 2', 'change the museum visit', etc. "
+                "Triggers a days replan scoped to the replacement query."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "day": {
+                        "type": "integer",
+                        "description": "Day number (1-based) containing the activity",
+                    },
+                    "activity_name": {
+                        "type": "string",
+                        "description": "Name of the activity to replace",
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "What to replace it with, e.g. 'a different sushi restaurant'",
+                    },
+                },
+                "required": ["day", "activity_name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_phrasebook",
             "description": (
                 "Return a small phrasebook (10 essential phrases) for the destination's "
@@ -421,6 +500,9 @@ TOOL_DISPATCH: dict = {
     "get_phrasebook": phrasebook.get_phrasebook,
     "toggle_setting": ui_tools.toggle_setting,
     "submit_trip_form": ui_tools.submit_trip_form,
+    "pick_flight": ui_tools.pick_flight,
+    "pick_hotel": ui_tools.pick_hotel,
+    "replace_activity": ui_tools.replace_activity,
 }
 
 # Integration testing: when MOCK_TOOLS=1 is set, replace all tool

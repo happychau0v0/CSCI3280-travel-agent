@@ -6,7 +6,6 @@ import ChatPopover from "./components/ChatPopover";
 import AgentStatusBar from "./components/AgentStatusBar";
 import HistoryOverlay from "./components/HistoryOverlay";
 import SettingsOverlay, {
-  loadTts,
   loadTheme,
   applyTheme,
   loadCurrency,
@@ -19,6 +18,7 @@ import HelpOverlay from "./components/HelpOverlay";
 import PrintView from "./components/PrintView";
 import TripChecklist from "./components/TripChecklist";
 import FavoritesOverlay from "./components/FavoritesOverlay";
+import ServiceStatusOverlay from "./components/ServiceStatusOverlay";
 import PanelHome from "./components/panels/PanelHome";
 import PanelFlights from "./components/panels/PanelFlights";
 import PanelHotels from "./components/panels/PanelHotels";
@@ -211,6 +211,7 @@ function App() {
   const [printOpen, setPrintOpen] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [favoritesOpen, setFavoritesOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
   // Agent status state used by the AgentStatusBar — addresses the
   // round-7 "feels unresponsive" complaint with overlapping indicators.
   const [agentState, setAgentState] = useState("idle"); // idle|working|done|error
@@ -237,6 +238,9 @@ function App() {
   // navigate_menu tool_start), which yanks the user to an empty
   // HOTELS panel before the itinerary data has landed.
   const pendingNavigateRef = useRef(null);
+  // Chained send queued by pick_flight/pick_hotel/replace_activity SSE handlers.
+  // Fired AFTER the current stream's done event to avoid concurrent-request races.
+  const pendingChainedSendRef = useRef(null);
   // Round 12 — undo / redo stacks for user-driven picks
   // (selected_flight and selected_hotel only). Each entry is a
   // {selected_flight, selected_hotel} snapshot taken BEFORE a pick
@@ -271,15 +275,10 @@ function App() {
   const tripDates = loadTripDates(); // edited via PanelProfile in the future
   const { location: userLocation, requestPermission } = useGeolocation();
   const menu = useMenuState();
-  const [tts, setTts] = useState(() => loadTts());
   const [currency, setCurrency] = useState(() => loadCurrency());
   const [llmModel, setLlmModel] = useState(() => loadLlmModel());
   const [theme, setTheme] = useState(() => loadTheme());
-  const subtitles = useSubtitleQueue({
-    muted,
-    rate: tts.rate,
-    voiceName: tts.voiceName,
-  });
+  const subtitles = useSubtitleQueue({ muted });
   const cues = useAudioCues({ muted });
 
   // Compute the size of the active panel's left list so the keyboard
@@ -399,14 +398,11 @@ function App() {
     },
     [cues, menu],
   );
-  // Mouse click on a list item: move the cursor AND enter list scope
-  // explicitly. The scope flip is what makes ←/→ stop cycling tabs and
-  // signals to the user that they're now "inside" the panel.
+  // Mouse click on a list item: move the cursor to the clicked row.
   const selectListItem = useCallback(
     (index) => {
       cues.tick();
       menu.setListIndex(index);
-      menu.setScope("list");
     },
     [cues, menu],
   );
@@ -417,7 +413,6 @@ function App() {
     state: menu.state,
     setPanel: setPanelWithCue,
     setListIndex: setListIndexWithCue,
-    setScope: menu.setScope,
     listSize,
     onOpenChat: () => {
       cues.select();
@@ -465,8 +460,6 @@ function App() {
     onBack: () => {
       if (chatPopoverOpen) {
         setChatPopoverOpen(false);
-      } else if (menu.state.scope === "list") {
-        menu.setScope("tabs");
       }
     },
     onToggleMute: () => setMuted((m) => !m),
@@ -484,7 +477,8 @@ function App() {
     onOpenPrint: () => setPrintOpen(true),
     onOpenChecklist: () => setChecklistOpen(true),
     onOpenFavorites: () => setFavoritesOpen(true),
-    enabled: !historyOpen && !settingsOpen && !helpOpen && !printOpen && !checklistOpen && !favoritesOpen,
+    onOpenStatus: () => { cues.select(); setStatusOpen(true); },
+    enabled: !historyOpen && !settingsOpen && !helpOpen && !printOpen && !checklistOpen && !favoritesOpen && !statusOpen,
   });
 
   // Persist messages + itinerary
@@ -751,8 +745,15 @@ function App() {
               if (!streamDisplayTimerRef.current) {
                 streamDisplayTimerRef.current = setTimeout(() => {
                   streamDisplayTimerRef.current = null;
-                  // Show the last ~150 chars so the subtitle fits one line.
-                  const buf = streamTokenBufRef.current;
+                  // Strip JSON fences before displaying — the LLM emits the
+                  // itinerary block first, subtitle sentence after. Without
+                  // stripping, raw JSON scrolls through the subtitle bar live.
+                  // Two passes: first removes closed fences, second removes
+                  // an open fence that's still being generated (no closing ```).
+                  const buf = streamTokenBufRef.current
+                    .replace(/```json[\s\S]*?```/g, "")
+                    .replace(/```json[\s\S]*/g, "")
+                    .trim();
                   setStreamingText(buf.length > 150 ? "…" + buf.slice(-147) : buf);
                 }, 200);
               }
@@ -831,6 +832,69 @@ function App() {
                 setPendingFormPrefill(prefill);
               }
               subtitles.push("Filling in your trip details...");
+            } else if (type === "pick_flight") {
+              // Chat mode — LLM picked a flight on the user's behalf.
+              // Queue the hotels replan to fire AFTER this stream's done event
+              // to avoid concurrent-request races.
+              const { label, index } = payload || {};
+              const opts = currentItineraryRef.current?.flight?.options;
+              const opt = label
+                ? opts?.find(
+                    (o) =>
+                      o.label === label ||
+                      o.airline?.toLowerCase() === label?.toLowerCase(),
+                  )
+                : opts?.[index ?? 0];
+              if (opt) {
+                pushPickSnapshot();
+                setCurrentItinerary((prev) => ({ ...prev, selected_flight: opt }));
+                cues.chime();
+                const lbl = [
+                  opt.airline,
+                  opt.departure_time && opt.arrival_time
+                    ? `${opt.departure_time}→${opt.arrival_time}`
+                    : null,
+                  opt.price_low ? `HK$${opt.price_low}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(", ");
+                pendingChainedSendRef.current = {
+                  text: `Selected flight: ${lbl}. Now find hotels.`,
+                  opts: { callRole: "hotels" },
+                };
+              }
+            } else if (type === "pick_hotel") {
+              // Chat mode — LLM picked a hotel on the user's behalf.
+              // Queue the days replan to fire AFTER this stream's done event.
+              const { name, index } = payload || {};
+              const hotels = currentItineraryRef.current?.hotels;
+              const hotel = name
+                ? hotels?.find(
+                    (h) => h.name?.toLowerCase() === name?.toLowerCase(),
+                  )
+                : hotels?.[index ?? 0];
+              if (hotel) {
+                pushPickSnapshot();
+                setCurrentItinerary((prev) => ({
+                  ...prev,
+                  selected_hotel: hotel,
+                }));
+                cues.chime();
+                pendingChainedSendRef.current = {
+                  text:
+                    `Set "${hotel.name}" as the base hotel. ` +
+                    `Plan the day-by-day itinerary with activities, meals, and directions.`,
+                  opts: { callRole: "days" },
+                };
+              }
+            } else if (type === "replace_activity") {
+              // Chat mode — LLM wants to replace a day activity.
+              // Queue the days replan to fire AFTER this stream's done event.
+              const { day, activity_name, query } = payload || {};
+              const q = query
+                ? `Replace "${activity_name}" on day ${day} with: ${query}`
+                : `Replace "${activity_name}" on day ${day} with a suitable alternative`;
+              pendingChainedSendRef.current = { text: q, opts: { callRole: "days" } };
             } else if (type === "partial_itinerary") {
               // Progressive disclosure — show raw tool results before the LLM
               // finishes generating its closing text. The `done` event's final
@@ -849,12 +913,9 @@ function App() {
                 }
                 return next;
               });
-              // Early navigate to FLIGHTS as soon as flight options arrive —
-              // don't wait for the LLM's closing text.
-              if (payload.flight?.options?.length > 0 && menu.state.panel === "HOME") {
-                menu.setPanel("FLIGHTS");
-                pendingNavigateRef.current = null;
-              }
+              // Intentionally no panel navigation here — partial_itinerary
+              // updates data progressively but never changes the active panel
+              // while the agent is working. Navigation fires once, at done.
             }
           },
         });
@@ -927,7 +988,14 @@ function App() {
           } else if (data.itinerary) {
             // Fallback: detect which turn just completed by what data
             // was returned, and navigate to the appropriate panel.
-            if (data.itinerary.days?.length) {
+            // IMPORTANT: Call A returns days[] date-stubs like [{date:"..."}]
+            // with no activities — checking days?.length would incorrectly
+            // navigate to DAYS. Only go to DAYS if at least one day has
+            // real activities.
+            const hasActivities = data.itinerary.days?.some(
+              (d) => d.activities?.length > 0
+            );
+            if (hasActivities) {
               menu.setPanel("DAYS");        // Turn 3 or follow-up edit
             } else if (data.itinerary.hotels?.length) {
               menu.setPanel("HOTELS");      // Turn 2
@@ -955,6 +1023,19 @@ function App() {
           setAgentState("idle");
           idleTimerRef.current = null;
         }, 1500);
+
+        // Flush any pick_flight / pick_hotel / replace_activity chained send.
+        // These are queued (not fired immediately) to avoid concurrent-request
+        // races where the chained handleSend would start while this stream is
+        // still running, causing message-state collisions.
+        {
+          const chained = pendingChainedSendRef.current;
+          pendingChainedSendRef.current = null;
+          if (chained) {
+            // Small delay so the done-state UI settles before the next agent turn.
+            setTimeout(() => handleSend(chained.text, chained.opts), 50);
+          }
+        }
 
         // Auto-reopen the chat popover on a follow-up question. If the
         // LLM's reply ends with "?", schedule the popover to pop after
@@ -989,6 +1070,7 @@ function App() {
       llmModel,
       saveCurrentPlanToHistory,
       setPendingInputRequest,
+      pushPickSnapshot,
     ],
   );
 
@@ -1536,7 +1618,6 @@ function App() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onChange={setPreferences}
-        onTtsChange={setTts}
         onCurrencyChange={setCurrency}
         onLlmModelChange={setLlmModel}
         onThemeChange={setTheme}
@@ -1568,6 +1649,11 @@ function App() {
             return next;
           });
         }}
+      />
+
+      <ServiceStatusOverlay
+        open={statusOpen}
+        onClose={() => setStatusOpen(false)}
       />
 
       {/* Bottom-center subtitle bar with auto-TTS + R16 history */}

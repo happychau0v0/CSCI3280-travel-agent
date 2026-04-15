@@ -5097,6 +5097,32 @@ body.theme-light .history-overlay-scroll::-webkit-scrollbar-thumb {
   text-transform: uppercase;
 }
 
+/* Live route overlay — animated marching dashes on the Leaflet polyline */
+@keyframes dash-march {
+  to { stroke-dashoffset: -32; }
+}
+.live-route-line path {
+  animation: dash-march 0.5s linear infinite;
+}
+
+/* "ROUTING…" chip that floats over the map while the live fetch is in flight */
+.map-live-loading {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  background: rgba(0, 0, 0, 0.75);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  padding: 3px 12px;
+  border: 1px solid var(--accent);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 /* ─── Itinerary card (rendered inside drawer) ────────────── */
 
 .itinerary-card {
@@ -5498,4 +5524,151 @@ body.theme-light .history-overlay-scroll::-webkit-scrollbar-thumb {
     width: auto;
   }
   .itinerary-drawer { width: 100vw; }
+}
+
+/* ─── ServiceStatusOverlay ─────────────────────────────────────────── */
+.sso-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  outline: none;
+}
+.sso-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 6, 18, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.sso-frame {
+  position: relative;
+  width: min(560px, 92vw);
+  margin-top: 88px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-glass);
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 64px rgba(0, 217, 255, 0.3);
+  pointer-events: auto;
+  font-family: var(--mono);
+}
+.sso-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 217, 255, 0.06);
+}
+.sso-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--accent);
+}
+.sso-hints {
+  font-size: 10px;
+  color: var(--text-d);
+}
+.sso-hints kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  font-size: 9px;
+  color: var(--text-h);
+  margin: 0 2px;
+}
+.sso-body {
+  padding: 24px 28px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sso-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--text-d);
+}
+.sso-pulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: sso-blink 1s ease-in-out infinite;
+}
+@keyframes sso-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.2; }
+}
+.sso-fetch-error {
+  font-size: 11px;
+  color: #ef4444;
+  letter-spacing: 0.06em;
+}
+.sso-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.sso-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.sso-row:last-child { border-bottom: none; }
+.sso-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.sso-label {
+  flex: 1;
+  color: var(--text-h);
+  letter-spacing: 0.04em;
+}
+.sso-spacer { flex: 1; }
+.sso-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  min-width: 52px;
+  text-align: right;
+}
+.sso-latency {
+  font-size: 11px;
+  color: var(--text-d);
+  min-width: 60px;
+  text-align: right;
+}
+.sso-detail {
+  display: block;
+  width: 100%;
+  font-size: 10px;
+  color: #ef4444;
+  margin-top: 2px;
+  letter-spacing: 0.04em;
+  word-break: break-all;
+}
+.sso-checked {
+  font-size: 10px;
+  color: var(--text-d);
+  letter-spacing: 0.06em;
+  margin: 4px 0 0;
 }

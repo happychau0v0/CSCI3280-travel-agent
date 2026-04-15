@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { API_BASE } from "../api/client";
 
 /**
  * Split a paragraph into sentences for subtitle display.
@@ -6,51 +7,70 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
  */
 export function splitSentences(text) {
   if (!text) return [];
-  // Strip markdown bold/code blocks first
+  // Pre-clean: strip code fences, bold, entire heading lines, em-dashes
   const clean = text
     .replace(/```[\s\S]*?```/g, "")
     .replace(/\*\*/g, "")
+    .replace(/^#{1,6}\s.*$/gm, "")    // strip entire heading lines (including their text)
+    .replace(/\s—\s/g, ", ")           // em-dash: " — " → ", "
     .replace(/\s+/g, " ")
     .trim();
   if (!clean) return [];
-  // Split on sentence boundaries; lookbehind keeps the punctuation
+  // Split on sentence boundaries; lookbehind keeps the punctuation.
+  // Then strip list prefixes per-sentence so "- item" and "2. item"
+  // work whether the marker is at string start or mid-sentence position.
   return clean
     .split(/(?<=[.!?])\s+/)
-    .map((s) => s.trim())
+    .map((s) => s.replace(/^([-•*]|\d+[.)])\s*/, "").trim())
     .filter(Boolean);
 }
 
 /**
- * FIFO subtitle queue with optional auto-TTS.
+ * Fetch a sentence from the backend TTS endpoint.
+ * Returns { url: string } (blob URL) on success, or null to trigger
+ * browser SpeechSynthesis fallback (503 / 204 / network error).
+ * Caller must call URL.revokeObjectURL(url) when done.
+ */
+async function fetchTTS(text, signal) {
+  try {
+    const res = await fetch(`${API_BASE}/speech/tts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+      signal,
+    });
+    if (res.status === 503 || res.status === 204 || !res.ok) return null;
+    const blob = await res.blob();
+    return { url: URL.createObjectURL(blob) };
+  } catch (err) {
+    if (err.name === "AbortError") throw err; // let caller handle abort
+    return null; // network / other error → fallback
+  }
+}
+
+/**
+ * FIFO subtitle queue with backend TTS (xAI "ara" voice) and browser
+ * SpeechSynthesis fallback.
  *
  * Each queued item is an object { text, spoken } where `spoken: false`
- * means the text displays as a subtitle but is NOT read aloud. The echo
- * of the user's own message ("▸ Sent: …") uses `spoken: false` so the
- * user doesn't hear their own typing read back (R9-A2).
+ * means the text displays as a subtitle but is NOT read aloud.
  *
- * Advance is driven by the speechSynthesis `onend` event rather than
- * a fixed setTimeout, so long tool waits hold the current subtitle
- * silently instead of looping the narration every 2.5s (R9-D). A
- * safety timer (15s for spoken, 6s for silent) still fires if onend
- * never arrives (e.g. TTS unsupported, or an empty-queue state).
+ * Audio advance is driven by HTMLAudioElement.onended so pacing matches
+ * actual speech duration. A 15-second safety timer fires if onended
+ * never arrives (browser bug, 0-duration audio).
  *
- * `rate` and `voiceName` are passed in from App.jsx (sourced from the
- * user's SETTINGS overlay choices) and apply per-utterance. Both are
- * mirrored into refs so the advance loop reads fresh values without
- * being re-memoized on every keystroke (R9-C / B5).
+ * When the backend returns 503 (key missing / rate-limited), the queue
+ * silently falls back to window.speechSynthesis for that sentence and
+ * uses a displayMs timer instead of onended.
  *
- * Returns:
- *   {
- *     current,                  // string | null — currently displayed sentence
- *     push(text, opts),         // enqueue a single sentence { spoken=true }
- *     pushParagraph(text, opts),// split into sentences and enqueue all
- *     clear(),                  // empty the queue and stop speaking
- *   }
+ * A 1-sentence lookahead fetch hides the ~300–500ms backend TTS latency:
+ * while sentence N plays, sentence N+1 is already being fetched.
+ *
+ * The backend voice ("ara") and browser fallback voice/rate are fixed —
+ * no user-configurable TTS settings beyond mute.
  */
 export function useSubtitleQueue({
   muted = false,
-  rate = 1.15,
-  voiceName = null,
 } = {}) {
   const [current, setCurrent] = useState(null);
   const [history, setHistory] = useState([]);
@@ -60,47 +80,36 @@ export function useSubtitleQueue({
   const safetyDelayRef = useRef(0);
   const speakingRef = useRef(false);
   const mutedRef = useRef(muted);
-  const rateRef = useRef(rate);
-  const voiceNameRef = useRef(voiceName);
-  // Round 18 — pause state. While paused, the advance timer is
-  // cleared and the current line stays visible indefinitely. On
-  // resume, a fresh timer is scheduled for the remaining time.
   const pausedRef = useRef(false);
+
+  // New refs for async audio management
+  const pendingFetchRef = useRef(null);  // AbortController for current fetch
+  const lookaheadRef = useRef(null);     // { text, controller, promise }
+  const currentAudioRef = useRef(null);  // playing HTMLAudioElement
 
   const setCurrentBoth = useCallback((v) => {
     currentRef.current = v;
     setCurrent(v);
   }, []);
 
-  // Keep mutedRef / rateRef / voiceNameRef in sync so the advance loop
-  // reads the latest values without needing to re-memoize.
+  // Keep refs in sync with props
   useEffect(() => {
     mutedRef.current = muted;
-    if (muted && typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
+    if (muted) {
+      currentAudioRef.current?.pause();
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
     }
   }, [muted]);
-  useEffect(() => {
-    rateRef.current = rate;
-  }, [rate]);
-  useEffect(() => {
-    voiceNameRef.current = voiceName;
-  }, [voiceName]);
-
-  // Pick the best available voice. If the user picked a specific voice in
-  // Settings that name wins; otherwise apply the same priority as AudioPlayer:
-  // Google neural female > Google any > Samantha/Karen/named system > first English.
-  const pickVoice = useCallback((preferredName) => {
+  // Pick the best available browser voice for the fallback path.
+  // Auto-select the best available English browser voice.
+  // Priority: Google Neural Female > any Google > Samantha/Karen/named > first English.
+  const pickVoice = useCallback(() => {
     if (typeof window === "undefined" || !window.speechSynthesis) return null;
     try {
       const voices = window.speechSynthesis.getVoices() || [];
       if (voices.length === 0) return null;
-      // 1. User's explicit choice from Settings
-      if (preferredName) {
-        const exact = voices.find((v) => v.name === preferredName);
-        if (exact) return exact;
-      }
-      // 2. Auto-select best English voice (same logic as AudioPlayer.pickBestVoice)
       const en = voices.filter((v) => /^en[-_]/i.test(v.lang));
       if (en.length === 0) return voices[0];
       const googleNeural = en.find((v) => /Google (US|UK) English Female/i.test(v.name));
@@ -117,23 +126,61 @@ export function useSubtitleQueue({
     }
   }, []);
 
-  const advance = useCallback(() => {
+  // Browser SpeechSynthesis fallback — fire-and-forget (no onend hook to
+  // avoid cascade on headless browsers where events fire synchronously).
+  const speakBrowserFallback = useCallback((text) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.rate = 1.0;
+      utter.pitch = 1.0;
+      const voice = pickVoice();
+      if (voice) utter.voice = voice;
+      window.speechSynthesis.speak(utter);
+    } catch {
+      // ignore TTS errors — display still works
+    }
+  }, [pickVoice]);
+
+  // advance is defined via ref so it can be called from audio event handlers
+  // without stale closure issues.
+  const advanceRef = useRef(null);
+
+  const advance = useCallback(async () => {
+    // Clear any pending safety timer
     if (safetyTimerRef.current) {
       clearTimeout(safetyTimerRef.current);
       safetyTimerRef.current = null;
     }
+
+    // Stop currently playing audio
+    if (currentAudioRef.current) {
+      currentAudioRef.current.onended = null;
+      currentAudioRef.current.onerror = null;
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
+
+    // Cancel any in-flight fetch for the previous sentence
+    if (pendingFetchRef.current) {
+      pendingFetchRef.current.abort();
+      pendingFetchRef.current = null;
+    }
+
     const next = queueRef.current.shift();
     if (!next) {
       setCurrentBoth(null);
       speakingRef.current = false;
       return;
     }
+
     const { text, spoken } = next;
+
+    // Show subtitle immediately — don't wait for audio fetch
     setCurrentBoth(text);
-    // Round 16 — track the last ~20 subtitles so the user can scroll
-    // back through missed narration via the Subtitle history popover.
-    // User echoes (spoken=false) are excluded from history since
-    // they're just the prompt preview.
+
+    // Track subtitle history (exclude user echoes)
     if (spoken !== false) {
       setHistory((prev) => {
         const next2 = [...prev, text];
@@ -142,46 +189,118 @@ export function useSubtitleQueue({
     }
 
     const speak = spoken && !mutedRef.current &&
-      typeof window !== "undefined" && window.speechSynthesis;
+      typeof window !== "undefined";
 
-    // Display duration for the subtitle: ~60ms/char, clamped to a
-    // 2.5-6s window. Short enough not to stall the queue in
-    // headless browsers where TTS isn't wired; long enough that
-    // normal replies aren't chopped. Long tool-call gaps don't
-    // cause re-speaking because this is a SINGLE timer per item,
-    // not a loop-back.
+    // Display duration for fallback timer (~60ms/char, clamped 2.5–6s)
     const displayMs = Math.max(2500, Math.min(text.length * 60, 6000));
-
-    if (speak) {
-      try {
-        window.speechSynthesis.cancel();
-        const utter = new SpeechSynthesisUtterance(text);
-        utter.rate = rateRef.current || 1.15;
-        utter.pitch = 1.0;
-        const voice = pickVoice(voiceNameRef.current);
-        if (voice) utter.voice = voice;
-        // Fire-and-forget — we DON'T hook onend/onerror because on
-        // some browsers (headless Chromium, voice-less environments)
-        // the event fires synchronously during speak() which would
-        // cascade advance() calls and burn the whole queue in a few
-        // milliseconds. The setTimeout below is the single source of
-        // advance timing.
-        window.speechSynthesis.speak(utter);
-      } catch {
-        // ignore TTS errors — display still works
-      }
-    }
-
-    // Single setTimeout per item drives advance. No re-speak loop
-    // because each item only schedules ONE timer, and the next
-    // push will clear it via clear() or via advance() popping the
-    // queue. Round 18 — if paused (mouse hover), delay scheduling
-    // the timer until resume.
     safetyDelayRef.current = displayMs;
-    if (!pausedRef.current) {
-      safetyTimerRef.current = setTimeout(() => advance(), displayMs);
+
+    if (!speak) {
+      if (!pausedRef.current) {
+        safetyTimerRef.current = setTimeout(() => advanceRef.current?.(), displayMs);
+      }
+      return;
     }
-  }, [setCurrentBoth, pickVoice]);
+
+    // --- Fetch audio from backend ---
+
+    let audioResult = null;
+
+    // Check if the lookahead already prefetched this sentence
+    if (lookaheadRef.current && lookaheadRef.current.text === text) {
+      try {
+        audioResult = await lookaheadRef.current.promise;
+      } catch {
+        audioResult = null;
+      }
+      lookaheadRef.current = null;
+    } else {
+      // Cancel stale lookahead (queue order changed)
+      if (lookaheadRef.current) {
+        lookaheadRef.current.controller.abort();
+        lookaheadRef.current = null;
+      }
+      // Fetch current sentence
+      const controller = new AbortController();
+      pendingFetchRef.current = controller;
+      try {
+        audioResult = await fetchTTS(text, controller.signal);
+      } catch (err) {
+        if (err.name === "AbortError") return; // clear() was called mid-fetch
+        audioResult = null;
+      }
+      pendingFetchRef.current = null;
+    }
+
+    // Kick off lookahead fetch for the next queued sentence
+    const nextItem = queueRef.current[0];
+    if (nextItem && nextItem.spoken !== false && !mutedRef.current) {
+      const lac = new AbortController();
+      const laPromise = fetchTTS(nextItem.text, lac.signal).catch(() => null);
+      lookaheadRef.current = { text: nextItem.text, controller: lac, promise: laPromise };
+    }
+
+    // --- Fallback to browser TTS if backend returned null ---
+    if (audioResult === null) {
+      speakBrowserFallback(text);
+      if (!pausedRef.current) {
+        safetyTimerRef.current = setTimeout(() => advanceRef.current?.(), displayMs);
+      }
+      return;
+    }
+
+    // --- Play audio from backend ---
+    const { url } = audioResult;
+    const audio = new Audio(url);
+    currentAudioRef.current = audio;
+
+    // Safety timer: if onended never fires (browser bug, 0-duration)
+    const safetyMs = Math.max(15000, text.length * 80);
+    safetyTimerRef.current = setTimeout(() => {
+      URL.revokeObjectURL(url);
+      currentAudioRef.current = null;
+      advanceRef.current?.();
+    }, safetyMs);
+
+    audio.onended = () => {
+      clearTimeout(safetyTimerRef.current);
+      safetyTimerRef.current = null;
+      URL.revokeObjectURL(url);
+      currentAudioRef.current = null;
+      if (!pausedRef.current) advanceRef.current?.();
+    };
+
+    audio.onerror = () => {
+      clearTimeout(safetyTimerRef.current);
+      safetyTimerRef.current = null;
+      URL.revokeObjectURL(url);
+      currentAudioRef.current = null;
+      // Audio decode error → fall back to browser TTS for this sentence
+      speakBrowserFallback(text);
+      if (!pausedRef.current) {
+        safetyTimerRef.current = setTimeout(() => advanceRef.current?.(), displayMs);
+      }
+    };
+
+    if (!pausedRef.current) {
+      audio.play().catch(() => {
+        // play() rejected (autoplay policy, etc.) → fall back
+        clearTimeout(safetyTimerRef.current);
+        safetyTimerRef.current = null;
+        URL.revokeObjectURL(url);
+        currentAudioRef.current = null;
+        speakBrowserFallback(text);
+        if (!pausedRef.current) {
+          safetyTimerRef.current = setTimeout(() => advanceRef.current?.(), displayMs);
+        }
+      });
+    }
+  }, [setCurrentBoth, speakBrowserFallback]);
+
+  // Keep advanceRef current so audio event handlers always call the latest version
+  useEffect(() => {
+    advanceRef.current = advance;
+  }, [advance]);
 
   const pause = useCallback(() => {
     pausedRef.current = true;
@@ -189,30 +308,32 @@ export function useSubtitleQueue({
       clearTimeout(safetyTimerRef.current);
       safetyTimerRef.current = null;
     }
+    currentAudioRef.current?.pause();
     if (typeof window !== "undefined" && window.speechSynthesis) {
-      try {
-        window.speechSynthesis.pause?.();
-      } catch {
-        /* ignore */
-      }
+      try { window.speechSynthesis.pause?.(); } catch { /* ignore */ }
     }
   }, []);
 
   const resume = useCallback(() => {
     if (!pausedRef.current) return;
     pausedRef.current = false;
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      try {
-        window.speechSynthesis.resume?.();
-      } catch {
-        /* ignore */
-      }
+
+    if (currentAudioRef.current) {
+      // Resume backend audio — onended will call advance() when done
+      currentAudioRef.current.play().catch(() => {
+        currentAudioRef.current = null;
+        advance();
+      });
+      return;
     }
-    // Schedule the advance timer with a small residual window so
-    // the subtitle doesn't immediately pop.
+
+    // Browser TTS fallback path or silent item — use timer
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      try { window.speechSynthesis.resume?.(); } catch { /* ignore */ }
+    }
     if (currentRef.current && !safetyTimerRef.current) {
       const remaining = Math.max(1000, safetyDelayRef.current || 2500);
-      safetyTimerRef.current = setTimeout(() => advance(), remaining);
+      safetyTimerRef.current = setTimeout(() => advanceRef.current?.(), remaining);
     }
   }, [advance]);
 
@@ -239,6 +360,23 @@ export function useSubtitleQueue({
 
   const clear = useCallback(() => {
     queueRef.current = [];
+
+    // Cancel in-flight fetch
+    pendingFetchRef.current?.abort();
+    pendingFetchRef.current = null;
+
+    // Cancel lookahead fetch
+    lookaheadRef.current?.controller?.abort();
+    lookaheadRef.current = null;
+
+    // Stop playing audio
+    if (currentAudioRef.current) {
+      currentAudioRef.current.onended = null;
+      currentAudioRef.current.onerror = null;
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
+
     if (safetyTimerRef.current) {
       clearTimeout(safetyTimerRef.current);
       safetyTimerRef.current = null;
@@ -252,9 +390,7 @@ export function useSubtitleQueue({
 
   // Cleanup on unmount
   useEffect(() => {
-    return () => {
-      clear();
-    };
+    return () => { clear(); };
   }, [clear]);
 
   const clearHistory = useCallback(() => setHistory([]), []);

@@ -209,6 +209,25 @@ export async function streamChat({
 }
 
 /**
+ * Live directions lookup — used by the DAYS panel to show real-time routes
+ * on the map when the user clicks an activity. Bypasses the LLM tool loop.
+ * Returns { polyline, duration, distance, steps } or null on error.
+ */
+export async function getDirections(origin, destination, mode = "TRANSIT") {
+  try {
+    const res = await fetch(`${API_BASE}/api/directions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ origin, destination, mode }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Reorder a list of activities for shortest total travel distance.
  * Each activity must have lat and lng. Other fields ride along in `extra`.
  */

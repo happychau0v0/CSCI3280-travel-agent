@@ -267,6 +267,7 @@ async def _run_loop(
     bench_eval: bool = False,
     preferred_model: str | None = None,
     call_role: str | None = None,
+    sid: str | None = None,
 ) -> dict:
     """Internal: shared tool-call loop used by both chat() and chat_stream().
 
@@ -512,6 +513,14 @@ async def _run_loop(
                 # submit_trip_form pre-fills the PLAN form and triggers planning.
                 elif fn_name == "submit_trip_form":
                     await on_event("submit_form", fn_args)
+                # pick_flight / pick_hotel / replace_activity — chat mode
+                # UI-action tools that mirror the FLIGHTS/HOTELS/DAYS buttons.
+                elif fn_name == "pick_flight":
+                    await on_event("pick_flight", fn_args)
+                elif fn_name == "pick_hotel":
+                    await on_event("pick_hotel", fn_args)
+                elif fn_name == "replace_activity":
+                    await on_event("replace_activity", fn_args)
 
             fn = TOOL_DISPATCH.get(fn_name)
             if fn is None:
@@ -527,6 +536,16 @@ async def _run_loop(
 
             elapsed_ms = int((asyncio.get_event_loop().time() - t0) * 1000)
             logger.info("Tool done: %s — %dms", fn_name, elapsed_ms)
+            # Log the full tool result to llm_events.jsonl — not emitted via
+            # SSE (too large for streaming), but essential for debugging wrong
+            # itinerary data, failed geocoding, bad direction results, etc.
+            if sid:
+                from app.event_log import log_event as _log_event
+                _log_event(sid, call_role, "tool_result", {
+                    "name": fn_name,
+                    "result": tool_result,
+                    "elapsed_ms": elapsed_ms,
+                })
             if on_event is not None:
                 # Emit a partial_itinerary snapshot immediately so the
                 # frontend can show flights/hotels while the LLM is still
@@ -545,8 +564,27 @@ async def _run_loop(
                 "content": json.dumps(tool_result, default=str),
             }
 
-        tool_results = await asyncio.gather(*(_run_one(tc) for tc in msg.tool_calls))
+        # If request_input is in this batch, execute ONLY request_input and
+        # break immediately. Running search_flights or navigate_menu alongside
+        # request_input causes confusing UI state — the user hasn't answered
+        # yet so the LLM must wait. Filtering here prevents the LLM from
+        # sneaking through a search+navigate in the same tool-call batch.
+        has_request_input = any(
+            tc.function.name == "request_input" for tc in msg.tool_calls
+        )
+        calls_to_run = (
+            [tc for tc in msg.tool_calls if tc.function.name == "request_input"]
+            if has_request_input
+            else list(msg.tool_calls)
+        )
+        tool_results = await asyncio.gather(*(_run_one(tc) for tc in calls_to_run))
         full_messages.extend(tool_results)
+
+        if has_request_input:
+            # Frontend already received the request_input SSE event and is
+            # displaying the input form. Stop here — next message is the user's answer.
+            break
+
         _is_reasoning = "reasoning" in active_model and "non-reasoning" not in active_model
         keep_rounds = 3 if _is_reasoning else 2
         full_messages = _prune_tool_results(full_messages, keep_recent_rounds=keep_rounds)
@@ -620,6 +658,7 @@ async def chat_stream(
     bench_eval: bool = False,
     preferred_model: str | None = None,
     call_role: str | None = None,
+    sid: str | None = None,
 ) -> AsyncIterator[dict]:
     """Run the LLM and yield events as tool calls fire.
 
@@ -633,12 +672,18 @@ async def chat_stream(
     queue: asyncio.Queue = asyncio.Queue()
     _t0 = time.monotonic()
 
+    # Import lazily so tests that don't need the log file don't create it.
+    from app.event_log import log_event as _log_event
+
     async def emit(event_type: str, payload: dict) -> None:
         # Inject a server-side timestamp (ms since this request started) into
         # every event so the bench script can build a precise waterfall without
         # relying on client-side clock skew.
         payload["t"] = int((time.monotonic() - _t0) * 1000)
         await queue.put({"type": event_type, "data": payload})
+        # Mirror every SSE event to the structured JSONL log for debugging.
+        if sid:
+            _log_event(sid, call_role, event_type, payload)
 
     async def run() -> None:
         try:
@@ -651,15 +696,24 @@ async def chat_stream(
                 bench_eval=bench_eval,
                 preferred_model=preferred_model,
                 call_role=call_role,
+                sid=sid,
             )
             await queue.put({"type": "done", "data": result})
+            # Log the final reply text + full itinerary — this is the most
+            # important entry for debugging bad TTS output or wrong JSON.
+            if sid:
+                _log_event(sid, call_role, "done", result)
         except RuntimeError as e:
             # Missing API key — surface as error event so the SSE stream
             # can close gracefully instead of dropping the connection.
             await queue.put({"type": "error", "data": {"status": 503, "message": str(e)}})
+            if sid:
+                _log_event(sid, call_role, "error", {"status": 503, "message": str(e)})
         except Exception as e:
             logger.exception("chat_stream failed")
             await queue.put({"type": "error", "data": {"status": 500, "message": str(e)}})
+            if sid:
+                _log_event(sid, call_role, "error", {"status": 500, "message": str(e)})
         finally:
             await queue.put(None)  # sentinel
 
