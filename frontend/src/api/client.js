@@ -256,3 +256,15 @@ export async function optimizeRoute(activities) {
   }
   return res.json();
 }
+
+/**
+ * Search airports by name, IATA code, city, or country.
+ * Returns [{iata, name, city, country, lat, lng}, …].
+ */
+export async function searchAirports(q, limit = 10) {
+  if (!q || q.trim().length < 1) return [];
+  const params = new URLSearchParams({ q: q.trim(), limit: String(limit) });
+  const res = await fetch(`${API_BASE}/airports/search?${params}`);
+  if (!res.ok) return [];
+  return res.json();
+}
