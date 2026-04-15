@@ -271,6 +271,9 @@ function App() {
   const [suggestedFlightIdx, setSuggestedFlightIdx] = useState(null);
   // LLM-suggested hotel index — set when pick_hotel SSE fires, cleared on user pick.
   const [suggestedHotelIdx, setSuggestedHotelIdx] = useState(null);
+  // Proposed activity replacement from the replace LLM — shown as a preview card.
+  // Shape: { day: number, old_name: string, activity: object } | null
+  const [pendingReplacement, setPendingReplacement] = useState(null);
   // Tracks the in-flight done→idle setTimeout so a new request can
   // cancel it before it overwrites the new "working" state (B6).
   const idleTimerRef = useRef(null);
@@ -860,6 +863,36 @@ function App() {
     if (snap) planOneDayDetail(day, snap);
   }
 
+  function handleConfirmReplacement() {
+    if (!pendingReplacement) return;
+    const { day: dayNum, old_name, activity: newAct } = pendingReplacement;
+    setCurrentItinerary((prev) => {
+      if (!prev?.days) return prev;
+      const days = prev.days.map((d) => {
+        if (d.day !== dayNum) return d;
+        let activities = d.activities.map((a) =>
+          a.name === old_name
+            ? { ...a, ...newAct, time: newAct.time ?? a.time, duration_min: newAct.duration_min ?? a.duration_min }
+            : a
+        );
+        const changedIdx = activities.findIndex(
+          (a) => a.name === (newAct.name ?? old_name)
+        );
+        if (changedIdx >= 0) {
+          activities = cascadeActivityTimes(activities, changedIdx);
+        }
+        return { ...d, activities };
+      });
+      return { ...prev, days };
+    });
+    setPendingReplacement(null);
+    cues.chime();
+  }
+
+  function handleCancelReplacement() {
+    setPendingReplacement(null);
+  }
+
   async function planDaysActivities(itinerary) {
     if (isPlanningDaysRef.current) return;
     isPlanningDaysRef.current = true;
@@ -1207,27 +1240,9 @@ function App() {
           // instead of the full days array. Swap only the matching activity.
           if (data.itinerary.replace) {
             const { day: dayNum, old_name, activity: newAct } = data.itinerary.replace;
-            setCurrentItinerary((prev) => {
-              if (!prev?.days) return prev;
-              const days = prev.days.map((d) => {
-                if (d.day !== dayNum) return d;
-                let activities = d.activities.map((a) =>
-                  a.name === old_name
-                    ? { ...a, ...newAct, time: newAct.time ?? a.time, duration_min: newAct.duration_min ?? a.duration_min }
-                    : a
-                );
-                // Cascade start times for activities after the replaced one
-                // so downstream times stay consistent if duration changed.
-                const changedIdx = activities.findIndex(
-                  (a) => a.name === (newAct.name ?? old_name)
-                );
-                if (changedIdx >= 0) {
-                  activities = cascadeActivityTimes(activities, changedIdx);
-                }
-                return { ...d, activities };
-              });
-              return { ...prev, days };
-            });
+            // Show preview card — user must click CONFIRM to apply.
+            setPendingReplacement({ day: dayNum, old_name, activity: newAct });
+            menu.navigate({ panel: "DAYS" });
             cues.chime();
           } else {
           // Multi-turn additive merge: each LLM turn only emits fields
@@ -1795,6 +1810,9 @@ function App() {
             itinerary={currentItinerary}
             dayStatuses={dayStatuses}
             onRetryDay={handleRetryDay}
+            pendingReplacement={pendingReplacement}
+            onConfirmReplacement={handleConfirmReplacement}
+            onCancelReplacement={handleCancelReplacement}
             listIndex={menu.state.listIndex}
             side={menu.state.side}
             activityIndex={activityIndex}

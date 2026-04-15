@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import DayMiniMap from "../DayMiniMap";
 import PhotoGallery from "../PhotoGallery";
 import { getDirections } from "../../api/client";
@@ -375,6 +375,9 @@ export default function PanelDays({
   theme = "dark",
   dayStatuses = {},
   onRetryDay = null,
+  pendingReplacement = null,
+  onConfirmReplacement = null,
+  onCancelReplacement = null,
 }) {
   const days = itinerary?.days || [];
   const hotelName =
@@ -713,32 +716,59 @@ export default function PanelDays({
         })()}
         <ol className="activities">
           {activities.map((act, i) => (
-            <ActivityRow
-              key={`${selectedIdx}-${i}-${act.name || ""}`}
-              activity={act}
-              index={i}
-              isHotel={hotelName && act.name === hotelName}
-              isAirport={/airport/i.test(act.name || "")}
-              isActive={i === activeActivityIdx || (side === "right" && i === activityIndex)}
-              isDragTarget={i === dragOverIdx && dragFromIdx !== i}
-              expandOverride={expandAllOverride}
-              liveRoute={i === activeActivityIdx ? liveRoute : null}
-              liveRouteLoading={i === activeActivityIdx ? liveRouteLoading : false}
-              onClick={() => setActiveActivityIdx(i)}
-              onDragStart={handleDragStart}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onDragEnd={handleDragEnd}
-              onRemove={onRemoveActivity ? (idx) => onRemoveActivity(selectedIdx, idx) : null}
-              onReplace={onReplaceActivity ? (idx) => onReplaceActivity(selectedIdx, idx) : null}
-              onNoteChange={onSetActivityNote ? (idx, note) => onSetActivityNote(selectedIdx, idx, note) : null}
-              onEditField={onEditActivityField ? (idx, field, value) => onEditActivityField(selectedIdx, idx, field, value) : null}
-              isFavorite={favoriteKeys.has(act.place_id || act.name)}
-              onToggleFavorite={
-                onToggleFavorite ? (idx) => onToggleFavorite(selectedIdx, idx) : null
-              }
-            />
+            <React.Fragment key={`${selectedIdx}-${i}-${act.name || ""}`}>
+              <ActivityRow
+                activity={act}
+                index={i}
+                isHotel={hotelName && act.name === hotelName}
+                isAirport={/airport/i.test(act.name || "")}
+                isActive={i === activeActivityIdx || (side === "right" && i === activityIndex)}
+                isDragTarget={i === dragOverIdx && dragFromIdx !== i}
+                expandOverride={expandAllOverride}
+                liveRoute={i === activeActivityIdx ? liveRoute : null}
+                liveRouteLoading={i === activeActivityIdx ? liveRouteLoading : false}
+                onClick={() => setActiveActivityIdx(i)}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onDragEnd={handleDragEnd}
+                onRemove={onRemoveActivity ? (idx) => onRemoveActivity(selectedIdx, idx) : null}
+                onReplace={onReplaceActivity ? (idx) => onReplaceActivity(selectedIdx, idx) : null}
+                onNoteChange={onSetActivityNote ? (idx, note) => onSetActivityNote(selectedIdx, idx, note) : null}
+                onEditField={onEditActivityField ? (idx, field, value) => onEditActivityField(selectedIdx, idx, field, value) : null}
+                isFavorite={favoriteKeys.has(act.place_id || act.name)}
+                onToggleFavorite={
+                  onToggleFavorite ? (idx) => onToggleFavorite(selectedIdx, idx) : null
+                }
+              />
+              {pendingReplacement?.day === (days[selectedIdx]?.day) &&
+               pendingReplacement?.old_name === act.name && (
+                <li className="replace-preview">
+                  <div className="replace-preview-label">↻ Proposed replacement</div>
+                  <div className="replace-preview-name">{pendingReplacement.activity.name}</div>
+                  {pendingReplacement.activity.address && (
+                    <div className="replace-preview-meta">{pendingReplacement.activity.address}</div>
+                  )}
+                  <div className="replace-preview-actions">
+                    <button
+                      type="button"
+                      className="replace-preview-confirm"
+                      onClick={onConfirmReplacement}
+                    >
+                      ✓ CONFIRM
+                    </button>
+                    <button
+                      type="button"
+                      className="replace-preview-cancel"
+                      onClick={onCancelReplacement}
+                    >
+                      ✕ CANCEL
+                    </button>
+                  </div>
+                </li>
+              )}
+            </React.Fragment>
           ))}
         </ol>
         {/* Add Activity inline ghost row */}

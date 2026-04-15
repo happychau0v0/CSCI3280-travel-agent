@@ -444,6 +444,65 @@ li[tabindex]:focus-visible {
   flex-shrink: 0;
 }
 
+/* ─── Replace-activity preview card ────────────────────── */
+.replace-preview {
+  margin: 4px 0 8px 24px;
+  padding: 10px 12px;
+  border-left: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-radius: 0 4px 4px 0;
+  list-style: none;
+}
+
+.replace-preview-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  opacity: 0.6;
+  margin-bottom: 4px;
+}
+
+.replace-preview-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.replace-preview-meta {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  margin-bottom: 8px;
+}
+
+.replace-preview-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.replace-preview-confirm,
+.replace-preview-cancel {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  cursor: pointer;
+  background: transparent;
+  font-family: inherit;
+}
+
+.replace-preview-confirm {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.replace-preview-cancel {
+  color: var(--fg-dim, #666);
+  border-color: currentColor;
+}
+
+.replace-preview-confirm:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.replace-preview-cancel:hover  { background: color-mix(in srgb, currentColor 10%, transparent); }
+
 /* ─── Inline activity edit + add ─────────────────────────── */
 .activity-time-btn {
   background: transparent;

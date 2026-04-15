@@ -414,7 +414,7 @@ Available UI actions:
   toggle_setting(key, value)                 — change a user preference (tts_enabled, theme, currency, subtitle_size, auto_replan)
   pick_flight(label?, index?)               — navigate to FLIGHTS and highlight a suggested option; the user confirms by clicking PICK
   pick_hotel(name?, index?)                 — navigate to HOTELS and highlight a suggested hotel; the user confirms by clicking PICK
-  replace_activity(day, activity_name, query?) — replace a day activity and trigger a days replan
+  replace_activity(day, activity_name, query?) — propose a replacement activity; the user sees a preview and confirms or cancels
 
 MUST NOT call: search_flights, search_places, get_directions, get_weather, get_place_details.
 Leave all data fetching to the planning pipeline triggered by submit_trip_form or the pick/replace actions.
