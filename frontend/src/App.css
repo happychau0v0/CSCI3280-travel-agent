@@ -411,6 +411,23 @@ li[tabindex]:focus-visible {
   border-color: var(--accent);
 }
 
+/* ─── LLM-suggested flight row ─────────────────────────── */
+.flight-row-suggested {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.flight-suggested-badge {
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  opacity: 0.85;
+  margin-left: auto;
+  padding-left: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* ─── Inline activity edit + add ─────────────────────────── */
 .activity-time-btn {
   background: transparent;

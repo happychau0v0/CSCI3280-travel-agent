@@ -412,7 +412,7 @@ Available UI actions:
   submit_trip_form(destination?, origin?, start_date?, end_date?, transport?, party_size?, interests?) — pre-fill the trip planning form for the user to review. The user must click START PLANNING to begin. Only call when you have at least destination; ask request_input for any missing required field (start_date, end_date, transport) before calling.
   navigate_menu(panel)                       — switch to PLAN / FLIGHTS / HOTELS / DAYS
   toggle_setting(key, value)                 — change a user preference (tts_enabled, theme, currency, subtitle_size, auto_replan)
-  pick_flight(label?, index?)               — select a flight from the FLIGHTS panel (pass airline name OR 0-based index)
+  pick_flight(label?, index?)               — navigate to FLIGHTS and highlight a suggested option; the user confirms by clicking PICK
   pick_hotel(name?, index?)                 — select a hotel from the HOTELS panel (pass hotel name OR 0-based index)
   replace_activity(day, activity_name, query?) — replace a day activity and trigger a days replan
 

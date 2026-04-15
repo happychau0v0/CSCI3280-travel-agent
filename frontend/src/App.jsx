@@ -267,6 +267,8 @@ function App() {
   const [pendingInputRequest, _setPendingInputRequest] = useState(null);
   // OBJ3 — LLM can pre-fill the trip form; user must click START PLANNING to begin
   const [pendingFormPrefill, setPendingFormPrefill] = useState(null);
+  // LLM-suggested flight index — set when pick_flight SSE fires, cleared on user pick.
+  const [suggestedFlightIdx, setSuggestedFlightIdx] = useState(null);
   // Tracks the in-flight done→idle setTimeout so a new request can
   // cancel it before it overwrites the new "working" state (B6).
   const idleTimerRef = useRef(null);
@@ -515,6 +517,7 @@ function App() {
           (currentItinerary.selected_flight === opt ||
            currentItinerary.selected_flight?.airline === opt?.airline);
         if (opt && !alreadyPicked) {
+          setSuggestedFlightIdx(null);
           pushPickSnapshot();
           setCurrentItinerary({
             ...currentItinerary,
@@ -1120,35 +1123,18 @@ function App() {
               }
               subtitles.push("Filling in your trip details...");
             } else if (type === "pick_flight") {
-              // Chat mode — LLM picked a flight on the user's behalf.
-              // Queue the hotels replan to fire AFTER this stream's done event
-              // to avoid concurrent-request races.
+              // Chat suggestion — navigate to FLIGHTS and highlight the row.
+              // Do NOT select the flight or chain hotel search; user clicks PICK.
               const { label, index } = payload || {};
               const opts = currentItineraryRef.current?.flight?.options;
-              const opt = label
-                ? opts?.find(
-                    (o) =>
-                      o.label === label ||
-                      o.airline?.toLowerCase() === label?.toLowerCase(),
-                  )
-                : opts?.[index ?? 0];
-              if (opt) {
-                pushPickSnapshot();
-                setCurrentItinerary((prev) => ({ ...prev, selected_flight: opt }));
-                cues.chime();
-                const lbl = [
-                  opt.airline,
-                  opt.departure_time && opt.arrival_time
-                    ? `${opt.departure_time}→${opt.arrival_time}`
-                    : null,
-                  opt.price_low ? `HK$${opt.price_low}` : null,
-                ]
-                  .filter(Boolean)
-                  .join(", ");
-                pendingChainedSendRef.current = {
-                  text: `Selected flight: ${lbl}. Now find hotels in ${currentItineraryRef.current?.destination}.`,
-                  opts: { callRole: "hotels" },
-                };
+              const idx = label != null
+                ? (opts?.findIndex(
+                    (o) => o.label === label || o.airline?.toLowerCase() === label?.toLowerCase()
+                  ) ?? -1)
+                : (index ?? 0);
+              if (idx >= 0 && opts?.[idx]) {
+                setSuggestedFlightIdx(idx);
+                menu.navigate({ panel: "FLIGHTS" });
               }
             } else if (type === "pick_hotel") {
               // Chat mode — LLM picked a hotel on the user's behalf.
@@ -1700,8 +1686,10 @@ function App() {
             side={menu.state.side}
             isLoading={isLoading}
             backgroundHotelSearch={suppressHotelNavRef.current}
+            suggestedIdx={suggestedFlightIdx}
             onSelect={selectListItem}
             onPick={(i, tab) => {
+              setSuggestedFlightIdx(null);
               const isReturn = tab === "return";
               const opts = isReturn
                 ? currentItinerary?.flight?.return_options

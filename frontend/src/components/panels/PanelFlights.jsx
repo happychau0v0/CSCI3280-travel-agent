@@ -62,6 +62,7 @@ export default function PanelFlights({
   side = "left",
   isLoading = false,
   backgroundHotelSearch = false,
+  suggestedIdx = null,
   onSelect,
   onPick,
   onSkipFlight,
@@ -195,7 +196,8 @@ export default function PanelFlights({
               className={
                 `panel-list-item flight-option-row` +
                 (i === selectedIdx ? " active" : "") +
-                (i === pickedIdx ? " picked" : "")
+                (i === pickedIdx ? " picked" : "") +
+                (i === suggestedIdx ? " flight-row-suggested" : "")
               }
               onClick={() => onSelect?.(i)}
               data-testid={`flight-option-${i}`}
@@ -206,6 +208,9 @@ export default function PanelFlights({
                   <span className="panel-list-picked-tag"> ✓ PICKED</span>
                 )}
               </span>
+              {i === suggestedIdx && (
+                <span className="flight-suggested-badge">✦ Suggested</span>
+              )}
               <span className="panel-list-value">
                 {(opt.airline || opt.flight_number) && (
                   <span style={{ color: "var(--text-dim)", marginRight: 6 }}>
