@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { formatDisplayPrice } from "../SettingsOverlay";
 import VisaAlertBanner from "../VisaAlertBanner";
 
@@ -72,6 +72,13 @@ export default function PanelFlights({
 
   // Tab state — only relevant when return_options are present
   const [activeTab, setActiveTab] = useState("outbound");
+
+  // Auto-advance to RETURN tab when outbound is picked and return options exist
+  useEffect(() => {
+    if (itinerary?.selected_flight && hasReturn && activeTab === "outbound") {
+      setActiveTab("return");
+    }
+  }, [itinerary?.selected_flight]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const options = activeTab === "return" ? returnOptions : outboundOptions;
 
@@ -237,15 +244,15 @@ export default function PanelFlights({
                   {fromIata} {fromName}
                 </div>
               </div>
-              {selected.stops > 0 && selected.stop_cities?.length > 0 && (
-                <div className="flight-timeline-stops">
-                  via {selected.stop_cities.join(" → ")}
-                </div>
-              )}
               <div className="flight-timeline-line">
                 <div className="flight-timeline-airline">
                   {selected.airline || "—"} · {selected.seat_class_label || "Economy"}
                 </div>
+                {selected.stops > 0 && selected.stop_cities?.length > 0 && (
+                  <div className="flight-timeline-stops">
+                    via {selected.stop_cities.join(" → ")}
+                  </div>
+                )}
               </div>
               <div className="flight-timeline-row">
                 <div className="flight-timeline-time">{selected.arrival_time || "—"}</div>
@@ -278,21 +285,27 @@ export default function PanelFlights({
               {selectedIdx === pickedIdx
                 ? "✓ PICKED"
                 : activeTab === "return"
-                  ? "PICK RETURN FLIGHT ✓"
-                  : "PICK & FIND HOTELS →"}
+                  ? "PICK RETURN & FIND HOTELS →"
+                  : hasReturn
+                    ? "PICK OUTBOUND →"
+                    : "PICK & FIND HOTELS →"}
             </button>
 
-            {flight.google_flights_url && (
-              <a
-                href={flight.google_flights_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flight-cta"
-                style={{ marginTop: 12 }}
-              >
-                View live prices on Google Flights ↗
-              </a>
-            )}
+            {(() => {
+              const gUrl = flight.google_flights_url
+                || `https://www.google.com/travel/flights?q=Flights+from+${encodeURIComponent(fromIata)}+to+${encodeURIComponent(toIata)}`;
+              return (
+                <a
+                  href={gUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flight-cta"
+                  style={{ marginTop: 12 }}
+                >
+                  View live prices on Google Flights ↗
+                </a>
+              );
+            })()}
             {onSkipFlight && (
               <button
                 type="button"
