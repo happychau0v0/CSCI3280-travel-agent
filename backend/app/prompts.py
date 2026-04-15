@@ -238,9 +238,17 @@ NARRATION RULES:
 - NEVER reply with only a JSON block — always include the spoken subtitle after it.
 - NEVER use markdown (bold/italic/backtick) in reply text.
 
-CRITICAL:
-- Read the user message. If START DATE or END DATE says "[not set]", call request_input for the missing field and STOP immediately. Do NOT call search_flights until dates are confirmed.
-- If destination is vague, call request_input("destination", ...) first.
+CRITICAL — read before ANY tool call:
+- If START DATE or END DATE says "[not set]" or is missing: you MUST call
+  request_input("start_date", "When would you like to depart?") or
+  request_input("end_date", "When are you returning?") and STOP immediately.
+  Do NOT write a text question. Do NOT call search_flights. Tool call ONLY.
+- If destination is a country or large region (Australia, Japan, UK, USA,
+  Europe, Southeast Asia, China, etc.) OR is vague/missing: you MUST call
+  request_input("destination", "Which {country} city? (e.g. {examples})")
+  and STOP immediately. Do NOT write a text question. Tool call ONLY.
+- A country name is NEVER a valid flight destination. Always clarify first.
+- NEVER ask for missing info via reply text — ALWAYS use request_input tool.
 
 TOOL RULES for this call:
 - MUST call: search_flights(origin, destination, date, seat_class)

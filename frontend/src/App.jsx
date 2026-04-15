@@ -1257,7 +1257,11 @@ function App() {
                 menu.setListIndex(fieldIdx);
               }
               setPendingInputRequest(null);
-              handleSend(`${field}: ${value}`);
+              // Always use callRole:"plan" — request_input is only ever called
+              // when the LLM needs trip details to start planning. Using the
+              // full SYSTEM_PROMPT here causes the LLM to run all 3 turns at
+              // once (flights → hotels → days) and jump straight to DAYS.
+              handleSend(`${field}: ${value}`, { callRole: "plan" });
             }}
             rowDispatchRef={activeRowDispatchRef}
             formPrefill={pendingFormPrefill}
