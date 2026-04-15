@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.routers import airports as airports_router
 from app.routers import chat, geo, itinerary, photo, speech, status, visa
 from app.routers.directions import router as directions_router
 
@@ -44,6 +45,7 @@ app.include_router(speech.router)
 app.include_router(status.router)
 app.include_router(directions_router, prefix="/api")
 app.include_router(visa.router, prefix="/visa", tags=["visa"])
+app.include_router(airports_router.router)
 
 
 @app.get("/health")
