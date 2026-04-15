@@ -350,11 +350,11 @@ TOOL_DEFINITIONS: list[dict] = [
         "function": {
             "name": "submit_trip_form",
             "description": (
-                "Pre-fill the trip planning form and auto-start planning when all "
-                "required fields are valid (destination, start_date YYYY-MM-DD, "
-                "end_date YYYY-MM-DD, transport). If any required field is missing "
-                "or invalid the form is pre-filled for the user to review and submit. "
-                "Use when the user tells you a destination, dates, or trip details."
+                "Pre-fill the trip planning form for the user to review. "
+                "The user must click START PLANNING to begin planning. "
+                "Call when the user provides destination and/or trip dates. "
+                "All four fields (destination, start_date YYYY-MM-DD, end_date YYYY-MM-DD, "
+                "transport) must be known before calling — use request_input for any missing ones."
             ),
             "parameters": {
                 "type": "object",

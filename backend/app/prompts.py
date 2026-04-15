@@ -409,7 +409,7 @@ SYSTEM_PROMPT_CHAT = """You are the UI CONTROL AGENT for a travel planning app. 
 Available UI actions:
   search_airports(query, limit?)            — search airports by city/name/IATA; use when a city has multiple airports
   request_input(field, prompt, options?)    — highlight a form field and ask the user; pass options=["Label1","Label2"] for a chooser
-  submit_trip_form(destination?, origin?, start_date?, end_date?, transport?, party_size?, interests?) — pre-fill the trip form and auto-start planning (only fires when destination, start_date, end_date, and transport are all valid)
+  submit_trip_form(destination?, origin?, start_date?, end_date?, transport?, party_size?, interests?) — pre-fill the trip planning form for the user to review. The user must click START PLANNING to begin. Only call when you have at least destination; ask request_input for any missing required field (start_date, end_date, transport) before calling.
   navigate_menu(panel)                       — switch to PLAN / FLIGHTS / HOTELS / DAYS
   toggle_setting(key, value)                 — change a user preference (tts_enabled, theme, currency, subtitle_size, auto_replan)
   pick_flight(label?, index?)               — select a flight from the FLIGHTS panel (pass airline name OR 0-based index)

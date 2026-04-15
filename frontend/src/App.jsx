@@ -1683,22 +1683,10 @@ function App() {
             }}
             rowDispatchRef={activeRowDispatchRef}
             formPrefill={pendingFormPrefill}
-            onFormPrefilled={(prompt, formDates) => {
+            onFormPrefilled={() => {
               setPendingFormPrefill(null);
-              // Validation is performed inside PanelHome before this is called.
-              // Belt-and-suspenders: reject if any field is still [not set].
-              if (prompt.includes("[not set]")) return;
-              const stubs = formDates?.start_date && formDates?.end_date
-                ? generateDayStubs(formDates.start_date, formDates.end_date)
-                : null;
-              // Navigate to HOME so the user sees the pre-filled form,
-              // then fire planning exactly as if they clicked START PLANNING.
               menu.setPanel("HOME");
-              handleSend(prompt, {
-                reset: true,
-                callRole: "plan",
-                initialItinerary: stubs ? { days: stubs } : null,
-              });
+              // User reviews the pre-filled form and clicks START PLANNING themselves.
             }}
             side={menu.state.side}
           />
