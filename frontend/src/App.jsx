@@ -198,6 +198,11 @@ function App() {
   }, []);
   const [chatPopoverOpen, setChatPopoverOpen] = useState(false);
   const [chatPopoverInitial, setChatPopoverInitial] = useState("");
+  // Streaming text: accumulates LLM tokens as they arrive so the user sees
+  // text within ~200ms of the first token, not after the full LLM round.
+  const [streamingText, setStreamingText] = useState("");
+  const streamTokenBufRef = useRef("");   // raw token accumulator
+  const streamDisplayTimerRef = useRef(null); // throttle timer (max 5 updates/s)
   // Overlay state — HISTORY (H key) and SETTINGS (S key) replace the
   // dedicated tabs in the round-8.5 redesign.
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -213,6 +218,8 @@ function App() {
   const [requestStartedAt, setRequestStartedAt] = useState(null);
   // Per-tool timing log — [{name, elapsed_ms}] — reset each request
   const [toolTimings, setToolTimings] = useState([]);
+  // Which call_role is active — used by AgentStatusBar for ETA display
+  const [currentCallRole, setCurrentCallRole] = useState(null);
   const [pendingInputRequest, _setPendingInputRequest] = useState(null);
   // OBJ3 — LLM can pre-fill the trip form and auto-trigger planning
   const [pendingFormPrefill, setPendingFormPrefill] = useState(null);
@@ -643,7 +650,7 @@ function App() {
   }, []);
 
   const handleSend = useCallback(
-    async (text, { editLast = false, truncateBefore = null, reset = false } = {}) => {
+    async (text, { editLast = false, truncateBefore = null, reset = false, callRole = null } = {}) => {
       const userMsg = { role: "user", content: text };
 
       // New trip from the PLAN page: wipe the previous itinerary and
@@ -712,7 +719,13 @@ function App() {
       setAgentState("working");
       setCurrentTool(null);
       setToolTimings([]);
+      setCurrentCallRole(callRole);
       subtitles.clear();
+      // Reset streaming text state for this request.
+      streamTokenBufRef.current = "";
+      clearTimeout(streamDisplayTimerRef.current);
+      streamDisplayTimerRef.current = null;
+      setStreamingText("");
       lastSpokenToolLabelRef.current = null; // reset dedup on every new request
       const preview = text.length > 60 ? text.slice(0, 57) + "…" : text;
       // Echo the user's own message as a visible subtitle but DO NOT
@@ -729,8 +742,26 @@ function App() {
           userLocation,
           tripDates,
           llmModel,
+          callRole,
           onEvent: ({ type, data: payload }) => {
-            if (type === "tool_start") {
+            if (type === "token") {
+              // Accumulate tokens; throttle React state update to max 5/s so
+              // we don't trigger hundreds of re-renders during fast generation.
+              streamTokenBufRef.current += payload.text || "";
+              if (!streamDisplayTimerRef.current) {
+                streamDisplayTimerRef.current = setTimeout(() => {
+                  streamDisplayTimerRef.current = null;
+                  // Show the last ~150 chars so the subtitle fits one line.
+                  const buf = streamTokenBufRef.current;
+                  setStreamingText(buf.length > 150 ? "…" + buf.slice(-147) : buf);
+                }, 200);
+              }
+            } else if (type === "thinking") {
+              // LLM is about to generate — clear the previous tool name so
+              // the status bar shows "AGENT WORKING · Thinking…" during the
+              // silent pre-token phase (can be 3-5s for Grok-4.20).
+              setCurrentTool("_thinking");
+            } else if (type === "tool_start") {
               cues.bloop();
               const tool = payload?.name || payload?.tool;
               if (tool) {
@@ -828,6 +859,11 @@ function App() {
           },
         });
         if (!data) throw new Error("Stream ended without a response");
+        // Clear streaming display — the subtitle queue takes over with TTS.
+        clearTimeout(streamDisplayTimerRef.current);
+        streamDisplayTimerRef.current = null;
+        streamTokenBufRef.current = "";
+        setStreamingText("");
         const assistantMsg = { role: "assistant", content: data.reply };
         setMessages((prev) => [...prev, assistantMsg]);
         if (data.itinerary) {
@@ -901,9 +937,16 @@ function App() {
             cues.select();
           }
         }
-        subtitles.pushParagraph(data.reply);
+        // Strip ```json ... ``` fences before display — the raw LLM text
+        // includes the structured itinerary block which must not be read
+        // aloud or shown as subtitle text. Same regex as the history filter
+        // at line 690.
+        subtitles.pushParagraph(
+          (data.reply || "").replace(/```json[\s\S]*?```/g, "").trim()
+        );
         // ── Done state: brief ✓ READY flash, then collapse to idle
         setCurrentTool(null);
+        setCurrentCallRole(null);
         setAgentState("done");
         idleTimerRef.current = setTimeout(() => {
           setAgentState("idle");
@@ -1169,6 +1212,8 @@ function App() {
           setAgentState("idle");
         }}
         toolTimings={toolTimings}
+        callRole={currentCallRole}
+        isReasoningModel={!!llmModel && llmModel.includes("reasoning") && !llmModel.includes("non-reasoning")}
       />
 
       {/* NieR-style menu shell */}
@@ -1203,7 +1248,7 @@ function App() {
                 setPanelWithCue(panel);
               }
             }}
-            onPlan={(prompt) => handleSend(prompt, { reset: true })}
+            onPlan={(prompt) => handleSend(prompt, { reset: true, callRole: "plan" })}
             onResolveInput={(field, value, fieldIdx) => {
               if (typeof fieldIdx === "number" && fieldIdx >= 0) {
                 menu.setListIndex(fieldIdx);
@@ -1215,7 +1260,7 @@ function App() {
             formPrefill={pendingFormPrefill}
             onFormPrefilled={(prompt) => {
               setPendingFormPrefill(null);
-              handleSend(prompt);
+              handleSend(prompt, { callRole: "plan" });
             }}
           />
         )}
@@ -1232,6 +1277,10 @@ function App() {
                 : currentItinerary?.flight?.options;
               const opt = opts?.[i];
               if (!opt) return;
+              if (!isReturn && (!currentItinerary?.flight?.to_lat || !currentItinerary?.flight?.to_lng)) {
+                setError("No destination coordinates available. Please re-run START PLANNING first.");
+                return;
+              }
               pushPickSnapshot();
               if (isReturn) {
                 // Save return flight choice — don't navigate to hotels yet
@@ -1250,7 +1299,7 @@ function App() {
                   : null,
                 opt.price_low ? `HK$${opt.price_low}` : null,
               ].filter(Boolean).join(", ");
-              handleSend(`Selected flight: ${label}. Now find hotels.`);
+              handleSend(`Selected flight: ${label}. Now find hotels.`, { callRole: "hotels" });
             }}
             onSkipFlight={() => {
               pushPickSnapshot();
@@ -1258,6 +1307,7 @@ function App() {
               cues.chime();
               handleSend(
                 "No flight needed — using ground transport. Now find hotels near the destination.",
+                { callRole: "hotels" },
               );
             }}
           />
@@ -1272,6 +1322,10 @@ function App() {
             onPick={(i) => {
               const hotel = currentItinerary?.hotels?.[i];
               if (!hotel) return;
+              if (!currentItinerary?.hotels?.length) {
+                setError("No hotel data available. Please re-run hotel search first.");
+                return;
+              }
               pushPickSnapshot();
               // Stamp the hotel pick locally
               setCurrentItinerary({
@@ -1284,7 +1338,7 @@ function App() {
                 const prompt =
                   `Set "${hotel.name}" as the base hotel. ` +
                   `Plan the day-by-day itinerary with activities, meals, and directions.`;
-                handleSend(prompt);
+                handleSend(prompt, { callRole: "days" });
               } else {
                 // Manual mode — just advance to DAYS panel
                 setPanelWithCue("DAYS");
@@ -1340,6 +1394,7 @@ function App() {
               handleSend(
                 `Replace "${act.name}" on Day ${day.day} with a similar but different place in ${dest}. ` +
                 `Keep every other activity, keep the hotel anchor, update times if needed.`,
+                { callRole: "days" },
               );
             }}
             onSetActivityNote={(dayIdx, actIdx, note) => {
@@ -1510,7 +1565,7 @@ function App() {
 
       {/* Bottom-center subtitle bar with auto-TTS + R16 history */}
       <Subtitle
-        text={subtitles.current}
+        text={streamingText || subtitles.current}
         history={subtitles.history || []}
         onPause={subtitles.pause}
         onResume={subtitles.resume}
@@ -1527,9 +1582,9 @@ function App() {
           const idx = editTurnIdxRef.current;
           editTurnIdxRef.current = null;
           if (idx != null) {
-            handleSend(text, { truncateBefore: idx });
+            handleSend(text, { truncateBefore: idx, callRole: "chat" });
           } else {
-            handleSend(text, opts);
+            handleSend(text, { ...opts, callRole: "chat" });
           }
         }}
         onClose={() => {

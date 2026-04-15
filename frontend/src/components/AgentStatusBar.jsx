@@ -14,7 +14,16 @@ import { useEffect, useState } from "react";
  *   error   — red banner with error message, dismissible
  */
 
+// P50 estimates per role for non-reasoning model. Used for ETA display only.
+const ROLE_ETA_MS = {
+  plan:   12_000,
+  hotels: 16_000,
+  days:   18_000,
+  chat:    4_000,
+};
+
 const TOOL_LABELS = {
+  _thinking: "LLM thinking…",
   search_flights: "Searching flights",
   search_places: "Looking up places",
   get_place_details: "Fetching place details",
@@ -48,6 +57,8 @@ export default function AgentStatusBar({
   errorMessage = null,
   onDismissError,
   toolTimings = [],
+  callRole = null,
+  isReasoningModel = false,
 }) {
   const [elapsed, setElapsed] = useState(0);
 
@@ -130,9 +141,26 @@ export default function AgentStatusBar({
             <span className="status-tool"> · {friendlyTool(currentTool)}</span>
           )}
         </div>
-        <div className="status-progress">
-          <div className="status-progress-sweep" />
-        </div>
+        {currentTool === "_thinking" && !isReasoningModel && callRole && ROLE_ETA_MS[callRole] ? (
+          (() => {
+            const etaMs = ROLE_ETA_MS[callRole];
+            const elapsedMs = elapsed * 1000;
+            const progressPct = Math.min(98, (elapsedMs / etaMs) * 100);
+            const etaSec = Math.max(0, Math.ceil((etaMs - elapsedMs) / 1000));
+            return (
+              <div className="status-progress-eta-row">
+                <div className="status-progress">
+                  <div className="status-progress-fill" style={{ width: `${progressPct}%` }} />
+                </div>
+                <span className="status-eta">~{etaSec}s</span>
+              </div>
+            );
+          })()
+        ) : (
+          <div className="status-progress">
+            <div className="status-progress-sweep" />
+          </div>
+        )}
         {toolTimings.length > 0 && (
           <div className="status-timings">
             {toolTimings.slice(-4).map(({ name, elapsed_ms }, i) => (

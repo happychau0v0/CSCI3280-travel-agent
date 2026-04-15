@@ -796,6 +796,7 @@ li[tabindex]:focus-visible {
 .home-form {
   grid-column: 1;
   grid-row: 2;
+  align-self: start;   /* size to content — no internal scroll needed */
   pointer-events: auto;
   display: flex;
   flex-direction: column;
@@ -804,14 +805,19 @@ li[tabindex]:focus-visible {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border);
-  min-height: 0;
-  overflow: hidden;
 }
 
 .home-form-list {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
+  flex: 0 0 auto;
+  /* Cancel .panel-list-items base rules that don't apply to the inline
+   * home form: the form wrapper already provides background/border, and
+   * the list should never scroll — all rows must always be visible. */
+  overflow: visible;
+  max-height: none;
+  background: transparent;
+  border: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .home-form .trip-plan-btn {
@@ -836,11 +842,11 @@ li[tabindex]:focus-visible {
   flex-direction: row;
   align-items: center;
   gap: 8px;
-  padding: 2px 12px;
+  padding: 4px 12px;
   border-bottom: 1px solid var(--border);
   flex-wrap: nowrap;
   box-sizing: border-box;
-  height: 28px;
+  height: 32px;
 }
 
 .panel-list-item.home-form-row:last-child {
@@ -863,7 +869,7 @@ li[tabindex]:focus-visible {
   min-width: 0;
   padding: 4px 8px;
   height: 26px;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--code-bg);
   border: 1px solid transparent;
   color: var(--text-h);
   font-family: var(--mono);
@@ -873,17 +879,17 @@ li[tabindex]:focus-visible {
 }
 
 .home-form-input:hover {
-  background: rgba(0, 0, 0, 0.35);
+  border-color: var(--border-strong);
 }
 
 .home-form-input:focus {
   border-color: var(--accent);
-  background: rgba(0, 217, 255, 0.08);
+  background: var(--accent-bg);
 }
 
 .panel-list-item.home-form-row.field-pending .home-form-input {
-  border-color: #5eead4;
-  box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.35) inset;
+  border-color: var(--success);
+  box-shadow: 0 0 0 1px var(--success-glow) inset;
   animation: field-pulse 1.4s ease-in-out infinite;
 }
 
@@ -2993,7 +2999,7 @@ li[tabindex]:focus-visible {
   min-width: 480px;
   max-width: 80vw;
   padding: 14px 20px;
-  background: rgba(10, 14, 26, 0.92);
+  background: var(--status-bar-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   font-family: var(--mono);
@@ -3012,8 +3018,8 @@ li[tabindex]:focus-visible {
 }
 
 .agent-status-bar.status-done {
-  border: 1px solid #5eead4;
-  box-shadow: 0 0 32px rgba(94, 234, 212, 0.5);
+  border: 1px solid var(--success);
+  box-shadow: 0 0 32px var(--success-glow);
 }
 
 .agent-status-bar.status-error {
@@ -3032,7 +3038,7 @@ li[tabindex]:focus-visible {
 }
 
 .status-done .status-icon {
-  color: #5eead4;
+  color: var(--success);
 }
 
 .status-error .status-icon {
@@ -3099,6 +3105,32 @@ li[tabindex]:focus-visible {
 
 @keyframes status-sweep {
   to { left: 100%; }
+}
+
+.status-progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.8s linear;
+}
+
+.status-progress-eta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-progress-eta-row .status-progress {
+  flex: 1;
+}
+
+.status-eta {
+  font-size: 10px;
+  color: var(--accent);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .status-elapsed {
