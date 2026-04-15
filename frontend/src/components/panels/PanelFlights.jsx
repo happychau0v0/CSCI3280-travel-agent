@@ -60,6 +60,7 @@ export default function PanelFlights({
   currency = "HKD",
   visaAlert = null,
   side = "left",
+  isLoading = false,
   onSelect,
   onPick,
   onSkipFlight,
@@ -278,7 +279,7 @@ export default function PanelFlights({
               type="button"
               className="trip-plan-btn"
               onClick={() => onPick?.(selectedIdx, activeTab)}
-              disabled={selectedIdx === pickedIdx}
+              disabled={isLoading || selectedIdx === pickedIdx}
               data-testid="flight-pick-btn"
               style={{ marginTop: 16 }}
             >
