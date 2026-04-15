@@ -182,6 +182,11 @@ function App() {
   const initial = loadState();
   const [messages, setMessages] = useState(initial.messages);
   const [currentItinerary, setCurrentItinerary] = useState(initial.itinerary);
+  // dayStatuses tracks loading/error state per day number during two-phase planning.
+  // Key: day number (1-based), Value: "pending" | "loading" | "done" | "error"
+  const [dayStatuses, setDayStatuses] = useState({}); // eslint-disable-line no-unused-vars
+  const setDayStatus = (dayNum, status) => // eslint-disable-line no-unused-vars
+    setDayStatuses((prev) => ({ ...prev, [dayNum]: status }));
   const [planHistory, setPlanHistory] = useState(() => loadPlanHistory());
   const [favorites, setFavorites] = useState(() => loadFavorites());
   const favoriteKeys = useMemo(() => new Set(favorites.map((f) => f.key)), [favorites]);
@@ -708,6 +713,46 @@ function App() {
       return next;
     });
   }, []);
+
+  function buildThemeMessage(itinerary) { // eslint-disable-line no-unused-vars
+    const { destination, flight, days } = itinerary;
+    const totalDays = days?.length ?? 0;
+    const arrivalTime = flight?.arrival_time ?? "unknown";
+    const arrivalIata = flight?.to_iata ?? "";
+    const returnFlight = flight?.return_options?.[0];
+    const departureTime = returnFlight?.departure_time ?? null;
+    const departureIata = flight?.from_iata ?? arrivalIata;
+    const lastDate = days?.[totalDays - 1]?.date ?? "";
+
+    let msg = `Plan themes for a ${totalDays}-day trip to ${destination}. `;
+    msg += `Day 1 (${days?.[0]?.date ?? ""}): flight arrives at ${arrivalTime} at ${arrivalIata}. `;
+    if (departureTime) {
+      msg += `Day ${totalDays} (${lastDate}): flight departs at ${departureTime} from ${departureIata}. `;
+    } else {
+      msg += `Day ${totalDays} (${lastDate}): departure day — plan a morning before the airport. `;
+    }
+    msg += `Assign each day a distinct geographic theme and 3-5 specific neighborhood names to focus on.`;
+    return msg;
+  }
+
+  function buildDayDetailMessage(day, itinerary) { // eslint-disable-line no-unused-vars
+    const { destination, selected_hotel, days } = itinerary;
+    const totalDays = days?.length ?? 0;
+    const hotel = selected_hotel;
+    const areas = day.suggested_areas?.join(", ") ?? destination;
+
+    let msg = `Plan activities for Day ${day.day} of ${totalDays} (${day.date}) in ${destination}. `;
+    msg += `Theme: ${day.theme}. Focus areas: ${areas}. `;
+    msg += `Base hotel: ${hotel?.name} at lat ${hotel?.lat}, lng ${hotel?.lng}. `;
+
+    if (day.key_constraints?.arrival_time) {
+      msg += `Flight arrives at ${day.key_constraints.airport_iata} at ${day.key_constraints.arrival_time} — first activity must be airport arrival. `;
+    }
+    if (day.key_constraints?.departure_time) {
+      msg += `Flight departs ${day.key_constraints.airport_iata} at ${day.key_constraints.departure_time} — plan to finish activities 3 hours before. `;
+    }
+    return msg.trim();
+  }
 
   const handleSend = useCallback(
     async (text, { editLast = false, truncateBefore = null, reset = false, callRole = null } = {}) => {
