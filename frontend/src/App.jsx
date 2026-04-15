@@ -1341,7 +1341,7 @@ function App() {
     if (menu.state.panel === "HOTELS") {
       return { lat: dest.to_lat, lng: dest.to_lng, altitude: 0.08 };
     }
-    if (menu.state.panel === "DAYS") {
+    if (menu.state.panel === "DAYS" || menu.state.panel === "EXPORT") {
       return { lat: dest.to_lat, lng: dest.to_lng, altitude: 0.05 };
     }
     return null;
@@ -1353,7 +1353,7 @@ function App() {
   // CSS opacity transition kicks in. The Leaflet map fading in
   // simultaneously creates a "landed on the map" effect.
   useEffect(() => {
-    const isMapPanel = menu.state.panel === "HOTELS" || menu.state.panel === "DAYS";
+    const isMapPanel = menu.state.panel === "HOTELS" || menu.state.panel === "DAYS" || menu.state.panel === "EXPORT";
     const canvas = document.querySelector(".globe-canvas");
     if (!canvas) return;
     if (isMapPanel) {
