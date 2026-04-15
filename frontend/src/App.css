@@ -369,6 +369,8 @@ li[tabindex]:focus-visible {
 }
 
 .flight-skip-btn {
+  display: block;
+  width: 100%;
   margin-top: 8px;
   padding: 8px 14px;
   font-family: var(--mono);
@@ -896,6 +898,103 @@ li[tabindex]:focus-visible {
 .home-form-input:focus {
   border-color: var(--accent);
   background: var(--accent-bg);
+}
+
+/* Airport combobox — used in ORIGIN / DESTINATION rows */
+.airport-combo-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  background: var(--code-bg);
+  border: 1px solid transparent;
+  transition: border-color 0.1s ease, background 0.1s ease;
+}
+
+.airport-combo-wrap:hover {
+  border-color: var(--border-strong, var(--border));
+}
+
+.airport-combo-wrap:focus-within {
+  border-color: var(--accent);
+  background: var(--accent-bg, var(--code-bg));
+}
+
+.airport-combo-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--text-h);
+  padding: 0;
+  text-overflow: ellipsis;
+}
+
+.airport-combo-input::placeholder {
+  color: var(--text-dim);
+}
+
+.airport-combo-list {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: -1px;
+  right: -1px;
+  z-index: 120;
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-top: 1px solid var(--accent);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.airport-combo-item {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.airport-combo-item:hover,
+.airport-combo-item-active {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.airport-combo-iata {
+  grid-row: 1 / 3;
+  align-self: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+}
+
+.airport-combo-name {
+  font-size: 10px;
+  color: var(--text-h);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.airport-combo-city {
+  font-size: 9px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Custom select dropdown — replaces native <select> to avoid backdrop-filter
@@ -2561,6 +2660,8 @@ li[tabindex]:focus-visible {
 }
 
 .trip-plan-btn {
+  display: block;
+  width: 100%;
   margin-top: 12px;
   padding: 16px 18px;
   font-family: var(--mono);
