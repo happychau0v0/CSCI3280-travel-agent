@@ -59,6 +59,7 @@ export default function PanelFlights({
   listIndex,
   currency = "HKD",
   visaAlert = null,
+  side = "left",
   onSelect,
   onPick,
   onSkipFlight,
@@ -117,7 +118,7 @@ export default function PanelFlights({
   const legDate = activeTab === "return" ? (flight.return_date || "—") : (flight.date || "—");
 
   return (
-    <section className="panel panel-grid panel-flights" aria-label="Flights">
+    <section className={`panel panel-grid panel-flights side-focus-${side}`} aria-label="Flights">
       {/* TOP band — route summary */}
       <header className="panel-grid-top-band home-summary-top">
         <div className="home-card-label">

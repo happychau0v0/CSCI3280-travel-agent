@@ -11,9 +11,8 @@ const GROUPS = [
     name: "NAVIGATION",
     rows: [
       ["1 / 2 / 3 / 4", "Jump to PLAN / FLIGHTS / HOTELS / DAYS"],
-      ["← / →", "Cycle tabs (when scope = tabs)"],
-      ["↑ / ↓", "Move list cursor"],
-      ["Tab", "Toggle scope tabs ↔ list"],
+      ["↑ / ↓", "Move list cursor (or activity cursor on DAYS right column)"],
+      ["Tab", "Toggle focus left column ↔ right column"],
       ["Esc", "Back / close overlay / leave list scope"],
     ],
   },

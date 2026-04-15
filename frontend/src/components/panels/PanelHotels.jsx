@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { photoSrc } from "../../api/client";
 import PhotoGallery from "../PhotoGallery";
 import HotelsMap from "../HotelsMap";
 
@@ -55,6 +54,7 @@ const RATING_FILTERS = [
 export default function PanelHotels({
   itinerary,
   listIndex,
+  side = "left",
   onSelect,
   onPick,
   autoReplan = true,
@@ -122,7 +122,7 @@ export default function PanelHotels({
       : null;
 
   return (
-    <section className="panel panel-grid panel-hotels" aria-label="Hotels">
+    <section className={`panel panel-grid panel-hotels side-focus-${side}`} aria-label="Hotels">
       {/* TOP band — summary + Round 13 filter chips */}
       <header className="panel-grid-top-band home-summary-top">
         <div className="home-card-label">
@@ -201,7 +201,6 @@ export default function PanelHotels({
       <div className="panel-grid-left panel-grid-scroll">
         <ul className="panel-list-items">
           {hotels.map((h, i) => {
-            const thumbSrc = photoSrc(h.photos?.[0] || h.photo_url);
             return (
               <li
                 key={h.place_id || i}
@@ -214,16 +213,6 @@ export default function PanelHotels({
                 onClick={() => onSelect?.(i)}
                 data-testid={`hotel-option-${i}`}
               >
-                {thumbSrc && (
-                  <img
-                    src={thumbSrc}
-                    alt=""
-                    className="hotel-option-thumb"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
-                )}
                 <div className="hotel-option-body">
                   <div className="hotel-option-name">
                     {h.name}
@@ -235,6 +224,9 @@ export default function PanelHotels({
                     {h.rating != null && <>★ {h.rating.toFixed(1)}</>}
                     {PRICE_LEVEL_LABELS[h.price_level] && (
                       <> · {PRICE_LEVEL_LABELS[h.price_level]}</>
+                    )}
+                    {PRICE_LEVEL_ESTIMATES[h.price_level] && (
+                      <> · {PRICE_LEVEL_ESTIMATES[h.price_level]}</>
                     )}
                   </div>
                 </div>
