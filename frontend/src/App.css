@@ -5795,9 +5795,11 @@ body.theme-light .history-overlay-scroll::-webkit-scrollbar-thumb {
 
 /* ── Export Panel ───────────────────────────────────── */
 .export-panel {
+  pointer-events: auto; /* panel-slot has pointer-events:none; must opt back in */
   padding: 24px 28px;
   max-width: 860px;
   margin: 0 auto;
+  overflow-y: auto;
 }
 
 .export-panel-header {
