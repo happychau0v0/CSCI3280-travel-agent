@@ -809,10 +809,10 @@ function App() {
         callRole: "day_themes",
       });
       if (themesResult?.itinerary?.days?.length) {
+        const themeMap = new Map(
+          (themesResult.itinerary.days ?? []).map((d) => [d.day, d])
+        );
         setCurrentItinerary((prev) => {
-          const themeMap = new Map(
-            (themesResult.itinerary.days ?? []).map((d) => [d.day, d])
-          );
           const merged = (prev?.days ?? []).map((d) => ({
             ...d,
             ...(themeMap.get(d.day) ?? {}),
@@ -821,9 +821,9 @@ function App() {
         });
         themedItinerary = {
           ...itinerary,
-          days: (itinerary.days ?? []).map((d, i) => ({
+          days: (itinerary.days ?? []).map((d) => ({
             ...d,
-            ...(themesResult.itinerary.days?.[i] ?? {}),
+            ...(themeMap.get(d.day) ?? {}),
           })),
         };
       }
