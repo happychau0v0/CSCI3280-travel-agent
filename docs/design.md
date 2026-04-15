@@ -347,15 +347,24 @@ structured text prompt is the interface between turns.
 
 ## Panel Navigation Contract
 
-Navigation is always driven by **data arriving**, not by a hardcoded redirect.
+Navigation fires **once, after the agent turn completes** (`done` event).
+The `partial_itinerary` SSE event updates panel *data* progressively but
+never changes the *active panel* while the agent is working. This keeps the
+UI stable and prevents showing a partially-loaded page during loading.
 
 | Condition | Navigation |
 |-----------|-----------|
-| `partial_itinerary` carries `flight.options` | → FLIGHTS |
-| `partial_itinerary` carries `hotels` | → HOTELS |
-| `done` carries `days[0].activities` | → DAYS |
-| Chat calls `navigate_menu(panel)` | → that panel |
+| `done` — `flight.options` present, no day activities | → FLIGHTS |
+| `done` — `hotels[]` present | → HOTELS |
+| `done` — at least one `days[].activities[]` present | → DAYS |
+| Chat calls `navigate_menu(panel)` | → that panel (buffered in `pendingNavigateRef`, flushed at `done`) |
 | Any call returns an error | Stay on current panel, show error |
+
+**Why not `partial_itinerary`?** Call A returns `days[]` date-stubs even
+before activities are planned. Navigating on `partial_itinerary` would jump
+the user to a partially-populated panel mid-stream. Checking
+`days?.some(d => d.activities?.length > 0)` at `done` distinguishes real
+day data (Turn 3) from empty stubs (Turn 1).
 
 If a call returns no data (API failure, quota exhaustion), the frontend stays
 on the current panel and shows an error banner. It never navigates to an
@@ -370,8 +379,8 @@ empty panel.
 - `START PLANNING` fires `handleSend(buildPrompt(form))` — Call A shaped correctly
 - `PICK outbound flight` fires `handleSend("Selected flight... Now find hotels.")` — Call B triggered
 - `PICK & PLAN DAYS` fires `handleSend("Set hotel X as base. Plan day-by-day...")` — Call C triggered
-- `partial_itinerary` SSE fires immediately on `search_flights` / `search_places` completion
-- Frontend navigates on `partial_itinerary` data presence (FLIGHTS / HOTELS)
+- `partial_itinerary` SSE fires immediately on `search_flights` / `search_places` completion (data only — no panel change)
+- Frontend navigates at `done` event: FLIGHTS if `flight.options` present, HOTELS if `hotels[]`, DAYS if any `days[].activities[]`
 - Chat has `navigate_menu`, `request_input`, `submit_trip_form` tools wired up
 
 ### ❌ Gaps to address

@@ -913,12 +913,9 @@ function App() {
                 }
                 return next;
               });
-              // Early navigate to FLIGHTS as soon as flight options arrive —
-              // don't wait for the LLM's closing text.
-              if (payload.flight?.options?.length > 0 && menu.state.panel === "HOME") {
-                menu.setPanel("FLIGHTS");
-                pendingNavigateRef.current = null;
-              }
+              // Intentionally no panel navigation here — partial_itinerary
+              // updates data progressively but never changes the active panel
+              // while the agent is working. Navigation fires once, at done.
             }
           },
         });
@@ -991,7 +988,14 @@ function App() {
           } else if (data.itinerary) {
             // Fallback: detect which turn just completed by what data
             // was returned, and navigate to the appropriate panel.
-            if (data.itinerary.days?.length) {
+            // IMPORTANT: Call A returns days[] date-stubs like [{date:"..."}]
+            // with no activities — checking days?.length would incorrectly
+            // navigate to DAYS. Only go to DAYS if at least one day has
+            // real activities.
+            const hasActivities = data.itinerary.days?.some(
+              (d) => d.activities?.length > 0
+            );
+            if (hasActivities) {
               menu.setPanel("DAYS");        // Turn 3 or follow-up edit
             } else if (data.itinerary.hotels?.length) {
               menu.setPanel("HOTELS");      // Turn 2
