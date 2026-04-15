@@ -4,38 +4,24 @@ import { PANELS, PANELS_WITH_LIST } from "./useMenuState";
 /**
  * Document-level hotkey dispatcher for the NieR-style menu shell.
  *
- * Scope model:
- *   - "tabs"  — default. ←/→ cycles tabs.
- *   - "list"  — entered explicitly via Tab key or by clicking a list
- *               item. ←/→ is absorbed (no tab cycling) so the user can
- *               browse the list without accidentally jumping panels.
+ * Navigation model:
+ *   - Tab          — advance to next panel (HOME→FLIGHTS→HOTELS→DAYS→HOME)
+ *   - 1-4          — jump directly to that panel
+ *   - ↑/↓          — move list cursor on list-bearing panels (always)
+ *   - Space        — pick the focused item on FLIGHTS or HOTELS
+ *   - ←/→          — not used for panel navigation (reserved for sub-components)
  *
- * Hotkeys:
- *   1-N        — jump to tab N (always lands in scope=tabs)
- *   ← / →      — cycle tabs ONLY when scope=tabs
- *   ↑ / ↓      — move list cursor (works in any scope on list panels)
- *   Tab        — toggle scope tabs ↔ list (only meaningful on list panels)
- *   T          — open chat popover (was Enter — Enter now free for forms)
- *   Cmd/Ctrl+K — same as T
- *   Space      — activate currently focused item
- *   Esc        — back (closes overlay, then closes popover, then leaves list scope)
- *   M          — toggle mute (auto-TTS)
- *   H          — toggle HISTORY overlay
- *   S          — toggle SETTINGS overlay
- *   E          — handled inside HISTORY overlay only
+ * Overlays (H, S, ?, P, L, F, C) are open-only — Esc closes them.
+ * The hook is disabled entirely while any overlay is open so each overlay
+ * can own its own keyboard handling without leaking events.
  *
- * The hook is a passive listener — it calls back into the parent via
- * the handlers object. The parent owns the menu state.
- *
- * Disable hotkeys when the user is typing in an input/textarea by
- * checking the event target's tagName.
+ * Hotkeys are suppressed while the user is typing in an input/textarea.
  */
 export function useKeyboard({
   state,
   setPanel,
   setListIndex,
-  setScope,
-  listSize, // total items in current panel's left list (for clamping)
+  listSize,
   onOpenChat,
   onActivate,
   onBack,
@@ -55,43 +41,18 @@ export function useKeyboard({
     if (!enabled) return;
 
     const handleKey = (e) => {
-      // Don't fire hotkeys when the user is typing in an input/textarea
+      // Suppress hotkeys while typing; allow Esc to escape inputs.
       const target = e.target;
       const tag = target?.tagName;
       const isTypingField =
         tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable;
-      // Allow Esc to escape inputs but block everything else
       if (isTypingField && e.key !== "Escape") return;
-      // Blur the input on Escape so keyboard shortcuts become active again
       if (isTypingField && e.key === "Escape") {
         target.blur();
+        return;
       }
 
-      // In "detail" scope, the user has explicitly Tabbed into the
-      // right pane to use browser-native focus. Don't hijack Tab,
-      // arrows, Space, or number keys — let the browser handle them.
-      // Esc still works to return to list scope (handled below).
-      if (state.scope === "detail") {
-        if (e.key === "Escape") {
-          e.preventDefault();
-          setScope("list");
-          return;
-        }
-        // Allow Tab to cycle from detail→tabs (forward) or detail→list (back)
-        if (e.key === "Tab") {
-          e.preventDefault();
-          setScope(e.shiftKey ? "list" : "tabs");
-          return;
-        }
-        // Allow chat/help/overlays even in detail scope
-        const allowedInDetail = ["t", "T", "?", "h", "H", "s", "S", "m", "M"];
-        if (!allowedInDetail.includes(e.key) && !e.metaKey && !e.ctrlKey) {
-          return;
-        }
-        // Falls through to switch below for allowed keys
-      }
-
-      // Number keys → jump to tab N (clamped to PANELS length)
+      // Number keys → jump to panel N
       const num = parseInt(e.key, 10);
       if (!Number.isNaN(num) && num >= 1 && num <= PANELS.length) {
         e.preventDefault();
@@ -100,39 +61,20 @@ export function useKeyboard({
       }
 
       switch (e.key) {
-        // ←/→ cycles tabs ONLY when scope=tabs. When the user has
-        // explicitly entered list scope (via Tab key or click), ←/→
-        // is absorbed so panels don't get yanked away.
-        case "ArrowLeft": {
-          if (state.scope !== "tabs") break;
+        // Tab advances to the next panel (wraps around).
+        case "Tab":
           e.preventDefault();
-          const idx = PANELS.indexOf(state.panel);
-          const next = (idx - 1 + PANELS.length) % PANELS.length;
-          setPanel(PANELS[next]);
+          setPanel(PANELS[(PANELS.indexOf(state.panel) + 1) % PANELS.length]);
           break;
-        }
 
-        case "ArrowRight": {
-          if (state.scope !== "tabs") break;
-          e.preventDefault();
-          const idx = PANELS.indexOf(state.panel);
-          const next = (idx + 1) % PANELS.length;
-          setPanel(PANELS[next]);
-          break;
-        }
-
-        // ↑/↓ ALWAYS moves the list cursor on a list-bearing panel,
-        // regardless of scope. The meaning is unambiguous, so there's
-        // no reason to gate it on scope.
-        // OBJ4: only preventDefault when actually moving (not at boundary)
-        // so native scroll kicks in when the cursor can't move further.
+        // ↑/↓ always move the list cursor on list-bearing panels.
+        // Don't preventDefault at the boundary so native scroll takes over.
         case "ArrowUp":
           if (PANELS_WITH_LIST.has(state.panel) && listSize > 0) {
             if (state.listIndex > 0) {
               e.preventDefault();
               setListIndex(state.listIndex - 1);
             }
-            // at top boundary: let native scroll happen (no preventDefault)
           }
           break;
 
@@ -142,22 +84,14 @@ export function useKeyboard({
               e.preventDefault();
               setListIndex(state.listIndex + 1);
             }
-            // at bottom boundary: let native scroll happen (no preventDefault)
           }
           break;
 
-        case "Tab":
-          // Cycle scope: tabs → list → detail → tabs.
-          // - "tabs": ←/→ moves between panels
-          // - "list": ↑/↓ moves through left list, Space picks
-          // - "detail": browser-native Tab moves through right pane
-          //             (PICK button, photo gallery, links, etc.)
-          if (PANELS_WITH_LIST.has(state.panel)) {
+        // Space picks the focused item on FLIGHTS or HOTELS.
+        case " ":
+          if (state.panel === "FLIGHTS" || state.panel === "HOTELS") {
             e.preventDefault();
-            const next = state.scope === "tabs" ? "list"
-                       : state.scope === "list" ? "detail"
-                       : "tabs";
-            setScope(next);
+            onActivate?.();
           }
           break;
 
@@ -179,8 +113,6 @@ export function useKeyboard({
 
         case "z":
         case "Z":
-          // Round 12 — Ctrl/Cmd+Z undoes the last flight/hotel pick.
-          // Shift+Ctrl/Cmd+Z (or Ctrl+Y) redoes it.
           if (e.metaKey || e.ctrlKey) {
             e.preventDefault();
             if (e.shiftKey) {
@@ -200,14 +132,12 @@ export function useKeyboard({
           break;
 
         case "?":
-          // Round 14 — keyboard help overlay
           e.preventDefault();
           onOpenHelp?.();
           break;
 
         case "p":
         case "P":
-          // Round 17 — open the print-friendly trip view
           if (!e.metaKey && !e.ctrlKey) {
             e.preventDefault();
             onOpenPrint?.();
@@ -216,7 +146,6 @@ export function useKeyboard({
 
         case "l":
         case "L":
-          // Round 18 — open the trip checklist
           if (!e.metaKey && !e.ctrlKey) {
             e.preventDefault();
             onOpenChecklist?.();
@@ -225,7 +154,6 @@ export function useKeyboard({
 
         case "f":
         case "F":
-          // Round 20 — open the favorites overlay
           if (!e.metaKey && !e.ctrlKey) {
             e.preventDefault();
             onOpenFavorites?.();
@@ -256,13 +184,6 @@ export function useKeyboard({
           }
           break;
 
-        case " ":
-          if (state.scope === "list") {
-            e.preventDefault();
-            onActivate?.();
-          }
-          break;
-
         case "Escape":
           e.preventDefault();
           onBack?.();
@@ -285,13 +206,11 @@ export function useKeyboard({
     return () => document.removeEventListener("keydown", handleKey);
   }, [
     enabled,
-    state.scope,
     state.panel,
     state.listIndex,
     listSize,
     setPanel,
     setListIndex,
-    setScope,
     onOpenChat,
     onActivate,
     onBack,
