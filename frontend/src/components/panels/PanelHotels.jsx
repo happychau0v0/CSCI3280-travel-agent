@@ -216,10 +216,10 @@ export default function PanelHotels({
                     {i === pickedIdx && (
                       <span className="panel-list-picked-tag"> ✓ PICKED</span>
                     )}
-                    {i === suggestedIdx && (
-                      <span className="hotel-suggested-badge">✦ Suggested</span>
-                    )}
                   </div>
+                  {i === suggestedIdx && (
+                    <span className="hotel-suggested-badge">✦ Suggested</span>
+                  )}
                   <div className="hotel-option-meta">
                     {h.rating != null && <>★ {h.rating.toFixed(1)}</>}
                     {PRICE_LEVEL_LABELS[h.price_level] && (
