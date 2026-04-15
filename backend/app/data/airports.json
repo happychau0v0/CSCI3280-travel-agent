@@ -648,14 +648,6 @@
     "lng": 20.8443
   },
   {
-    "iata": "AEI",
-    "name": "Algeciras Heliport",
-    "city": "Algeciras",
-    "country": "Spain",
-    "lat": 36.1289,
-    "lng": -5.4411
-  },
-  {
     "iata": "AEO",
     "name": "Aioun el Atrouss Airport",
     "city": "Aioun El Atrouss",
@@ -12816,14 +12808,6 @@
     "lng": 12.0701
   },
   {
-    "iata": "FRN",
-    "name": "Bryant Army Heliport",
-    "city": "Fort Richardson",
-    "country": "United States",
-    "lat": 61.2664,
-    "lng": -149.653
-  },
-  {
     "iata": "FRO",
     "name": "Florø Airport",
     "city": "Floro",
@@ -15016,14 +15000,6 @@
     "lng": 68.4129
   },
   {
-    "iata": "GZM",
-    "name": "Xewkija Heliport",
-    "city": "Gozo",
-    "country": "Malta",
-    "lat": 36.0272,
-    "lng": 14.2728
-  },
-  {
     "iata": "GZO",
     "name": "Nusatupe Airport",
     "city": "Gizo",
@@ -15512,14 +15488,6 @@
     "lng": 120.434
   },
   {
-    "iata": "HGI",
-    "name": "Paloich Airport, Heliport",
-    "city": "Higleig",
-    "country": "South Sudan",
-    "lat": 10.5292,
-    "lng": 32.5006
-  },
-  {
     "iata": "HGL",
     "name": "Helgoland-Düne Airport",
     "city": "Helgoland",
@@ -15598,14 +15566,6 @@
     "country": "Germany",
     "lat": 49.9487,
     "lng": 7.2639
-  },
-  {
-    "iata": "HHP",
-    "name": "Shun Tak Heliport",
-    "city": "Hong Kong",
-    "country": "Hong Kong",
-    "lat": 22.2894,
-    "lng": 114.1522
   },
   {
     "iata": "HHQ",
@@ -18424,14 +18384,6 @@
     "lng": -51.5533
   },
   {
-    "iata": "JCH",
-    "name": "Qasigiannguit Heliport",
-    "city": "Qasigiannguit",
-    "country": "Greenland",
-    "lat": 68.8228,
-    "lng": -51.1734
-  },
-  {
     "iata": "JCI",
     "name": "New Century Aircenter Airport",
     "city": "Olathe",
@@ -18552,14 +18504,6 @@
     "lng": -73.7789
   },
   {
-    "iata": "JFR",
-    "name": "Paamiut Heliport",
-    "city": "Paamiut",
-    "country": "Greenland",
-    "lat": 61.9922,
-    "lng": -49.6625
-  },
-  {
     "iata": "JGA",
     "name": "Jamnagar Airport",
     "city": "Jamnagar",
@@ -18582,14 +18526,6 @@
     "country": "China",
     "lat": 39.8569,
     "lng": 98.3414
-  },
-  {
-    "iata": "JGO",
-    "name": "Qeqertarsuaq Heliport",
-    "city": "Qeqertarsuaq Airport",
-    "country": "Greenland",
-    "lat": 69.2512,
-    "lng": -53.5149
   },
   {
     "iata": "JGS",
@@ -18752,14 +18688,6 @@
     "lng": 118.59
   },
   {
-    "iata": "JJU",
-    "name": "Qaqortoq Heliport",
-    "city": "Qaqortoq",
-    "country": "Greenland",
-    "lat": 60.7157,
-    "lng": -46.0299
-  },
-  {
     "iata": "JKG",
     "name": "Jönköping Airport",
     "city": "Joenkoeping",
@@ -18870,22 +18798,6 @@
     "country": "Argentina",
     "lat": -34.5459,
     "lng": -60.9306
-  },
-  {
-    "iata": "JNN",
-    "name": "Nanortalik Heliport",
-    "city": "Nanortalik",
-    "country": "Greenland",
-    "lat": 60.1419,
-    "lng": -45.233
-  },
-  {
-    "iata": "JNS",
-    "name": "Narsaq Heliport",
-    "city": "Narsaq",
-    "country": "Greenland",
-    "lat": 60.9173,
-    "lng": -46.0599
   },
   {
     "iata": "JNU",
@@ -19022,22 +18934,6 @@
     "country": "Panama",
     "lat": 7.5178,
     "lng": -78.1572
-  },
-  {
-    "iata": "JRA",
-    "name": "West 30th St. Heliport",
-    "city": "New York",
-    "country": "United States",
-    "lat": 40.7545,
-    "lng": -74.0071
-  },
-  {
-    "iata": "JRB",
-    "name": "Downtown-Manhattan/Wall St Heliport",
-    "city": "New York",
-    "country": "United States",
-    "lat": 40.7012,
-    "lng": -74.009
   },
   {
     "iata": "JRF",
@@ -22960,14 +22856,6 @@
     "lng": 48.818
   },
   {
-    "iata": "LLU",
-    "name": "Alluitsup Paa Heliport",
-    "city": "Alluitsup Paa",
-    "country": "Greenland",
-    "lat": 60.4644,
-    "lng": -45.5692
-  },
-  {
     "iata": "LLV",
     "name": "Lüliang Airport",
     "city": "Lvliang",
@@ -26120,14 +26008,6 @@
     "lng": 121.954
   },
   {
-    "iata": "MPK",
-    "name": "Mokpo Heliport",
-    "city": "Mokpo",
-    "country": "South Korea",
-    "lat": 34.7589,
-    "lng": 126.38
-  },
-  {
     "iata": "MPL",
     "name": "Montpellier-Méditerranée Airport",
     "city": "Montpellier",
@@ -29254,14 +29134,6 @@
     "country": "United States",
     "lat": 66.9123,
     "lng": -156.897
-  },
-  {
-    "iata": "OBY",
-    "name": "Ittoqqortoormiit Heliport",
-    "city": "Ittoqqortoormiit",
-    "country": "Greenland",
-    "lat": 70.4882,
-    "lng": -21.9717
   },
   {
     "iata": "OCA",
@@ -33240,14 +33112,6 @@
     "lng": 30.3987
   },
   {
-    "iata": "PZE",
-    "name": "Penzance Heliport",
-    "city": "Penzance",
-    "country": "United Kingdom",
-    "lat": 50.1281,
-    "lng": -5.5184
-  },
-  {
     "iata": "PZH",
     "name": "Zhob Airport",
     "city": "Zhob",
@@ -33344,28 +33208,12 @@
     "lng": 8.6458
   },
   {
-    "iata": "QFG",
-    "name": "Eqalugaarsuit Heliport",
-    "city": "Eqalugaarsuit",
-    "country": "Greenland",
-    "lat": 60.6197,
-    "lng": -45.9141
-  },
-  {
     "iata": "QFO",
     "name": "Duxford Aerodrome",
     "city": "Duxford",
     "country": "United Kingdom",
     "lat": 52.0908,
     "lng": 0.1319
-  },
-  {
-    "iata": "QGQ",
-    "name": "Attu Heliport",
-    "city": "Attu",
-    "country": "Greenland",
-    "lat": 67.9407,
-    "lng": -53.6219
   },
   {
     "iata": "QGU",
@@ -33406,22 +33254,6 @@
     "country": "Saudi Arabia",
     "lat": 27.039,
     "lng": 49.4051
-  },
-  {
-    "iata": "QJE",
-    "name": "Kitsissuarsuit Heliport",
-    "city": "Kitsissuarsuit",
-    "country": "Greenland",
-    "lat": 68.8579,
-    "lng": -53.1233
-  },
-  {
-    "iata": "QJI",
-    "name": "Ikamiut Heliport",
-    "city": "Ikamiut",
-    "country": "Greenland",
-    "lat": 68.6343,
-    "lng": -51.8323
   },
   {
     "iata": "QKX",
@@ -33560,22 +33392,6 @@
     "lng": -47.3348
   },
   {
-    "iata": "QPW",
-    "name": "Kangaatsiaq Heliport",
-    "city": "Kangaatsiaq",
-    "country": "Greenland",
-    "lat": 68.3127,
-    "lng": -53.4602
-  },
-  {
-    "iata": "QQT",
-    "name": "Qeqertaq Heliport",
-    "city": "Qeqertaq",
-    "country": "Greenland",
-    "lat": 69.9959,
-    "lng": -51.3009
-  },
-  {
     "iata": "QRA",
     "name": "Rand Airport",
     "city": "Johannesburg",
@@ -33622,14 +33438,6 @@
     "country": "Nigeria",
     "lat": 5.5961,
     "lng": 5.8178
-  },
-  {
-    "iata": "QRY",
-    "name": "Ikerassaarsuk Heliport",
-    "city": "Ikerasaarsuk",
-    "country": "Greenland",
-    "lat": 68.1409,
-    "lng": -53.4415
   },
   {
     "iata": "QSA",
@@ -41824,14 +41632,6 @@
     "lng": 96.5258
   },
   {
-    "iata": "UMD",
-    "name": "Uummannaq Heliport",
-    "city": "Uummannaq",
-    "country": "Greenland",
-    "lat": 70.6804,
-    "lng": -52.1116
-  },
-  {
     "iata": "UME",
     "name": "Umeå Airport",
     "city": "Umea",
@@ -43288,14 +43088,6 @@
     "lng": 24.7288
   },
   {
-    "iata": "VRY",
-    "name": "Værøy Heliport",
-    "city": "Værøy",
-    "country": "Norway",
-    "lat": 67.6546,
-    "lng": 12.7273
-  },
-  {
     "iata": "VSA",
     "name": "Carlos Rovirosa Pérez International Airport",
     "city": "Villahermosa",
@@ -43862,14 +43654,6 @@
     "country": "United States",
     "lat": 59.2826,
     "lng": -158.618
-  },
-  {
-    "iata": "WKL",
-    "name": "Waikoloa Heliport",
-    "city": "Waikoloa Village",
-    "country": "United States",
-    "lat": 19.9205,
-    "lng": -155.8607
   },
   {
     "iata": "WKR",
@@ -44614,14 +44398,6 @@
     "country": "China",
     "lat": 43.9156,
     "lng": 115.964
-  },
-  {
-    "iata": "XIQ",
-    "name": "Ilimanaq Heliport",
-    "city": "Ilimanaq",
-    "country": "Greenland",
-    "lat": 69.0809,
-    "lng": -51.1143
   },
   {
     "iata": "XIY",
@@ -46942,14 +46718,6 @@
     "country": "Canada",
     "lat": 45.4386,
     "lng": -71.6914
-  },
-  {
-    "iata": "YSD",
-    "name": "Suffield Heliport",
-    "city": "Suffield",
-    "country": "Canada",
-    "lat": 50.2667,
-    "lng": -111.183
   },
   {
     "iata": "YSE",

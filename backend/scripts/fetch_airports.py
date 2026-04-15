@@ -5,7 +5,11 @@ Usage:
     cd backend && python scripts/fetch_airports.py
 
 Output: app/data/airports.json
-Filters: must have a valid 3-letter IATA code (not \\N) and type == "airport".
+Filters:
+  - must have a valid 3-letter IATA code (not \\N)
+  - type must not be a known non-commercial facility
+  - name must not contain heliport/helipad keywords (some heliports are
+    mis-tagged as "airport" in the source data)
 """
 import csv
 import json
@@ -27,12 +31,21 @@ def main() -> None:
     with urllib.request.urlopen(URL) as resp:
         content = resp.read().decode("utf-8")
 
+    # Types that are definitively non-commercial facilities.
+    NON_COMMERCIAL = {"heliport", "seaplane_base", "balloonport", "closed", "station"}
+    # Name substrings that identify non-commercial facilities even when the
+    # type field is wrong (e.g. HHP "Shun Tak Heliport" is tagged "airport").
+    NAME_EXCLUDE = ("heliport", "helipad", "helibase", "heliplex")
+
     airports = []
     for row in csv.DictReader(content.splitlines(), fieldnames=FIELDS):
         iata = row["iata"].strip()
         if not iata or iata == r"\N" or len(iata) != 3:
             continue
-        if row["type"] != "airport":
+        if row["type"] in NON_COMMERCIAL:
+            continue
+        name_lower = row["name"].strip().lower()
+        if any(kw in name_lower for kw in NAME_EXCLUDE):
             continue
         try:
             lat = round(float(row["lat"]), 4)
