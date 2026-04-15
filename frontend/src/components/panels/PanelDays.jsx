@@ -35,6 +35,18 @@ function weatherIcon(weather) {
   return "🌡️";
 }
 
+// Safety coerce for weather temperature — LLM may emit "22°C" strings
+// even though the prompt says numeric. Strip the suffix and parse.
+function coerceTemp(v) {
+  if (v == null) return null;
+  if (typeof v === "number") return v;
+  if (typeof v === "string") {
+    const n = parseFloat(v.replace(/[°CcFf]/g, ""));
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
 // Round 18 — heuristic check: is the weather likely to make outdoor
 // activities unpleasant? Returns "rainy" | "snowy" | "stormy" | null.
 function badOutdoorWeather(weather) {
@@ -460,8 +472,8 @@ export default function PanelDays({
               {" · "}
               <span>{weatherIcon(selected.weather)}</span>{" "}
               {selected.weather.condition}
-              {selected.weather.temp != null && (
-                <> · {Math.round(selected.weather.temp)}°C</>
+              {coerceTemp(selected.weather.temp) != null && (
+                <> · {Math.round(coerceTemp(selected.weather.temp))}°C</>
               )}
             </>
           )}
@@ -515,9 +527,9 @@ export default function PanelDays({
                 <span className="day-forecast-icon">
                   {d.weather ? weatherIcon(d.weather) : "—"}
                 </span>
-                {d.weather?.temp != null && (
+                {coerceTemp(d.weather?.temp) != null && (
                   <span className="day-forecast-temp">
-                    {Math.round(d.weather.temp)}°
+                    {Math.round(coerceTemp(d.weather.temp))}°
                   </span>
                 )}
               </button>
