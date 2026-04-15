@@ -78,6 +78,7 @@ export default function PanelFlights({
   useEffect(() => {
     if (itinerary?.selected_flight && hasReturn && activeTab === "outbound") {
       setActiveTab("return");
+      onSelect?.(0); // reset list index so return tab starts at row 0
     }
   }, [itinerary?.selected_flight]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -165,7 +166,7 @@ export default function PanelFlights({
               role="tab"
               aria-selected={activeTab === "outbound"}
               className={`flight-tab${activeTab === "outbound" ? " active" : ""}`}
-              onClick={() => setActiveTab("outbound")}
+              onClick={() => { setActiveTab("outbound"); onSelect?.(0); }}
               data-testid="flight-tab-outbound"
             >
               ✈ {flight.from_iata} → {flight.to_iata}
@@ -175,7 +176,7 @@ export default function PanelFlights({
               role="tab"
               aria-selected={activeTab === "return"}
               className={`flight-tab${activeTab === "return" ? " active" : ""}`}
-              onClick={() => setActiveTab("return")}
+              onClick={() => { setActiveTab("return"); onSelect?.(0); }}
               data-testid="flight-tab-return"
             >
               ✈ {flight.to_iata} → {flight.from_iata}
