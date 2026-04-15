@@ -1,17 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { exportPdf } from "../../api/client";
 import { downloadKml, countKmlPlaces } from "../../utils/exportKml";
-
-/**
- * EXPORT panel — 5th tab.
- *
- * Two export cards:
- *   1. PDF — backend-generated document via POST /export/pdf (weasyprint)
- *      Includes: visa requirements, flight, hotel, day-by-day itinerary,
- *      pre-trip checklist, phrasebook.
- *   2. Google Maps KML — client-side KML generation; downloads a .kml file
- *      that can be imported into Google My Maps or Google Earth.
- */
 
 const CHECKLIST_DEFAULT_ITEMS = [
   { key: "passport", label: "Passport valid for 6+ months", critical: true },
@@ -28,6 +17,40 @@ const CHECKLIST_DEFAULT_ITEMS = [
   { key: "home", label: "House-sitter / mail / plants", critical: false },
 ];
 
+// Progress phases shown while the PDF request is in flight.
+// `after` is the ms delay from when loading starts before this label shows.
+const PDF_PHASES = [
+  { after: 0,     label: "Sending request…" },
+  { after: 2000,  label: "Fetching activity photos…" },
+  { after: 10000, label: "Rendering PDF… almost done" },
+];
+
+function usePdfPhase(loading) {
+  const [phaseLabel, setPhaseLabel] = useState("");
+  const timersRef = useRef([]);
+
+  useEffect(() => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+    if (!loading) {
+      // Reset asynchronously so setState is never called synchronously in the effect body
+      const t = setTimeout(() => setPhaseLabel(""), 0);
+      timersRef.current = [t];
+      return () => clearTimeout(t);
+    }
+    // Schedule each phase label to appear after its delay
+    timersRef.current = PDF_PHASES.map(({ after, label }) =>
+      setTimeout(() => setPhaseLabel(label), after),
+    );
+    return () => {
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
+    };
+  }, [loading]);
+
+  return phaseLabel;
+}
+
 function loadChecklistState(destinationKey) {
   try {
     const raw = localStorage.getItem("travel-checklist");
@@ -43,6 +66,8 @@ export default function PanelExport({ itinerary, visaAlert }) {
   const [pdfError, setPdfError] = useState(null);
   const [pdfDone, setPdfDone] = useState(false);
   const [kmlDone, setKmlDone] = useState(false);
+
+  const phaseLabel = usePdfPhase(pdfLoading);
 
   const hasItinerary = !!(itinerary?.days?.length);
   const kmlPlaces = countKmlPlaces(itinerary);
@@ -65,7 +90,7 @@ export default function PanelExport({ itinerary, visaAlert }) {
         checklistItems,
       });
       setPdfDone(true);
-      setTimeout(() => setPdfDone(false), 3000);
+      setTimeout(() => setPdfDone(false), 4000);
     } catch (err) {
       setPdfError(err.message || "PDF export failed");
     } finally {
@@ -94,7 +119,7 @@ export default function PanelExport({ itinerary, visaAlert }) {
 
       {!hasItinerary && (
         <div className="export-empty">
-          <p>Complete your trip plan first — PLAN, FLIGHTS, HOTELS, and DAYS must all be filled in before you can export.</p>
+          <p>Complete your trip plan first — PLAN → FLIGHTS → HOTELS → DAYS — then come back to export.</p>
         </div>
       )}
 
@@ -105,28 +130,45 @@ export default function PanelExport({ itinerary, visaAlert }) {
           <div className="export-card-body">
             <div className="export-card-title">TRIP DOCUMENT (PDF)</div>
             <div className="export-card-desc">
-              A clean, printable PDF with all trip details — ready for customs, hotels, and offline use.
+              Click <strong>Download PDF</strong> to generate a clean, printable document
+              with your full itinerary — ready for customs, hotels, and offline use.
+              Generation takes ~15–20 seconds while photos are fetched.
             </div>
+
             <ul className="export-card-includes">
               {visaAlert && <li>✓ Visa requirements ({itinerary?.destination})</li>}
               {itinerary?.flight && <li>✓ Flight details</li>}
-              {(itinerary?.selected_hotel || itinerary?.hotels?.length > 0) && <li>✓ Hotel</li>}
+              {(itinerary?.selected_hotel || itinerary?.hotels?.length > 0) && <li>✓ Hotel + photo</li>}
               {itinerary?.days?.length > 0 && (
-                <li>✓ {itinerary.days.length}-day itinerary with directions</li>
+                <li>✓ {itinerary.days.length}-day itinerary with directions + activity photos</li>
               )}
               <li>✓ Pre-trip checklist ({checklistItems.filter(i => i.checked).length}/{checklistItems.length} done)</li>
               {itinerary?.phrasebook && <li>✓ Phrasebook ({itinerary.phrasebook.language})</li>}
             </ul>
+
+            {/* Loading progress */}
+            {pdfLoading && (
+              <div className="export-progress">
+                <span className="export-spinner" aria-hidden="true" />
+                <span className="export-progress-label">{phaseLabel}</span>
+              </div>
+            )}
+
             {pdfError && (
               <div className="export-error">{pdfError}</div>
             )}
+
             <button
               type="button"
-              className="export-btn"
+              className={`export-btn${pdfDone ? " export-btn--done" : ""}`}
               onClick={handleExportPdf}
               disabled={pdfLoading}
             >
-              {pdfLoading ? "Generating…" : pdfDone ? "✓ Downloaded" : "Download PDF"}
+              {pdfLoading
+                ? <><span className="export-btn-spinner" aria-hidden="true" /> Generating…</>
+                : pdfDone
+                ? "✓ Downloaded"
+                : "Download PDF"}
             </button>
           </div>
         </div>
@@ -137,26 +179,30 @@ export default function PanelExport({ itinerary, visaAlert }) {
           <div className="export-card-body">
             <div className="export-card-title">GOOGLE MAPS BOOKMARKS (KML)</div>
             <div className="export-card-desc">
-              Download a <code>.kml</code> file with all your trip places. Import it into{" "}
-              <strong>Google My Maps</strong> or <strong>Google Earth</strong> to get pinned
-              locations organised by day.
+              Click <strong>Download KML</strong> to save all trip places as a file you can
+              import into <strong>Google My Maps</strong> or <strong>Google Earth</strong>.
+              Instant — no server call needed.
             </div>
+
             {kmlPlaces > 0 && (
               <ul className="export-card-includes">
-                <li>✓ {kmlPlaces} place{kmlPlaces !== 1 ? "s" : ""} across airports, hotel, and daily activities</li>
+                <li>✓ {kmlPlaces} place{kmlPlaces !== 1 ? "s" : ""} — airports, hotel, and daily activities</li>
                 <li>✓ Organised into folders by day</li>
               </ul>
             )}
+
             <div className="export-card-hint">
-              After download: open{" "}
-              <em>Google My Maps → Create a new map → Import</em> and select the .kml file.
+              After download: <em>Google My Maps → Create a new map → Import</em> → select the .kml file.
             </div>
+
             <button
               type="button"
-              className="export-btn"
+              className={`export-btn${kmlDone ? " export-btn--done" : ""}`}
               onClick={handleExportKml}
             >
-              {kmlDone ? "✓ Downloaded" : `Download KML${kmlPlaces > 0 ? ` (${kmlPlaces} places)` : ""}`}
+              {kmlDone
+                ? "✓ Downloaded"
+                : `Download KML${kmlPlaces > 0 ? ` (${kmlPlaces} places)` : ""}`}
             </button>
           </div>
         </div>

@@ -5912,7 +5912,7 @@ body.theme-light .history-overlay-scroll::-webkit-scrollbar-thumb {
 
 .export-btn {
   align-self: flex-start;
-  margin-top: 6px;
+  margin-top: 8px;
   padding: 7px 16px;
   background: transparent;
   border: 1px solid var(--accent-border);
@@ -5924,6 +5924,9 @@ body.theme-light .history-overlay-scroll::-webkit-scrollbar-thumb {
   cursor: pointer;
   border-radius: 2px;
   transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
 }
 
 .export-btn:hover:not(:disabled) {
@@ -5932,13 +5935,65 @@ body.theme-light .history-overlay-scroll::-webkit-scrollbar-thumb {
 }
 
 .export-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.5;
   cursor: not-allowed;
+}
+
+.export-btn--done {
+  border-color: rgba(74, 222, 128, 0.5);
+  color: #4ade80;
+}
+
+/* Tiny spinner inside the button while loading */
+.export-btn-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: export-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+/* Progress row shown below the includes list */
+.export-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--accent-border);
+  border-radius: 3px;
+  background: rgba(0, 217, 255, 0.04);
+}
+
+.export-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--accent);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: export-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.export-progress-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent);
+  letter-spacing: 0.06em;
+}
+
+@keyframes export-spin {
+  to { transform: rotate(360deg); }
 }
 
 .export-error {
   font-size: 11px;
   color: #ff6b6b;
+  margin-top: 6px;
   padding: 6px 10px;
   border: 1px solid rgba(255, 107, 107, 0.3);
   border-radius: 3px;
