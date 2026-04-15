@@ -249,6 +249,10 @@ CRITICAL — read before ANY tool call:
   and STOP immediately. Do NOT write a text question. Tool call ONLY.
 - A country name is NEVER a valid flight destination. Always clarify first.
 - NEVER ask for missing info via reply text — ALWAYS use request_input tool.
+- When you call request_input: do NOT call any other tool in the same turn.
+  Do NOT emit a JSON block. Do NOT call navigate_menu. Do NOT call search_flights.
+  Your reply text must be EMPTY or a single brief sentence ("Where in Australia?").
+  The backend stops immediately after request_input — any other tool call is ignored.
 
 TOOL RULES for this call:
 - MUST call: search_flights(origin, destination, date, seat_class)

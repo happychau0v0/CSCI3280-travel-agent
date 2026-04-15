@@ -545,8 +545,27 @@ async def _run_loop(
                 "content": json.dumps(tool_result, default=str),
             }
 
-        tool_results = await asyncio.gather(*(_run_one(tc) for tc in msg.tool_calls))
+        # If request_input is in this batch, execute ONLY request_input and
+        # break immediately. Running search_flights or navigate_menu alongside
+        # request_input causes confusing UI state — the user hasn't answered
+        # yet so the LLM must wait. Filtering here prevents the LLM from
+        # sneaking through a search+navigate in the same tool-call batch.
+        has_request_input = any(
+            tc.function.name == "request_input" for tc in msg.tool_calls
+        )
+        calls_to_run = (
+            [tc for tc in msg.tool_calls if tc.function.name == "request_input"]
+            if has_request_input
+            else list(msg.tool_calls)
+        )
+        tool_results = await asyncio.gather(*(_run_one(tc) for tc in calls_to_run))
         full_messages.extend(tool_results)
+
+        if has_request_input:
+            # Frontend already received the request_input SSE event and is
+            # displaying the input form. Stop here — next message is the user's answer.
+            break
+
         _is_reasoning = "reasoning" in active_model and "non-reasoning" not in active_model
         keep_rounds = 3 if _is_reasoning else 2
         full_messages = _prune_tool_results(full_messages, keep_recent_rounds=keep_rounds)
