@@ -875,7 +875,12 @@ li[tabindex]:focus-visible {
   font-family: var(--mono);
   font-size: 12px;
   outline: none;
+  text-overflow: ellipsis;
   transition: border-color 0.1s ease, background 0.1s ease;
+}
+
+.home-form-input:not(:focus) {
+  overflow: hidden;
 }
 
 .home-form-input:hover {

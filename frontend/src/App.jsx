@@ -689,7 +689,7 @@ function App() {
       // after the JSON (the spoken subtitle) is preserved for context.
       const history = baseMessages.map((m) => {
         if (m.role !== "assistant") return { role: m.role, content: m.content };
-        const trimmed = m.content.replace(/```json[\s\S]*?```/g, "[itinerary data]");
+        const trimmed = m.content.replace(/```json[\s\S]*?```/g, "«itinerary»");
         return { role: m.role, content: trimmed };
       });
 
@@ -942,7 +942,10 @@ function App() {
         // aloud or shown as subtitle text. Same regex as the history filter
         // at line 690.
         subtitles.pushParagraph(
-          (data.reply || "").replace(/```json[\s\S]*?```/g, "").trim()
+          (data.reply || "")
+            .replace(/```json[\s\S]*?```/g, "")
+            .replace(/\[itinerary[^\]]*\]/gi, "")
+            .trim()
         );
         // ── Done state: brief ✓ READY flash, then collapse to idle
         setCurrentTool(null);
