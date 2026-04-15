@@ -6,7 +6,7 @@ import HighlightedText from "./HighlightedText";
  * HistoryOverlay — full-screen dimmed conversation review.
  *
  * Triggered by the H hotkey. Renders a portal to document.body so it
- * sits above the menu shell and AgentStatusBar. Inside:
+ * sits above the menu shell. Inside:
  *   - A scrollable pane with all turns rendered top-to-bottom
  *   - Speaker badges (YOU teal, AGENT cyan)
  *   - The active turn is highlighted with a glow

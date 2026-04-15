@@ -8,10 +8,10 @@ const TAB_LABELS = {
 };
 
 /**
- * Top-of-screen NieR-style tab strip. Shows the panel tabs on the left.
- * Agent status is shown separately in the AgentStatusBar (top-right corner).
+ * Top-of-screen NieR-style tab strip. Shows the panel tabs on the left
+ * and a subtle "Thinking…" indicator on the right when the agent is busy.
  */
-export default function TabStrip({ activePanel, scope, onTabClick }) {
+export default function TabStrip({ activePanel, scope, onTabClick, agentState = "idle" }) {
   return (
     <nav className="tab-strip" aria-label="Menu sections">
       {PANELS.map((panel, i) => {
@@ -31,6 +31,12 @@ export default function TabStrip({ activePanel, scope, onTabClick }) {
           </button>
         );
       })}
+      {agentState === "working" && (
+        <div className="tab-status" aria-live="polite" aria-label="Agent thinking">
+          <span className="tab-status-dot" />
+          <span className="tab-status-label">Thinking…</span>
+        </div>
+      )}
     </nav>
   );
 }
