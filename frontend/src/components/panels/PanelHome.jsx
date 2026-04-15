@@ -477,22 +477,8 @@ export default function PanelHome({
         </div>
       </button>
 
-      {/* TOP-CENTER — next trip summary + R14 template chips.
-       *  When the agent is working, show a compact status indicator here
-       *  instead of the trip summary — this fills the blank center space. */}
+      {/* TOP-CENTER — next trip summary + R14 template chips. */}
       <div className="home-summary-top">
-        {agentState === "working" ? (
-          <div className="home-agent-working">
-            <span className="home-agent-working-icon">◢</span>
-            <span className="home-agent-working-label">
-              AGENT WORKING
-              {currentTool && currentTool !== "_thinking" && (
-                <span className="home-agent-working-tool"> · {currentTool.replace(/_/g, " ")}</span>
-              )}
-            </span>
-            <span className="home-agent-working-bar" />
-          </div>
-        ) : null}
         <div className="home-card-label">🌏 NEXT TRIP</div>
         {itinerary?.destination ? (
           <div className="home-summary-line">

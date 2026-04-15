@@ -1347,8 +1347,6 @@ function App() {
         onTabClick={setPanelWithCue}
         muted={muted}
         overlay={historyOpen ? "history" : settingsOpen ? "settings" : null}
-        agentState={agentState}
-        currentTool={currentTool}
       >
         {menu.state.panel === "HOME" && (
           <PanelHome

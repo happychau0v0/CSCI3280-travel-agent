@@ -173,6 +173,14 @@ li[tabindex]:focus-visible {
   min-height: 0;
 }
 
+/* Side-focus indicators — accent border-left on the active column */
+.side-focus-left .panel-grid-left {
+  border-left: 2px solid var(--accent);
+}
+.side-focus-right .panel-grid-right {
+  border-left: 2px solid var(--accent);
+}
+
 .panel-grid-top-band {
   grid-column: 2;
   grid-row: 1;
@@ -524,24 +532,12 @@ li[tabindex]:focus-visible {
 
 /* Hotel option row with thumb */
 .hotel-option-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  padding: 10px 12px;
-}
-
-.hotel-option-thumb {
-  flex: 0 0 auto;
-  width: 56px;
-  height: 56px;
-  object-fit: cover;
-  border-radius: 4px;
-  border: 1px solid var(--border);
+  /* No flex — let .panel-list-item's column layout handle spacing */
 }
 
 .hotel-option-body {
-  flex: 1 1 auto;
   min-width: 0;
+  text-align: left;
 }
 
 .hotel-option-name {
@@ -2332,53 +2328,6 @@ li[tabindex]:focus-visible {
   font-family: var(--mono);
 }
 
-/* Inline agent-working strip in the HOME center top card */
-.home-agent-working {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 8px;
-  padding: 6px 12px;
-  border: 1px solid var(--accent);
-  box-shadow: 0 0 16px rgba(0, 217, 255, 0.25);
-  background: rgba(0, 217, 255, 0.06);
-}
-
-.home-agent-working-icon {
-  color: var(--accent);
-  font-size: 10px;
-  animation: status-icon-pulse 1.6s ease-in-out infinite;
-}
-
-.home-agent-working-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  color: var(--text-h);
-  text-transform: uppercase;
-}
-
-.home-agent-working-tool {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.home-agent-working-bar {
-  flex: 0 0 60px;
-  height: 2px;
-  background: rgba(0, 217, 255, 0.2);
-  position: relative;
-  overflow: hidden;
-}
-
-.home-agent-working-bar::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: var(--accent);
-  animation: tab-working-sweep 1.4s ease-in-out infinite;
-}
 
 .home-summary-line {
   font-size: 14px;
@@ -3134,28 +3083,23 @@ li[tabindex]:focus-visible {
   color: #c4b5fd;
 }
 
-/* AgentStatusBar — prominent working banner pinned below the tab strip */
-
-/* AgentStatusBar — centered below the tab strip.
- * On the HOME panel, working state shows in the center card instead.
- * Hide the working-state bar on HOME to avoid duplication. */
-.panel-active-home .agent-status-bar.status-working {
-  display: none;
-}
-
+/* AgentStatusBar — compact banner pinned to the top-right corner.
+ * Sits in the empty column-3 / row-1 space on FLIGHTS/HOTELS/DAYS.
+ * On HOME the history card shifts down to make room (see .home-card-tr rule). */
 
 .agent-status-bar {
   position: fixed;
   top: 56px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 0;
+  left: auto;
+  transform: none;
   z-index: 100;
   display: flex;
   align-items: center;
-  gap: 16px;
-  min-width: 360px;
-  max-width: 60vw;
-  padding: 10px 18px;
+  gap: 12px;
+  min-width: 220px;
+  max-width: min(300px, 28vw);
+  padding: 8px 14px;
   background: var(--status-bar-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -3165,8 +3109,17 @@ li[tabindex]:focus-visible {
 }
 
 @keyframes status-slide-in {
-  from { opacity: 0; transform: translate(-50%, -8px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* On HOME the history card occupies the same top-right spot.
+ * Reserve space for the status bar only while it is mounted (non-idle). */
+.panel-active-home .home-card-tr {
+  transition: margin-top 0.25s ease;
+}
+.panel-active-home:has(.agent-status-bar) .home-card-tr {
+  margin-top: 72px;
 }
 
 .agent-status-bar.status-working {
@@ -3895,55 +3848,6 @@ body.theme-light .tab-strip {
   font-size: 11px;
 }
 
-/* Inline agent-working indicator in the tab strip right side */
-.tab-strip-working {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 8px;
-  color: var(--accent);
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.tab-strip-working-icon {
-  font-size: 10px;
-  animation: status-icon-pulse 1.6s ease-in-out infinite;
-}
-
-.tab-strip-working-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tab-strip-working-bar {
-  flex: 0 0 80px;
-  height: 2px;
-  background: rgba(0, 217, 255, 0.2);
-  position: relative;
-  overflow: hidden;
-}
-
-.tab-strip-working-bar::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: var(--accent);
-  animation: tab-working-sweep 1.4s ease-in-out infinite;
-  transform-origin: left;
-}
-
-@keyframes tab-working-sweep {
-  0%   { transform: scaleX(0); transform-origin: left; }
-  50%  { transform: scaleX(1); transform-origin: left; }
-  51%  { transform: scaleX(1); transform-origin: right; }
-  100% { transform: scaleX(0); transform-origin: right; }
-}
 
 /* Footer hint strip — bottom of screen */
 
