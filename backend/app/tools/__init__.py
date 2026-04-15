@@ -139,11 +139,21 @@ TOOL_DEFINITIONS: list[dict] = [
                 "properties": {
                     "origin": {
                         "type": "string",
-                        "description": "Origin city name, e.g. 'Hong Kong'. Major cities only.",
+                        "description": (
+                            "Departure airport — prefer a 3-letter IATA code (e.g. 'HKG', 'NRT'). "
+                            "The ORIGIN field in the form contains a label like "
+                            "'Hong Kong International Airport (HKG)' — extract the code in "
+                            "parentheses and pass just that. A city name also works as fallback."
+                        ),
                     },
                     "destination": {
                         "type": "string",
-                        "description": "Destination city name, e.g. 'Tokyo'. Major cities only.",
+                        "description": (
+                            "Arrival airport — prefer a 3-letter IATA code (e.g. 'NRT', 'LHR'). "
+                            "The DESTINATION field contains a label like 'Tokyo Narita (NRT)' — "
+                            "extract the code in parentheses and pass just that. "
+                            "A city name also works as fallback."
+                        ),
                     },
                     "date": {
                         "type": "string",
@@ -349,11 +359,17 @@ TOOL_DEFINITIONS: list[dict] = [
                 "properties": {
                     "destination": {
                         "type": "string",
-                        "description": "Destination city/country, e.g. 'Tokyo, Japan'",
+                        "description": (
+                            "Arrival airport as a 3-letter IATA code (e.g. 'NRT', 'LHR'). "
+                            "Do not pass a city name — the form uses airport pickers."
+                        ),
                     },
                     "origin": {
                         "type": "string",
-                        "description": "Origin city, e.g. 'Hong Kong'",
+                        "description": (
+                            "Departure airport as a 3-letter IATA code (e.g. 'HKG', 'SIN'). "
+                            "Do not pass a city name — the form uses airport pickers."
+                        ),
                     },
                     "start_date": {
                         "type": "string",
