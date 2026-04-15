@@ -199,6 +199,7 @@ function App() {
   const [chatPopoverOpen, setChatPopoverOpen] = useState(false);
   const [chatPopoverInitial, setChatPopoverInitial] = useState("");
   const [chatPopoverPromptLabel, setChatPopoverPromptLabel] = useState("");
+  const [chatPopoverOptions, setChatPopoverOptions] = useState(null);
   // Streaming text: accumulates LLM tokens as they arrive so the user sees
   // text within ~200ms of the first token, not after the full LLM round.
   const [streamingText, setStreamingText] = useState("");
@@ -241,6 +242,10 @@ function App() {
   // Chained send queued by pick_flight/pick_hotel/replace_activity SSE handlers.
   // Fired AFTER the current stream's done event to avoid concurrent-request races.
   const pendingChainedSendRef = useRef(null);
+  // Set to true when hotel search is started in the background while the user is
+  // still picking their return flight. Prevents the done event from auto-navigating
+  // to HOTELS until the return flight has been picked.
+  const suppressHotelNavRef = useRef(false);
   // Replace-activity context: set when user clicks REPLACE, consumed by ChatPopover onSend.
   const pendingReplaceRef = useRef(null);
   // Round 12 — undo / redo stacks for user-driven picks
@@ -426,6 +431,7 @@ function App() {
       cues.select();
       setChatPopoverInitial("");
       setChatPopoverPromptLabel("");
+      setChatPopoverOptions(null);
       setChatPopoverOpen(true);
     },
     onActivate: () => {
@@ -828,6 +834,7 @@ function App() {
               setPendingInputRequest(payload);
               if (payload?.prompt) {
                 setChatPopoverPromptLabel(payload.prompt);
+                setChatPopoverOptions(payload.options?.length ? payload.options : null);
                 setChatPopoverInitial("");
                 setChatPopoverOpen(true);
                 subtitles.push(payload.prompt);
@@ -1027,7 +1034,11 @@ function App() {
             if (hasActivities) {
               menu.setPanel("DAYS");        // Turn 3 or follow-up edit
             } else if (data.itinerary.hotels?.length) {
-              menu.setPanel("HOTELS");      // Turn 2
+              // Suppress navigation to HOTELS while user is still picking
+              // their return flight (background hotel search optimization).
+              if (!suppressHotelNavRef.current) {
+                menu.setPanel("HOTELS");    // Turn 2
+              }
             } else if (data.itinerary.flight?.options?.length) {
               menu.setPanel("FLIGHTS");     // Turn 1
             }
@@ -1075,6 +1086,7 @@ function App() {
         if (trimmedReply.endsWith("?") && !pendingInputRequestRef.current) {
           autoReopenTimerRef.current = setTimeout(() => {
             setChatPopoverPromptLabel("");
+            setChatPopoverOptions(null);
             setChatPopoverOpen(true);
             autoReopenTimerRef.current = null;
           }, 2000);
@@ -1378,29 +1390,49 @@ function App() {
                 : currentItinerary?.flight?.options;
               const opt = opts?.[i];
               if (!opt) return;
+              const hasReturnOptions = (currentItinerary?.flight?.return_options?.length ?? 0) > 0;
               if (!isReturn && (!currentItinerary?.flight?.to_lat || !currentItinerary?.flight?.to_lng)) {
                 setError("No destination coordinates available. Please re-run START PLANNING first.");
                 return;
               }
               pushPickSnapshot();
+              const flightLabel = (f) => f ? [
+                f.airline,
+                f.departure_time && f.arrival_time ? `${f.departure_time}→${f.arrival_time}` : null,
+                f.price_low ? `HK$${f.price_low}` : null,
+              ].filter(Boolean).join(", ") : null;
               if (isReturn) {
-                // Save return flight choice — don't navigate to hotels yet
+                // Return pick → save return flight, clear background suppression.
+                // If hotel data already arrived, navigate now; otherwise the done
+                // event will navigate once the in-flight search completes.
                 setCurrentItinerary({ ...currentItinerary, selected_return_flight: opt });
                 cues.chime();
-                return;
+                suppressHotelNavRef.current = false;
+                if (currentItinerary?.hotels?.length) {
+                  menu.setPanel("HOTELS");
+                  cues.select();
+                }
+                // If agentState is still "working", navigation happens in done event.
+              } else if (hasReturnOptions) {
+                // Outbound pick with return options → start hotel search in background
+                // immediately, but suppress navigation until return flight is picked.
+                // PanelFlights useEffect auto-switches to RETURN tab.
+                setCurrentItinerary({ ...currentItinerary, selected_flight: opt });
+                cues.chime();
+                suppressHotelNavRef.current = true;
+                handleSend(
+                  `Selected flight: ${flightLabel(opt)}. Now find hotels.`,
+                  { callRole: "hotels" },
+                );
+              } else {
+                // One-way trip → save + fire hotel search immediately
+                setCurrentItinerary({ ...currentItinerary, selected_flight: opt });
+                cues.chime();
+                handleSend(
+                  `Selected flight: ${flightLabel(opt)}. Now find hotels.`,
+                  { callRole: "hotels" },
+                );
               }
-              // Stamp the outbound flight pick locally, then fire Turn 2
-              // so the LLM searches for hotels near the destination.
-              setCurrentItinerary({ ...currentItinerary, selected_flight: opt });
-              cues.chime();
-              const label = [
-                opt.airline,
-                opt.departure_time && opt.arrival_time
-                  ? `${opt.departure_time}→${opt.arrival_time}`
-                  : null,
-                opt.price_low ? `HK$${opt.price_low}` : null,
-              ].filter(Boolean).join(", ");
-              handleSend(`Selected flight: ${label}. Now find hotels.`, { callRole: "hotels" });
             }}
             onSkipFlight={() => {
               pushPickSnapshot();
@@ -1711,12 +1743,14 @@ function App() {
           setChatPopoverOpen(false);
           setChatPopoverInitial("");
           setChatPopoverPromptLabel("");
+          setChatPopoverOptions(null);
           editTurnIdxRef.current = null;
           pendingReplaceRef.current = null;
         }}
         isLoading={isLoading}
         initialText={chatPopoverInitial}
         promptLabel={chatPopoverPromptLabel}
+        options={chatPopoverOptions}
         onRecallLast={() => lastUserMessage}
       />
     </div>

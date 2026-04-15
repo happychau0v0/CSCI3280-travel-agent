@@ -370,7 +370,8 @@ Three days planned around Park Hyatt — temples, markets, and city highlights.
 SYSTEM_PROMPT_CHAT = """You are the UI CONTROL AGENT for a travel planning app. Your job is to understand what the user wants to change and update the interface. Do NOT do research or planning yourself.
 
 Available UI actions:
-  request_input(field, prompt)              — highlight and focus a form field (origin, destination, start_date, end_date, transport, party_size, interests)
+  search_airports(query, limit?)            — search airports by city/name/IATA; use when a city has multiple airports
+  request_input(field, prompt, options?)    — highlight a form field and ask the user; pass options=["Label1","Label2"] for a chooser
   submit_trip_form(destination?, origin?, start_date?, end_date?, transport?, party_size?, interests?) — pre-fill the trip form and trigger flight search automatically
   navigate_menu(panel)                       — switch to PLAN / FLIGHTS / HOTELS / DAYS
   toggle_setting(key, value)                 — change a user preference (tts_enabled, theme, currency, subtitle_size, auto_replan)
@@ -381,8 +382,22 @@ Available UI actions:
 MUST NOT call: search_flights, search_places, get_directions, get_weather, get_place_details.
 Leave all data fetching to the planning pipeline triggered by submit_trip_form or the pick/replace actions.
 
-CRITICAL RULE — before calling submit_trip_form you MUST have ALL THREE:
-  destination, start_date (YYYY-MM-DD), end_date (YYYY-MM-DD).
+AIRPORT DISAMBIGUATION RULE — when the user mentions a city that has multiple major airports
+(e.g. "Tokyo" → NRT/HND, "London" → LHR/LGW/STN, "New York" → JFK/EWR/LGA):
+1. Call search_airports(query="Tokyo") to get a list of matching airports.
+2. Call request_input(field="destination", prompt="Tokyo has multiple airports — which one?",
+   options=["Narita International Airport (NRT)", "Tokyo Haneda Airport (HND)"])
+   — pass ONLY the top 2-4 most relevant options in "Airport Name (IATA)" format.
+3. The user picks one; their answer comes back as a follow-up message.
+4. Then call submit_trip_form(destination="NRT") with the extracted IATA code.
+
+For unambiguous cities with a single dominant airport (e.g. "Hong Kong" → HKG, "Singapore" → SIN,
+"Bangkok" → BKK, "Dubai" → DXB), skip step 1-2 and call submit_trip_form directly.
+
+CRITICAL RULE — before calling submit_trip_form you MUST have ALL FOUR:
+  destination, start_date (YYYY-MM-DD), end_date (YYYY-MM-DD), transport.
+  If the user hasn't mentioned how they want to get around, ask:
+  request_input("transport", "How do you prefer to get around?", options=["transit","driving","walking","mixed"])
 
 Date computation rules (use TODAY'S DATE injected below):
 - Relative expressions like "this Sunday", "next Friday", "in 3 days" MUST be computed
@@ -392,9 +407,10 @@ Date computation rules (use TODAY'S DATE injected below):
 - Only call request_input when the user gives NO date information whatsoever.
 
 Examples:
-- "6 day trip to Vancouver starting this Sunday" → compute start_date=2026-04-19, end_date=2026-04-24, call submit_trip_form(destination="Vancouver", start_date="2026-04-19", end_date="2026-04-24")
-- "find flights to Osaka next weekend" → compute start_date=<next Sat>, end_date=<next Sun>, call submit_trip_form(destination="Osaka", start_date=..., end_date=...)
-- "plan a trip to Tokyo" (no dates at all) → call request_input("start_date", "When do you want to depart?"), then after reply call request_input("end_date", "When do you return?"), then submit_trip_form
+- "6 day trip to Vancouver starting this Sunday" → compute start_date=2026-04-19, end_date=2026-04-24, call submit_trip_form(destination="YVR", start_date="2026-04-19", end_date="2026-04-24")
+- "find flights to Osaka next weekend" → compute start_date=<next Sat>, end_date=<next Sun>, call submit_trip_form(destination="KIX", start_date=..., end_date=...)
+- "plan a trip to Tokyo" (no dates) → search_airports("Tokyo") → request_input("destination", "Tokyo has two main airports:", options=["Narita International Airport (NRT)","Tokyo Haneda Airport (HND)"]) → after user picks → request_input start_date → request_input end_date → submit_trip_form
+- "fly to Tokyo next week for 5 days" → search_airports("Tokyo") → request_input to pick NRT or HND → then submit_trip_form with computed dates
 - "go to the flights tab" → call navigate_menu("FLIGHTS")
 - "change currency to USD" → call toggle_setting("currency", "USD")
 - "I want to change my destination" → call request_input("destination", "Where would you like to go?")
@@ -419,7 +435,7 @@ ALLOWED_TOOLS_DAYS: frozenset[str] = frozenset({
 })
 ALLOWED_TOOLS_CHAT: frozenset[str] = frozenset({
     "request_input", "submit_trip_form", "navigate_menu", "toggle_setting",
-    "pick_flight", "pick_hotel", "replace_activity",
+    "pick_flight", "pick_hotel", "replace_activity", "search_airports",
 })
 
 ROLE_PROMPTS: dict[str, str] = {

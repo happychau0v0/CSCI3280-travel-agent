@@ -23,6 +23,8 @@ import VoiceRecorder from "./VoiceRecorder";
  *   isLoading: bool — disable input while a request is in flight
  *   initialText: string | null — prefill text on open (E hotkey path)
  *   onRecallLast: () => string | null — fetch last user message
+ *   promptLabel: string — question text shown above input
+ *   options: string[] | null — when set, render clickable choice buttons
  */
 export default function ChatPopover({
   open,
@@ -32,6 +34,7 @@ export default function ChatPopover({
   initialText = "",
   onRecallLast,
   promptLabel = "",
+  options = null,
 }) {
   const [text, setText] = useState("");
   // The "this popover session is an edit" flag lives here, NOT in the
@@ -127,32 +130,52 @@ export default function ChatPopover({
         {promptLabel && (
           <p className="chat-popover-prompt-label">{promptLabel}</p>
         )}
-        <VoiceRecorder onResult={handleVoiceResult} disabled={isLoading} />
-        <input
-          ref={inputRef}
-          type="text"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Speak or type to the agent…"
-          disabled={isLoading}
-          autoComplete="off"
-        />
-        <button
-          type="submit"
-          className="chat-popover-send"
-          disabled={!text.trim() || isLoading}
-        >
-          {isLoading ? "…" : "→"}
-        </button>
-        <button
-          type="button"
-          className="chat-popover-close"
-          onClick={onClose}
-          aria-label="Close"
-        >
-          ×
-        </button>
+        {options && options.length > 0 && (
+          <div className="chat-popover-options">
+            {options.map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                className="chat-popover-option-btn"
+                disabled={isLoading}
+                onClick={() => {
+                  onSend?.(opt, { editLast: false });
+                  onClose?.();
+                }}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="chat-popover-input-row">
+          <VoiceRecorder onResult={handleVoiceResult} disabled={isLoading} />
+          <input
+            ref={inputRef}
+            type="text"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Speak or type to the agent…"
+            disabled={isLoading}
+            autoComplete="off"
+          />
+          <button
+            type="submit"
+            className="chat-popover-send"
+            disabled={!text.trim() || isLoading}
+          >
+            {isLoading ? "…" : "→"}
+          </button>
+          <button
+            type="button"
+            className="chat-popover-close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
       </form>
     </>
   );

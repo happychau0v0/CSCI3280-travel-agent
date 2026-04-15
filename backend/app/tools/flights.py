@@ -253,11 +253,21 @@ def _offset_hhmm(start: str, minutes: int) -> str:
 # ─── Google Flights deep link ─────────────────────────────────────────────
 
 
-def _google_flights_url(from_iata: str, to_iata: str, date: str | None) -> str:
-    """Build a Google Flights URL with origin / destination / date pre-filled."""
-    parts = [f"Flights from {from_iata} to {to_iata}"]
-    if date:
-        parts.append(f"on {date}")
+def _google_flights_url(from_iata: str, to_iata: str, date: str | None, return_date: str | None = None) -> str:
+    """Build a Google Flights URL with origin / destination / date pre-filled.
+
+    When return_date is provided, generates a round-trip search URL so
+    the user lands on the correct trip type in Google Flights.
+    """
+    if return_date:
+        parts = [f"round trip flights from {from_iata} to {to_iata}"]
+        if date:
+            parts.append(f"on {date}")
+        parts.append(f"return {return_date}")
+    else:
+        parts = [f"Flights from {from_iata} to {to_iata}"]
+        if date:
+            parts.append(f"on {date}")
     q = quote_plus(" ".join(parts))
     return f"https://www.google.com/travel/flights?q={q}"
 
@@ -465,11 +475,11 @@ def _options_from_live(live: list[dict]) -> list[dict]:
                 _add(candidate, "non-stop", "Alternative airline", recommended=False)
                 break
 
-    # 4. Cheapest 1-stop (only if genuinely cheaper than cheapest non-stop)
+    # 4. Cheapest 1-stop — always include as an alternative so users can
+    #    compare stop options regardless of price vs non-stop.
     if onestops:
         cheap_onestop = onestops[0]
-        if not nonstops or cheap_onestop["price_num"] < nonstops[0]["price_num"]:
-            _add(cheap_onestop, "1-stop", "1 stop · cheap", recommended=False)
+        _add(cheap_onestop, "1-stop", "1 stop · cheap", recommended=False)
 
         # 5. Budget 1-stop with long layover OR much cheaper
         if len(onestops) > 1:
@@ -545,6 +555,7 @@ async def search_flights(
     destination: str,
     date: str | None = None,
     seat_class: str | None = None,
+    return_date: str | None = None,
 ) -> dict:
     """Search for flights between two cities.
 
@@ -557,6 +568,10 @@ async def search_flights(
     "premium_economy", "business", or "first" to scale prices by a
     fixed multiplier (1.6×/3.2×/5.5×). Each returned option carries a
     seat_class + seat_class_label field the frontend displays.
+
+    return_date — optional return date (YYYY-MM-DD). When provided, the
+    Google Flights deep link is generated as a round-trip search URL.
+    Pass this when calling search_flights for the return leg of a round trip.
     """
     seat_class = (seat_class or "economy").lower().strip()
     if seat_class not in SEAT_CLASS_MULTIPLIERS:
@@ -572,14 +587,31 @@ async def search_flights(
     from_iata, from_name, from_lat, from_lng = from_entry
     to_iata, to_name, to_lat, to_lng = to_entry
 
+    # Reject same-airport and intra-metro trips — no commercial service exists.
+    if from_iata == to_iata:
+        return {
+            "error": (
+                f"Origin and destination are the same airport ({from_iata}). "
+                "Please choose different airports."
+            )
+        }
+    distance_km = _haversine_km(from_lat, from_lng, to_lat, to_lng)
+    if distance_km < 80:
+        return {
+            "error": (
+                f"No commercial flights operate between {from_iata} and {to_iata} "
+                f"— these airports are only {round(distance_km)} km apart "
+                "(they serve the same metro area). Consider ground transport instead."
+            )
+        }
+
     # Default to ~30 days from today if no date supplied so we get realistic
     # advance-purchase pricing instead of last-minute spikes.
     if not date:
         from datetime import timedelta
         date = (datetime.now(timezone.utc) + timedelta(days=30)).date().isoformat()
 
-    distance_km = _haversine_km(from_lat, from_lng, to_lat, to_lng)
-    deep_link = _google_flights_url(from_iata, to_iata, date)
+    deep_link = _google_flights_url(from_iata, to_iata, date, return_date)
 
     # Best-effort live data via fast-flights (offloaded to a thread).
     # The primp.Client patch above sets a 2.5 s socket-level timeout so

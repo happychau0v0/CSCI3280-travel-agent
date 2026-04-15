@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from app.tools import (
+    airports as airports_tool,
     day_windows,
     directions,
     flights,
@@ -479,6 +480,34 @@ TOOL_DEFINITIONS: list[dict] = [
     {
         "type": "function",
         "function": {
+            "name": "search_airports",
+            "description": (
+                "Search the airport database by name, city, country, or IATA code. "
+                "Use this when the user mentions an ambiguous location that could map "
+                "to multiple airports (e.g. 'Tokyo' → NRT or HND, 'London' → LHR/LGW/STN). "
+                "Returns up to `limit` matching airports with IATA codes and city names. "
+                "After calling this, present the options to the user with request_input "
+                "using the `options` list so they can pick the right airport."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "City name, airport name, or IATA code, e.g. 'Tokyo' or 'LHR'",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max results to return (default 5, max 10)",
+                    },
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_phrasebook",
             "description": (
                 "Return a small phrasebook (10 essential phrases) for the destination's "
@@ -503,6 +532,12 @@ TOOL_DEFINITIONS: list[dict] = [
 ]
 
 
+async def _search_airports(query: str, limit: int = 5) -> list[dict]:
+    """Thin async wrapper around airports.search() for TOOL_DISPATCH."""
+    results = airports_tool.search(query, limit=min(limit, 10))
+    return results
+
+
 TOOL_DISPATCH: dict = {
     "search_places": places.search_places,
     "get_place_details": places.get_place_details,
@@ -510,6 +545,7 @@ TOOL_DISPATCH: dict = {
     "get_weather": weather.get_weather,
     "geocode_city": geocode.geocode_city,
     "search_flights": flights.search_flights,
+    "search_airports": _search_airports,
     "navigate_menu": navigate.navigate_menu,
     "request_input": request_input_tool.request_input,
     "get_day_windows": day_windows.get_day_windows,

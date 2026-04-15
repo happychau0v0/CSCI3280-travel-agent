@@ -1314,7 +1314,7 @@ li[tabindex]:focus-visible {
   font-size: 10px;
   letter-spacing: 0.12em;
   padding: 4px 10px;
-  background: rgba(0, 0, 0, 0.4);
+  background: transparent;
   border: 1px solid var(--border);
   color: var(--text);
   cursor: pointer;
@@ -3331,13 +3331,20 @@ select.panel-input {
   z-index: 50;
   width: min(640px, calc(100vw - 64px));
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 0;
   padding: 14px 20px;
   background: var(--bg-elevated);
   border: 1px solid var(--accent-border);
   font-family: var(--mono);
   box-shadow: 0 0 40px rgba(0, 217, 255, 0.2), 0 24px 48px rgba(0, 0, 0, 0.5);
+}
+
+.chat-popover-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
 }
 
 .chat-popover-bracket {
@@ -3377,6 +3384,7 @@ select.panel-input {
 
 .chat-popover-prompt-label {
   width: 100%;
+  box-sizing: border-box;
   margin: 0 0 0.5rem;
   padding: 0.45rem 0.75rem;
   background: color-mix(in srgb, var(--accent) 10%, transparent);
@@ -3386,6 +3394,39 @@ select.panel-input {
   font-size: 0.8rem;
   line-height: 1.4;
   text-align: left;
+}
+
+.chat-popover-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  margin: 0 0 0.6rem;
+}
+
+.chat-popover-option-btn {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 6px 12px;
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text-h);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.chat-popover-option-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.chat-popover-option-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .chat-popover input[type="text"] {
