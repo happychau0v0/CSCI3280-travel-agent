@@ -49,7 +49,7 @@ NARRATION RULES (read these carefully):
 
 CRITICAL RULES (you MUST follow these):
 1. NEVER invent place names, addresses, ratings, opening hours, or prices. Always call a tool first.
-2. NEVER suggest transport between places without calling `get_directions` first. Save the polyline.
+2. NEVER suggest transport between places without calling `get_directions` first to get travel time.
 3. NEVER state weather conditions without calling `get_weather` first.
 4. For ANY multi-day trip, ALWAYS call `get_weather` for the destination FIRST.
 5. Honor the USER LOCATION block at the top of this prompt — that's where the user is RIGHT NOW. Use it as the trip origin. NEVER ask "where are you" if that block is present.
@@ -175,7 +175,7 @@ ALL DAYS (universal rules):
   `get_place_details(place_id)` and copy its `description` field into
   the activity. Never fabricate descriptions — only use text returned
   by the tool. If get_place_details returns no description, omit the field.
-- Call `get_directions` between consecutive activities. Save polyline.
+- Call `get_directions` between consecutive activities for travel time.
 - Times must be strictly monotonic.
 - Call `get_weather(destination)` at the START of Turn 3 if you don't
   have weather data from conversation history. For EACH day, set the
@@ -224,7 +224,7 @@ FIELDS PER TURN:
 AVAILABLE TOOLS:
 - search_places(query, location?, radius_km?) — find real places. Returns photo_url paths and lat/lng.
 - get_place_details(place_id) — get hours, reviews, photos.
-- get_directions(origin, destination, mode?) — compute a route. Returns a polyline you must save.
+- get_directions(origin, destination, mode?) — compute a route. Returns travel time and distance for scheduling. The frontend handles map display.
 - get_weather(city, date?) — current + 5-day forecast.
 - geocode_city(query) — resolve a city name to lat/lng + country.
 - search_flights(origin, destination, date?, seat_class?, return_date?) — flight prices and route. Use for trips > 500 km. Pass return_date when calling for the return leg of a round-trip so the Google Flights link shows a round-trip search.
@@ -351,9 +351,9 @@ TOOL RULES for this call:
 - MUST call: search_places for each day's activities (temples, restaurants, markets etc. matching interests)
 - MAY call: get_weather(destination) — if not already available, call once at the start
 - MUST call: get_directions for EVERY consecutive pair of activities — batch ALL
-  direction calls in Round 1 alongside search_places. transport_to_next MUST be
-  populated for every activity except the final hotel-return or departure-airport.
-  Setting transport_to_next = null is only allowed for the very last activity of the day.
+  direction calls in Round 1 alongside search_places. Populate transport_to_next
+  with mode, duration, and distance for every activity except the very last one.
+  The polyline field is handled by the frontend — do not include it.
 - MUST NOT call: get_place_details — search_places already provides all required fields
 - MUST NOT call: search_flights, request_input
 - navigate_menu: call ONCE at the very end with "DAYS" — never mid-stream
@@ -544,7 +544,7 @@ class TransportStep(BaseModel):
     mode: str
     duration: str
     distance: str
-    polyline: str | None = None
+    # polyline intentionally omitted — fetched client-side on activity selection
 
 
 class Activity(BaseModel):

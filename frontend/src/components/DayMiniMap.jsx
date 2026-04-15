@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Polyline, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -134,19 +134,21 @@ function AirportBadge({ airport, distanceKm }) {
 }
 
 /** Floating chip showing transport mode + duration for the active leg. */
-function TransportBadge({ activity }) {
+function TransportBadge({ activity, liveRoute }) {
   const transport = activity?.transport_to_next;
-  if (!transport?.mode) return null;
-  const icon = MODE_ICON[transport.mode] || "→";
-  const label = MODE_LABEL[transport.mode] || transport.mode;
-  const color = MODE_COLOR[transport.mode] || MODE_DEFAULT_COLOR;
+  const mode = transport?.mode || liveRoute?.mode;
+  if (!mode) return null;
+  const duration = liveRoute?.duration || transport?.duration;
+  const icon = MODE_ICON[mode] || "→";
+  const label = MODE_LABEL[mode] || mode;
+  const color = MODE_COLOR[mode] || MODE_DEFAULT_COLOR;
   return (
     <div
       className="transport-badge"
       style={{ borderColor: color, color }}
       data-testid="transport-badge"
     >
-      {icon} {label}{transport.duration ? ` · ${transport.duration}` : ""}
+      {icon} {label}{duration ? ` · ${duration}` : ""}
     </div>
   );
 }
@@ -327,7 +329,13 @@ export default function DayMiniMap({
               positions={coords}
               pathOptions={{ color, weight: 5, opacity: 0.9, dashArray: "10 6" }}
               className="live-route-line"
-            />
+            >
+              {liveRoute.duration && (
+                <Tooltip permanent direction="center" className="route-duration-label">
+                  {liveRoute.duration}
+                </Tooltip>
+              )}
+            </Polyline>
           ) : null;
         })()}
         <FitBounds points={focusPoints} />
@@ -338,8 +346,8 @@ export default function DayMiniMap({
       {liveRouteLoading && (
         <div className="map-live-loading" aria-live="polite">ROUTING…</div>
       )}
-      {activeActivity?.transport_to_next?.mode && (
-        <TransportBadge activity={activeActivity} />
+      {(activeActivity?.transport_to_next?.mode || liveRoute?.mode) && (
+        <TransportBadge activity={activeActivity} liveRoute={liveRoute} />
       )}
     </div>
   );

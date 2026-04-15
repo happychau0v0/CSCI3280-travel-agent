@@ -5233,6 +5233,20 @@ body.theme-light .history-overlay-scroll::-webkit-scrollbar-thumb {
   white-space: nowrap;
 }
 
+/* ─── Route duration label on Leaflet polyline ────────────── */
+.route-duration-label {
+  background: rgba(0, 0, 0, 0.72) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 4px !important;
+  font-size: 11px !important;
+  font-family: var(--mono) !important;
+  padding: 2px 7px !important;
+  white-space: nowrap !important;
+  box-shadow: none !important;
+}
+.route-duration-label::before { display: none !important; } /* hide tooltip arrow */
+
 /* ─── Itinerary card (rendered inside drawer) ────────────── */
 
 .itinerary-card {

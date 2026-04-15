@@ -340,6 +340,9 @@ export default function PanelDays({
   const [liveRoute, setLiveRoute] = useState(null);
   const [liveRouteLoading, setLiveRouteLoading] = useState(false);
   const liveRouteTimer = useRef(null);
+  // Cache fetched routes to avoid re-fetching on re-selection.
+  // Key: "originLat,Lng→destLat,Lng-MODE"
+  const routeCacheRef = useRef(new Map());
 
   // Add Activity inline form state
   const [addingActivity, setAddingActivity] = useState(false);
@@ -381,11 +384,24 @@ export default function PanelDays({
     // Infer mode from the previous activity's stored transport, or default TRANSIT.
     const mode = prevAct?.transport_to_next?.mode || "TRANSIT";
 
+    // Check cache first — skip the network round-trip for already-fetched legs.
+    const cacheKey = `${originStr}→${destStr}-${mode}`;
+    const cached = routeCacheRef.current.get(cacheKey);
+    if (cached) {
+      setLiveRoute(cached);
+      setLiveRouteLoading(false);
+      return;
+    }
+
     setLiveRouteLoading(true);
     liveRouteTimer.current = setTimeout(async () => {
       const result = await getDirections(originStr, destStr, mode);
       setLiveRouteLoading(false);
-      if (result?.polyline) setLiveRoute({ ...result, mode });
+      if (result?.polyline) {
+        const route = { ...result, mode };
+        routeCacheRef.current.set(cacheKey, route);
+        setLiveRoute(route);
+      }
     }, 400);
 
     return () => clearTimeout(liveRouteTimer.current);
