@@ -297,6 +297,7 @@ export default function PanelHome({
   rowDispatchRef,
   formPrefill = null,
   onFormPrefilled,
+  side = "left",
 }) {
   const [form, setForm] = useState(() => loadForm());
   const [formErrors, setFormErrors] = useState({});
@@ -417,8 +418,14 @@ export default function PanelHome({
 
   const handlePlan = () => {
     if (!validateForm()) return;
+    setFormErrors({});
     onPlan?.(prompt);
   };
+
+  // Clear all errors once planning starts (isLoading flips to true)
+  useEffect(() => {
+    if (isLoading) setFormErrors({});
+  }, [isLoading]);
 
   // Register a row activator for the Space hotkey — focus the row
   // matching the current listIndex so the user can start typing
@@ -449,7 +456,7 @@ export default function PanelHome({
   const planLabel = hasItinerary ? "REPLAN →" : "START PLANNING →";
 
   return (
-    <section className="panel panel-grid panel-home" aria-label="Home dashboard">
+    <section className={`panel panel-grid panel-home side-focus-${side}`} aria-label="Home dashboard">
       {/* TOP-LEFT — live status */}
       <button
         type="button"
@@ -470,8 +477,22 @@ export default function PanelHome({
         </div>
       </button>
 
-      {/* TOP-CENTER — next trip summary + R14 template chips */}
+      {/* TOP-CENTER — next trip summary + R14 template chips.
+       *  When the agent is working, show a compact status indicator here
+       *  instead of the trip summary — this fills the blank center space. */}
       <div className="home-summary-top">
+        {agentState === "working" ? (
+          <div className="home-agent-working">
+            <span className="home-agent-working-icon">◢</span>
+            <span className="home-agent-working-label">
+              AGENT WORKING
+              {currentTool && currentTool !== "_thinking" && (
+                <span className="home-agent-working-tool"> · {currentTool.replace(/_/g, " ")}</span>
+              )}
+            </span>
+            <span className="home-agent-working-bar" />
+          </div>
+        ) : null}
         <div className="home-card-label">🌏 NEXT TRIP</div>
         {itinerary?.destination ? (
           <div className="home-summary-line">
@@ -543,7 +564,8 @@ export default function PanelHome({
             const rowClass =
               `panel-list-item home-form-row home-form-row-${field.type}` +
               (isActive ? " active" : "") +
-              (isFocused ? " field-pending" : "");
+              (isFocused ? " field-pending" : "") +
+              (formErrors[field.key] ? " has-error" : "");
             return (
               <li
                 key={field.key}
@@ -614,11 +636,6 @@ export default function PanelHome({
                     testId={`home-input-${field.key}`}
                   />
                 )}
-                {formErrors[field.key] && (
-                  <div className="home-form-error" role="alert">
-                    ✗ {formErrors[field.key]}
-                  </div>
-                )}
                 {isFocused && pendingInputRequest?.prompt && (
                   <div className="home-form-prompt" role="status">
                     {pendingInputRequest.prompt}
@@ -642,6 +659,13 @@ export default function PanelHome({
             );
           })}
         </ul>
+        {Object.keys(formErrors).length > 0 && (
+          <div className="trip-plan-errors" role="alert">
+            {Object.values(formErrors).map((msg, i) => (
+              <span key={i}>✗ {msg}</span>
+            ))}
+          </div>
+        )}
         <button
           type="button"
           className="trip-plan-btn"

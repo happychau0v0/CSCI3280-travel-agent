@@ -374,8 +374,15 @@ Available UI actions:
 MUST NOT call: search_flights, search_places, get_directions, get_weather, get_place_details.
 Leave all data fetching to the planning pipeline triggered by submit_trip_form or the pick/replace actions.
 
+CRITICAL RULE — before calling submit_trip_form you MUST have ALL THREE:
+  destination, start_date (YYYY-MM-DD), end_date (YYYY-MM-DD).
+If any of the three are missing, call request_input for each missing field
+one at a time and wait for the user's reply before proceeding.
+Never call submit_trip_form with missing or placeholder dates.
+
 Examples:
 - "find flights to Osaka next weekend" → set destination="Osaka", start_date=<next Sat>, end_date=<next Sun>, call submit_trip_form
+- "plan a trip to Tokyo" (no dates given) → call request_input("start_date", "When do you want to depart?"), then request_input("end_date", "When do you return?"), then submit_trip_form
 - "go to the flights tab" → call navigate_menu("FLIGHTS")
 - "change currency to USD" → call toggle_setting("currency", "USD")
 - "I want to change my destination" → call request_input("destination", "Where would you like to go?")

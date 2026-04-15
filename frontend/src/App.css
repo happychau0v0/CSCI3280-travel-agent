@@ -2332,6 +2332,54 @@ li[tabindex]:focus-visible {
   font-family: var(--mono);
 }
 
+/* Inline agent-working strip in the HOME center top card */
+.home-agent-working {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 16px rgba(0, 217, 255, 0.25);
+  background: rgba(0, 217, 255, 0.06);
+}
+
+.home-agent-working-icon {
+  color: var(--accent);
+  font-size: 10px;
+  animation: status-icon-pulse 1.6s ease-in-out infinite;
+}
+
+.home-agent-working-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--text-h);
+  text-transform: uppercase;
+}
+
+.home-agent-working-tool {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.home-agent-working-bar {
+  flex: 0 0 60px;
+  height: 2px;
+  background: rgba(0, 217, 255, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.home-agent-working-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  animation: tab-working-sweep 1.4s ease-in-out infinite;
+}
+
 .home-summary-line {
   font-size: 14px;
   color: var(--text-h);
@@ -3088,32 +3136,37 @@ li[tabindex]:focus-visible {
 
 /* AgentStatusBar — prominent working banner pinned below the tab strip */
 
-/* AgentStatusBar — only used for done/error flash states now.
- * The working state is handled inline in the TabStrip via .tab-strip-working. */
+/* AgentStatusBar — centered below the tab strip.
+ * On the HOME panel, working state shows in the center card instead.
+ * Hide the working-state bar on HOME to avoid duplication. */
+.panel-active-home .agent-status-bar.status-working {
+  display: none;
+}
+
+
 .agent-status-bar {
   position: fixed;
-  top: 0;
-  right: 0;
-  left: auto;
-  transform: none;
-  z-index: 200;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
   display: flex;
   align-items: center;
-  gap: 12px;
-  max-width: 480px;
-  height: 56px;
-  padding: 0 20px;
+  gap: 16px;
+  min-width: 360px;
+  max-width: 60vw;
+  padding: 10px 18px;
   background: var(--status-bar-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   font-family: var(--mono);
   pointer-events: auto;
-  animation: status-slide-in 0.2s ease;
+  animation: status-slide-in 0.3s ease;
 }
 
 @keyframes status-slide-in {
-  from { opacity: 0; transform: translateX(10px); }
-  to { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
 }
 
 .agent-status-bar.status-working {

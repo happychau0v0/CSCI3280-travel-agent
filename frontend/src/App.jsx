@@ -215,6 +215,9 @@ function App() {
   const [statusOpen, setStatusOpen] = useState(false);
   // Visa alert — fetched from /visa/check when the user reaches FLIGHTS panel.
   const [visaAlert, setVisaAlert] = useState(null);
+  // Activity cursor for DAYS right-side keyboard navigation.
+  // Resets to 0 when the selected day changes.
+  const [activityIndex, setActivityIndex] = useState(0);
   // Agent status state used by the AgentStatusBar — addresses the
   // round-7 "feels unresponsive" complaint with overlapping indicators.
   const [agentState, setAgentState] = useState("idle"); // idle|working|done|error
@@ -418,7 +421,11 @@ function App() {
     state: menu.state,
     setPanel: setPanelWithCue,
     setListIndex: setListIndexWithCue,
+    setSide: menu.setSide,
     listSize,
+    activityListSize: currentItinerary?.days?.[menu.state.listIndex]?.activities?.length || 0,
+    activityIndex,
+    setActivityIndex,
     onOpenChat: () => {
       cues.select();
       setChatPopoverInitial("");
@@ -490,6 +497,11 @@ function App() {
   useEffect(() => {
     saveState(messages, currentItinerary);
   }, [messages, currentItinerary]);
+
+  // Reset activity cursor when the selected day changes on the DAYS panel.
+  useEffect(() => {
+    setActivityIndex(0);
+  }, [menu.state.listIndex]);
 
   // Visa alert — check visa requirements when the user reaches the FLIGHTS panel.
   // Uses IATA_TO_ISO2 to convert the destination airport code to a country ISO-2,
@@ -1291,7 +1303,7 @@ function App() {
   }, [menu.state.panel]);
 
   return (
-    <div className="app">
+    <div className={`app panel-active-${menu.state.panel.toLowerCase()}`}>
       {/* Only show the top-level error banner when the AgentStatusBar
        *  ISN'T already rendering the same error. When agentState is
        *  "error", AgentStatusBar shows a prominent red bar — stacking
@@ -1379,8 +1391,13 @@ function App() {
             formPrefill={pendingFormPrefill}
             onFormPrefilled={(prompt) => {
               setPendingFormPrefill(null);
+              // Guard: only fire planning if dates are set. submit_trip_form
+              // from chat sometimes omits dates; [not set] in the prompt means
+              // the LLM should have asked via request_input first.
+              if (prompt.includes("[not set]")) return;
               handleSend(prompt, { callRole: "plan" });
             }}
+            side={menu.state.side}
           />
         )}
         {menu.state.panel === "FLIGHTS" && (
@@ -1389,6 +1406,7 @@ function App() {
             listIndex={menu.state.listIndex}
             currency={currency}
             visaAlert={visaAlert}
+            side={menu.state.side}
             onSelect={selectListItem}
             onPick={(i, tab) => {
               const isReturn = tab === "return";
@@ -1464,12 +1482,15 @@ function App() {
                 setPanelWithCue("DAYS");
               }
             }}
+            side={menu.state.side}
           />
         )}
         {menu.state.panel === "DAYS" && (
           <PanelDays
             itinerary={currentItinerary}
             listIndex={menu.state.listIndex}
+            side={menu.state.side}
+            activityIndex={activityIndex}
             onSelect={selectListItem}
             onReorderActivities={(dayIdx, fromIdx, toIdx) => {
               // Round 13 — reorder activities within one day in
