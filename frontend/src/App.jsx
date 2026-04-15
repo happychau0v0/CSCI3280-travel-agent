@@ -233,6 +233,9 @@ function App() {
   // Agent status — drives the TabStrip indicator and isLoading guard
   const [agentState, setAgentState] = useState("idle"); // idle|working|done|error
   const [currentTool, setCurrentTool] = useState(null);
+  // Per-request tool timing data collected from tool_end SSE events
+  const [toolTimings, setToolTimings] = useState([]); // [{name, elapsed_ms}]
+  const requestStartedAtRef = useRef(null); // Date.now() when request begins
   const [pendingInputRequest, _setPendingInputRequest] = useState(null);
   // OBJ3 — LLM can pre-fill the trip form and auto-trigger planning
   const [pendingFormPrefill, setPendingFormPrefill] = useState(null);
@@ -472,7 +475,7 @@ function App() {
               ? `${opt.departure_time}→${opt.arrival_time}` : null,
             opt.price_low ? `HK$${opt.price_low}` : null,
           ].filter(Boolean).join(", ");
-          handleSend(`Selected flight: ${label}. Now find hotels.`);
+          handleSend(`Selected flight: ${label}. Now find hotels in ${currentItinerary?.destination}.`);
         }
         return;
       }
@@ -774,6 +777,8 @@ function App() {
       }
       setAgentState("working");
       setCurrentTool(null);
+      requestStartedAtRef.current = Date.now();
+      setToolTimings([]);
       subtitles.clear();
       // Reset streaming text state for this request.
       streamTokenBufRef.current = "";
@@ -838,6 +843,12 @@ function App() {
                   if (!alreadySpoken) lastSpokenToolLabelRef.current = label;
                   subtitles.push(label, { spoken: !alreadySpoken });
                 }
+              }
+            } else if (type === "tool_end") {
+              const name = payload?.name || payload?.tool;
+              const elapsed = payload?.elapsed_ms;
+              if (name && elapsed != null) {
+                setToolTimings(prev => [...prev, { name, elapsed_ms: elapsed }]);
               }
             } else if (type === "navigate") {
               // Round 11 — buffer instead of applying immediately.
@@ -916,7 +927,7 @@ function App() {
                   .filter(Boolean)
                   .join(", ");
                 pendingChainedSendRef.current = {
-                  text: `Selected flight: ${lbl}. Now find hotels.`,
+                  text: `Selected flight: ${lbl}. Now find hotels in ${currentItineraryRef.current?.destination}.`,
                   opts: { callRole: "hotels" },
                 };
               }
@@ -939,7 +950,7 @@ function App() {
                 cues.chime();
                 pendingChainedSendRef.current = {
                   text:
-                    `Set "${hotel.name}" as the base hotel. ` +
+                    `Set "${hotel.name}" as the base hotel in ${currentItineraryRef.current?.destination}. ` +
                     `Plan the day-by-day itinerary with activities, meals, and directions.`,
                   opts: { callRole: "days" },
                 };
@@ -1378,6 +1389,8 @@ function App() {
         muted={muted}
         overlay={historyOpen ? "history" : settingsOpen ? "settings" : null}
         agentState={agentState}
+        toolTimings={toolTimings}
+        requestStartedAt={requestStartedAtRef}
       >
         {menu.state.panel === "HOME" && (
           <PanelHome
@@ -1483,7 +1496,7 @@ function App() {
                 cues.chime();
                 suppressHotelNavRef.current = true;
                 handleSend(
-                  `Selected flight: ${flightLabel(opt)}. Now find hotels.`,
+                  `Selected flight: ${flightLabel(opt)}. Now find hotels in ${currentItinerary?.destination}.`,
                   { callRole: "hotels" },
                 );
               } else {
@@ -1491,7 +1504,7 @@ function App() {
                 setCurrentItinerary(itinWithNewFlight({ selected_flight: opt }));
                 cues.chime();
                 handleSend(
-                  `Selected flight: ${flightLabel(opt)}. Now find hotels.`,
+                  `Selected flight: ${flightLabel(opt)}. Now find hotels in ${currentItinerary?.destination}.`,
                   { callRole: "hotels" },
                 );
               }
@@ -1501,7 +1514,7 @@ function App() {
               setCurrentItinerary({ ...currentItinerary, selected_flight: null, flight: null });
               cues.chime();
               handleSend(
-                "No flight needed — using ground transport. Now find hotels near the destination.",
+                `No flight needed — using ground transport. Now find hotels in ${currentItinerary?.destination}.`,
                 { callRole: "hotels" },
               );
             }}
@@ -1533,7 +1546,7 @@ function App() {
               if (autoReplan) {
                 // Fire Turn 3 so the LLM builds days around this hotel
                 const prompt =
-                  `Set "${hotel.name}" as the base hotel. ` +
+                  `Set "${hotel.name}" as the base hotel in ${currentItinerary?.destination}. ` +
                   `Plan the day-by-day itinerary with activities, meals, and directions.`;
                 handleSend(prompt, { callRole: "days" });
               } else {
@@ -1813,6 +1826,12 @@ function App() {
               ? `Day ${dayNum}, replace "${actName}" with: ${preference}. Destination city: ${dest}.`
               : `Day ${dayNum}, replace "${actName}" with a different but similar place in ${dest}.`;
             handleSend(msg, { callRole: "replace" });
+          } else if (pendingInputRequestRef.current) {
+            // User answered a request_input question (e.g., clicked an airport option).
+            // Mirror onResolveInput: clear the request and send with the plan role.
+            const req = pendingInputRequestRef.current;
+            setPendingInputRequest(null);
+            handleSend(`${req.field}: ${text}`, { callRole: "plan" });
           } else {
             handleSend(text, { ...opts, callRole: "chat" });
           }
