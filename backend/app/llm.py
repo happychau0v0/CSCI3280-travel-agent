@@ -470,21 +470,29 @@ async def _run_loop(
         # the assistant message and the matching tool result messages to be
         # paired in order; the role="tool" messages we append below carry the
         # tool_call_id that ties them back to this assistant message.
+        # Gemini thinking models embed a `thought_signature` inside each tool
+        # call's function object. It must be round-tripped verbatim or the next
+        # request fails with 400 INVALID_ARGUMENT ("missing thought_signature").
+        # Check both tc.function.model_extra and tc.model_extra — the OpenAI SDK
+        # places extra fields from Pydantic-v2 extra-allow in model_extra.
+        def _serialise_tc(tc) -> dict:
+            fn: dict = {
+                "name": tc.function.name,
+                "arguments": tc.function.arguments,
+            }
+            sig = (
+                (getattr(tc.function, "model_extra", None) or {}).get("thought_signature")
+                or (getattr(tc, "model_extra", None) or {}).get("thought_signature")
+            )
+            if sig:
+                fn["thought_signature"] = sig
+            return {"id": tc.id, "type": "function", "function": fn}
+
         full_messages.append(
             {
                 "role": "assistant",
                 "content": msg.content or "",
-                "tool_calls": [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {
-                            "name": tc.function.name,
-                            "arguments": tc.function.arguments,
-                        },
-                    }
-                    for tc in msg.tool_calls
-                ],
+                "tool_calls": [_serialise_tc(tc) for tc in msg.tool_calls],
             }
         )
 

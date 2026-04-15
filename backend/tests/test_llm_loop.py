@@ -177,6 +177,102 @@ async def test_region_error_swaps_to_fallback_model_on_round_zero():
     assert any(t == "model_fallback" for t, _ in events)
 
 
+# ─── Gemini thought_signature round-trip ─────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_gemini_thought_signature_is_preserved_in_history():
+    """thought_signature from a Gemini thinking-model tool call must be
+    round-tripped into the assistant message on the next request, otherwise
+    Gemini rejects the history with 400 INVALID_ARGUMENT."""
+
+    sig = "AQID"  # fake base-64 signature
+
+    # Round 0: Gemini returns a tool call whose function carries thought_signature
+    # in model_extra (how the OpenAI SDK surfaces extra fields from Pydantic v2).
+    tc_with_sig = SimpleNamespace(
+        id="c1",
+        model_extra={},  # not at tc level
+        function=SimpleNamespace(
+            name="geocode_city",
+            arguments='{"city": "Tokyo"}',
+            model_extra={"thought_signature": sig},
+        ),
+    )
+    round0 = _completion(_msg(tool_calls=[tc_with_sig]))
+    round1 = _completion(_msg(content="done", tool_calls=None))
+
+    captured_calls: list[dict] = []
+
+    async def fake_create(**kwargs):
+        captured_calls.append(kwargs)
+        idx = len(captured_calls) - 1
+        return round0 if idx == 0 else round1
+
+    fake_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create))
+    )
+
+    async def noop_tool(**kwargs):
+        return {"ok": True}
+
+    with patch.object(llm, "_get_client", return_value=fake_client), \
+         patch.object(llm, "TOOL_DISPATCH", {"geocode_city": noop_tool}):
+        await llm._run_loop([{"role": "user", "content": "plan tokyo"}])
+
+    assert len(captured_calls) == 2, "expected exactly 2 LLM calls (tool round + final)"
+
+    # The second request must include the thought_signature in the assistant message.
+    round1_messages = captured_calls[1]["messages"]
+    assistant_msg = next(m for m in round1_messages if m.get("role") == "assistant")
+    tc_sent = assistant_msg["tool_calls"][0]
+    assert tc_sent["function"].get("thought_signature") == sig, (
+        "thought_signature was dropped — Gemini would reject this with 400"
+    )
+
+
+@pytest.mark.asyncio
+async def test_thought_signature_absent_when_not_in_model_extra():
+    """When the model returns no thought_signature (xAI / non-thinking Gemini),
+    the serialised tool call must NOT include a thought_signature key."""
+
+    tc_plain = SimpleNamespace(
+        id="c1",
+        model_extra={},
+        function=SimpleNamespace(
+            name="geocode_city",
+            arguments='{"city": "Paris"}',
+            model_extra={},  # no thought_signature
+        ),
+    )
+    round0 = _completion(_msg(tool_calls=[tc_plain]))
+    round1 = _completion(_msg(content="done", tool_calls=None))
+
+    calls: list[dict] = []
+
+    async def fake_create(**kwargs):
+        calls.append(kwargs)
+        return round0 if len(calls) == 1 else round1
+
+    fake_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create))
+    )
+
+    async def noop_tool(**kwargs):
+        return {"ok": True}
+
+    with patch.object(llm, "_get_client", return_value=fake_client), \
+         patch.object(llm, "TOOL_DISPATCH", {"geocode_city": noop_tool}):
+        await llm._run_loop([{"role": "user", "content": "plan paris"}])
+
+    round1_messages = calls[1]["messages"]
+    assistant_msg = next(m for m in round1_messages if m.get("role") == "assistant")
+    tc_sent = assistant_msg["tool_calls"][0]
+    assert "thought_signature" not in tc_sent["function"], (
+        "thought_signature should be absent for non-thinking models"
+    )
+
+
 def test_is_region_error_recognises_common_phrasings():
     assert _is_region_error(Exception("403 forbidden"))
     assert _is_region_error(Exception("model not available in your region"))
