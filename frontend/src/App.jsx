@@ -185,7 +185,7 @@ function App() {
   // dayStatuses tracks loading/error state per day number during two-phase planning.
   // Key: day number (1-based), Value: "pending" | "loading" | "done" | "error"
   const [dayStatuses, setDayStatuses] = useState({}); // eslint-disable-line no-unused-vars
-  const setDayStatus = (dayNum, status) => // eslint-disable-line no-unused-vars
+  const setDayStatus = (dayNum, status) =>
     setDayStatuses((prev) => ({ ...prev, [dayNum]: status }));
   const [planHistory, setPlanHistory] = useState(() => loadPlanHistory());
   const [favorites, setFavorites] = useState(() => loadFavorites());
@@ -714,7 +714,7 @@ function App() {
     });
   }, []);
 
-  function buildThemeMessage(itinerary) { // eslint-disable-line no-unused-vars
+  function buildThemeMessage(itinerary) {
     const { destination, flight, days } = itinerary;
     const totalDays = days?.length ?? 0;
     const arrivalTime = flight?.arrival_time ?? "unknown";
@@ -735,7 +735,7 @@ function App() {
     return msg;
   }
 
-  function buildDayDetailMessage(day, itinerary) { // eslint-disable-line no-unused-vars
+  function buildDayDetailMessage(day, itinerary) {
     const { destination, selected_hotel, days } = itinerary;
     const totalDays = days?.length ?? 0;
     const hotel = selected_hotel;
@@ -752,6 +752,97 @@ function App() {
       msg += `Flight departs ${day.key_constraints.airport_iata} at ${day.key_constraints.departure_time} — plan to finish activities 3 hours before. `;
     }
     return msg.trim();
+  }
+
+  async function planOneDayDetail(day, itinerary) {
+    setDayStatus(day.day, "loading");
+    const message = buildDayDetailMessage(day, itinerary);
+    let delay = 2000;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const result = await streamChat({
+          message,
+          preferences,
+          userLocation,
+          tripDates,
+          llmModel,
+          callRole: "day_detail",
+        });
+        if (result?.itinerary?.days?.length) {
+          setCurrentItinerary((prev) => {
+            if (!prev) return prev;
+            const incoming = result.itinerary.days;
+            const updatedMap = new Map(incoming.map((d) => [d.day, d]));
+            const merged = (prev.days ?? []).map((d) => updatedMap.get(d.day) ?? d);
+            return { ...prev, days: merged };
+          });
+          setDayStatus(day.day, "done");
+          return;
+        }
+      } catch (err) {
+        if (err?.message?.includes("429") && attempt < 2) {
+          await new Promise((r) => setTimeout(r, delay));
+          delay *= 2;
+          continue;
+        }
+      }
+      break;
+    }
+    setDayStatus(day.day, "error");
+  }
+
+  async function planDaysActivities(itinerary) { // eslint-disable-line no-unused-vars
+    // Reset all day statuses to pending before starting.
+    const initial = {};
+    (itinerary.days ?? []).forEach((d) => { initial[d.day] = "pending"; });
+    setDayStatuses(initial);
+
+    // Phase 1: theme pass — assign each day a theme + suggested areas.
+    let themedItinerary = itinerary;
+    try {
+      const themesResult = await streamChat({
+        message: buildThemeMessage(itinerary),
+        preferences,
+        userLocation,
+        tripDates,
+        llmModel,
+        callRole: "day_themes",
+      });
+      if (themesResult?.itinerary?.days?.length) {
+        setCurrentItinerary((prev) => {
+          const themeMap = new Map(
+            (themesResult.itinerary.days ?? []).map((d) => [d.day, d])
+          );
+          const merged = (prev?.days ?? []).map((d) => ({
+            ...d,
+            ...(themeMap.get(d.day) ?? {}),
+          }));
+          return { ...(prev ?? {}), days: merged };
+        });
+        themedItinerary = {
+          ...itinerary,
+          days: (itinerary.days ?? []).map((d, i) => ({
+            ...d,
+            ...(themesResult.itinerary.days?.[i] ?? {}),
+          })),
+        };
+      }
+    } catch {
+      // Theme pass failed — continue without themes (detail queries use destination only).
+    }
+
+    // Phase 2: per-day detail queries, sliding window of CONCURRENCY=7.
+    // Requests dispatched in day order so earlier days display first.
+    const days = themedItinerary.days ?? [];
+    const CONCURRENCY = 7;
+    const promises = [];
+    for (let i = 0; i < days.length; i++) {
+      if (i >= CONCURRENCY) await promises[i - CONCURRENCY];
+      promises.push(planOneDayDetail(days[i], themedItinerary));
+    }
+    await Promise.all(promises);
+
+    setPanelWithCue("DAYS");
   }
 
   const handleSend = useCallback(
