@@ -34,14 +34,17 @@ the form and trigger planning on their behalf.
 ┌─────────────────────────────────────────────────────────────────┐
 │  FLIGHTS panel                                                  │
 │                                                                 │
+│  [ OUTBOUND ] [ RETURN ]  ← tabs appear for round trips          │
 │  ┌──────────────────────────┐  Outbound options from LLM        │
 │  │ ✈ CX 543  07:30→12:00   │  (sorted by price / duration)     │
 │  │   HK$1,240 · 4h 30m     │                                   │
 │  └──────────────────────────┘                                   │
 │                                                                 │
-│              [ PICK & FIND HOTELS → ]                           │
+│  One-way: [ PICK & FIND HOTELS → ]                              │
+│  Round-trip outbound: [ PICK OUTBOUND → ] → auto-switch tab     │
+│  Round-trip return:   [ PICK RETURN & FIND HOTELS → ]           │
 └────────────────────┬────────────────────────────────────────────┘
-                     │ fires Scoped Call B
+                     │ fires Scoped Call B (after BOTH legs picked for round trips)
                      ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  HOTELS panel                                                   │
@@ -121,15 +124,20 @@ Flight cabin: economy. Use search_flights with seat_class="economy".
 **Post-call UI:** Frontend navigates to FLIGHTS automatically when
 `partial_itinerary` SSE carries `flight.options`.
 
+**Round-trip:** For round trips, `search_flights` is called twice in one batch — outbound and return (swapped origin↔destination). The return call includes `return_date=<outbound_date>` so the Google Flights deep link generates a round-trip URL. Results land in `flight.options` (outbound) and `flight.return_options` (return). The FLIGHTS panel shows an OUTBOUND / RETURN tab strip when `return_options` is non-empty.
+
 ---
 
 ### Call B — Hotel Search (`onPick` on FLIGHTS panel)
 
-**Trigger:** User clicks `PICK & FIND HOTELS →` on a selected outbound flight.
+**Trigger (one-way):** User clicks `PICK & FIND HOTELS →` on the outbound flight.
+
+**Trigger (round-trip):** User first picks the outbound flight (tab auto-advances to RETURN), then clicks `PICK RETURN & FIND HOTELS →`. Both picks must be made before Call B fires.
 
 **Input payload (built in `App.jsx` `onPick` handler):**
 ```
 Selected outbound flight: CX 543, 07:30→12:00, HK$1,240.
+Selected return flight: JL 72, 18:00→21:30, HK$1,480. (round-trip only)
 Destination: Tokyo (35.68N, 139.69E). Dates: 2026-06-01 to 2026-06-03.
 Party: 2. Interests: food, temples. Budget: moderate.
 Find hotels near the city centre.
