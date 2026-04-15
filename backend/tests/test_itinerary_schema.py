@@ -178,9 +178,13 @@ class TestBadEscapes:
         if result:
             itinerary = Itinerary(**result)
             activity = itinerary.days[0].activities[0]
+            # transport_to_next must parse successfully even though the
+            # fixture's JSON contains bad backslash escapes in the polyline
+            # field.  polyline is intentionally omitted from TransportStep
+            # (it is fetched client-side), so we only verify the surrounding
+            # transport object was extracted correctly.
             assert activity.transport_to_next is not None
-            # Polyline should be a non-empty string (content may differ due to escaping)
-            assert len(activity.transport_to_next.polyline) > 5
+            assert activity.transport_to_next.mode == "WALK"
 
 
 # ─── _sanitize_json unit tests ──────────────────────────────────────────
