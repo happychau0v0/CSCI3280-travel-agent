@@ -941,6 +941,7 @@ function App() {
       // day stubs so planDaysActivities always has dates to loop over.
       if (reset) {
         setCurrentItinerary(initialItinerary);
+        setSuggestedFlightIdx(null);
       }
 
       // Edit-and-rerun: truncate the conversation back to before a
