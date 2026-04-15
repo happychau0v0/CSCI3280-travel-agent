@@ -3,6 +3,64 @@ import PlanHistoryPanel from "../PlanHistoryPanel";
 import { formatDisplayPrice } from "../SettingsOverlay";
 
 /**
+ * Custom dropdown — replaces native <select> to avoid backdrop-filter
+ * compositing-layer misalignment (Chrome positions the OS popup relative
+ * to the compositing layer, not the screen, so it can appear far off).
+ */
+function SelectField({ value, options, onChange, fieldKey, isFocused, callbackRef, onFocus, testId }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+  const selected = options.find(([v]) => v === value) || options[0];
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div className="home-select-wrap" ref={wrapRef} data-testid={testId}>
+      <button
+        ref={callbackRef}
+        type="button"
+        className={`home-form-input home-select-trigger${isFocused ? " field-focused" : ""}`}
+        onClick={() => { setOpen((o) => !o); onFocus?.(); }}
+        onFocus={onFocus}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        data-field={fieldKey}
+      >
+        <span className="home-select-label">{selected[1]}</span>
+        <span className="home-select-arrow" aria-hidden>▾</span>
+      </button>
+      {open && (
+        <ul className="home-select-menu" role="listbox">
+          {options.map(([v, label]) => (
+            <li
+              key={v}
+              role="option"
+              aria-selected={v === value}
+              className={`home-select-option${v === value ? " selected" : ""}`}
+              onMouseDown={(e) => {
+                e.preventDefault(); // keep focus on trigger
+                onChange(v);
+                setOpen(false);
+              }}
+            >
+              {label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/**
  * PLAN (was HOME) — the trip-setup panel. Left = editable form,
  * center = globe background, right = NEXT STEPS hint card. Round 10
  * dropped the bottom flight/hotel preview cards so the form fits at
@@ -301,6 +359,12 @@ export default function PanelHome({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formPrefill]);
 
+  // updateVal accepts a raw value (used by SelectField); updateEv accepts an event (used by inputs).
+  const updateVal = (key) => (val) => {
+    const next = { ...form, [key]: val };
+    setForm(next);
+    saveForm(next);
+  };
   const update = (key) => (e) => {
     const next = { ...form, [key]: e.target.value };
     setForm(next);
@@ -512,22 +576,16 @@ export default function PanelHome({
                   />
                 )}
                 {field.type === "select" && (
-                  <select
-                    ref={setRowRef(field.key)}
-                    value={value || ""}
-                    onChange={update(field.key)}
+                  <SelectField
+                    value={value || field.options[0][0]}
+                    options={field.options}
+                    onChange={updateVal(field.key)}
+                    fieldKey={field.key}
+                    isFocused={isFocused}
+                    callbackRef={setRowRef(field.key)}
                     onFocus={() => onJumpTo && onJumpTo("HOME", i)}
-                    className="home-form-input"
-                    data-testid={`home-input-${field.key}`}
-                    data-field={field.key}
-                    {...(isFocused ? { "data-editor-active": "true" } : {})}
-                  >
-                    {field.options.map(([v, label]) => (
-                      <option key={v} value={v}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
+                    testId={`home-input-${field.key}`}
+                  />
                 )}
                 {isFocused && pendingInputRequest?.prompt && (
                   <div className="home-form-prompt" role="status">
