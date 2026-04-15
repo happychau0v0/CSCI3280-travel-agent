@@ -1219,7 +1219,9 @@ function App() {
               pendingNavigateRef.current = null;
               suppressDoneNavRef.current = true;
               if (menu.state.panel !== "HOME") menu.setPanel("HOME");
-              const prefill = payload?.prefill || {};
+              // The SSE payload is the raw tool args: {destination, start_date, ...}.
+              // Strip the event system's injected `t` field before using as prefill.
+              const { t: _t, ...prefill } = payload || {};
               if (Object.keys(prefill).length > 0) {
                 setPendingFormPrefill(prefill);
               }
