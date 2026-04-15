@@ -17,6 +17,7 @@
 #   NO_RELOAD=1         (backend skips --reload, use for prod-style runs)
 #   BACKEND_ONLY=1      (skip frontend restart)
 #   FRONTEND_ONLY=1     (skip backend restart)
+#   NO_TAILSCALE=1      (skip Tailscale serve setup even if tailscale is installed)
 
 set -euo pipefail
 
@@ -148,6 +149,25 @@ EOF
   return 1
 }
 
+# ─── Tailscale ────────────────────────────────────────────────────────
+setup_tailscale() {
+  if [[ -n "${NO_TAILSCALE:-}" ]]; then return 0; fi
+  if ! command -v tailscale &>/dev/null; then return 0; fi
+
+  local ts_host
+  ts_host="$(tailscale status --json 2>/dev/null | python3 -c \
+    "import sys,json; d=json.load(sys.stdin); print(d.get('Self',{}).get('DNSName','').rstrip('.'))" \
+    2>/dev/null || true)"
+  if [[ -z "$ts_host" ]]; then return 0; fi
+
+  echo "→ configuring Tailscale HTTPS serve for ${ts_host}"
+  sudo tailscale serve --bg --https=443  / "http://localhost:${FRONTEND_PORT}" &>/dev/null || true
+  sudo tailscale serve --bg --https="${BACKEND_PORT}" / "http://localhost:${BACKEND_PORT}" &>/dev/null || true
+  echo "✅ Tailscale serve active"
+  echo "   frontend → https://${ts_host}/"
+  echo "   backend  → https://${ts_host}:${BACKEND_PORT}/"
+}
+
 # ─── Run ──────────────────────────────────────────────────────────────
 if [[ -z "${FRONTEND_ONLY:-}" ]]; then
   restart_backend
@@ -155,6 +175,7 @@ fi
 if [[ -z "${BACKEND_ONLY:-}" ]]; then
   restart_frontend
 fi
+setup_tailscale
 
 echo ""
 echo "→ open http://localhost:${FRONTEND_PORT}"
