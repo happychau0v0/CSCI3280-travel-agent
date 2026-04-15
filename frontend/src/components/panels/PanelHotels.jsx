@@ -23,13 +23,6 @@ const PRICE_LEVEL_LABELS = {
   PRICE_LEVEL_VERY_EXPENSIVE: "$$$$",
 };
 
-const PRICE_LEVEL_ESTIMATES = {
-  PRICE_LEVEL_FREE: "Free",
-  PRICE_LEVEL_INEXPENSIVE: "~HK$400–900/night (est.)",
-  PRICE_LEVEL_MODERATE: "~HK$900–2,000/night (est.)",
-  PRICE_LEVEL_EXPENSIVE: "~HK$2,000–5,000/night (est.)",
-  PRICE_LEVEL_VERY_EXPENSIVE: "HK$5,000+/night (est.)",
-};
 
 const PRICE_LEVEL_RANK = {
   PRICE_LEVEL_FREE: 0,
@@ -225,10 +218,7 @@ export default function PanelHotels({
                   <div className="hotel-option-meta">
                     {h.rating != null && <>★ {h.rating.toFixed(1)}</>}
                     {PRICE_LEVEL_LABELS[h.price_level] && (
-                      <> · {PRICE_LEVEL_LABELS[h.price_level]}</>
-                    )}
-                    {PRICE_LEVEL_ESTIMATES[h.price_level] && (
-                      <> · {PRICE_LEVEL_ESTIMATES[h.price_level]}</>
+                      <> · <span title="Price category from Google Places — check the hotel for actual rates.">{PRICE_LEVEL_LABELS[h.price_level]}</span></>
                     )}
                   </div>
                 </div>
@@ -256,9 +246,9 @@ export default function PanelHotels({
                 </span>
               )}
             </div>
-            {selected.price_level && PRICE_LEVEL_ESTIMATES[selected.price_level] && (
-              <div className="hotel-detail-estimate">
-                {PRICE_LEVEL_ESTIMATES[selected.price_level]}
+            {selected.price_level && PRICE_LEVEL_LABELS[selected.price_level] && (
+              <div className="hotel-detail-estimate" title="Price category from Google Places — check the hotel for actual rates.">
+                {PRICE_LEVEL_LABELS[selected.price_level]}
               </div>
             )}
             <div className="hotel-detail-address">{selected.address}</div>
