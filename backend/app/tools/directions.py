@@ -78,6 +78,49 @@ def _parse_step(step: dict) -> dict:
     }
 
 
+def _collapse_drive_steps(steps: list[dict]) -> list[dict]:
+    """Replace consecutive DRIVE steps with a single summary step.
+
+    Turn-by-turn driving instructions are noise in a travel itinerary — only
+    transit steps (which bus/train to board, where to alight) need detail.
+    """
+    result: list[dict] = []
+    i = 0
+    while i < len(steps):
+        if steps[i].get("type") != "DRIVE":
+            result.append(steps[i])
+            i += 1
+            continue
+        # Collect the run of DRIVE steps and sum their durations/distances.
+        j = i
+        total_sec = 0
+        total_m = 0
+        while j < len(steps) and steps[j].get("type") == "DRIVE":
+            # duration is already formatted (e.g. "5 min") — we need raw seconds.
+            # Re-parse from the formatted string as a best-effort approximation.
+            dur = steps[j].get("duration", "")
+            m = re.match(r"(?:(\d+)h\s*)?(\d+)\s*min", dur)
+            if m:
+                total_sec += (int(m.group(1) or 0) * 3600) + int(m.group(2)) * 60
+            # distance is formatted (e.g. "1.2 km" or "300 m")
+            dist = steps[j].get("distance", "")
+            km = re.match(r"([\d.]+)\s*km", dist)
+            metres = re.match(r"(\d+)\s*m$", dist)
+            if km:
+                total_m += int(float(km.group(1)) * 1000)
+            elif metres:
+                total_m += int(metres.group(1))
+            j += 1
+        result.append({
+            "type": "DRIVE",
+            "instruction": "Drive",
+            "duration": _format_duration(f"{total_sec}s") if total_sec else "",
+            "distance": _format_distance(total_m) if total_m else "",
+        })
+        i = j
+    return result
+
+
 def _format_duration(duration_str: str) -> str:
     """Convert protobuf '1234s' to '20 min' or '2h 5min'."""
     if not duration_str:
@@ -155,11 +198,12 @@ async def get_directions(
         return {"duration": "", "distance": "", "steps": [], "polyline": ""}
 
     route = routes[0]
-    steps = [
+    raw_steps = [
         _parse_step(s)
         for leg in route.get("legs", [])
         for s in leg.get("steps", [])
     ]
+    steps = _collapse_drive_steps(raw_steps)
 
     return {
         "duration": _format_duration(route.get("duration", "")),
