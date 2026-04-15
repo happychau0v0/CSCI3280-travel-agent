@@ -979,6 +979,7 @@ function App() {
         setCurrentItinerary(initialItinerary);
         setSuggestedFlightIdx(null);
         setSuggestedHotelIdx(null);
+        setPendingReplacement(null);
       }
 
       // Edit-and-rerun: truncate the conversation back to before a
@@ -1187,8 +1188,8 @@ function App() {
                 menu.navigate({ panel: "HOTELS" });
               }
             } else if (type === "replace_activity") {
-              // Chat mode — LLM wants to replace a day activity.
-              // Queue the days replan to fire AFTER this stream's done event.
+              // Chat mode — queue the replace LLM call to fire AFTER this
+              // stream's done event to avoid concurrent-request races.
               const { day, activity_name, query } = payload || {};
               const dest = currentItineraryRef.current?.destination || "the destination";
               // Look up the original activity to pass its timing to the LLM.
@@ -1357,20 +1358,14 @@ function App() {
           idleTimerRef.current = null;
         }, 1500);
 
-        // Flush any pick_flight / pick_hotel / replace_activity chained send.
-        // These are queued (not fired immediately) to avoid concurrent-request
-        // races where the chained handleSend would start while this stream is
-        // still running, causing message-state collisions.
+        // Flush any replace_activity chained send. Queued (not fired
+        // immediately) to avoid concurrent-request races where the chained
+        // handleSend would start while this stream is still live.
         if (pendingChainedSendRef.current) {
           const pending = pendingChainedSendRef.current;
           pendingChainedSendRef.current = null;
-          if (pending.__planDays) {
-            const snap = currentItineraryRef.current;
-            if (snap) planDaysActivities({ ...snap, selected_hotel: pending.hotel });
-          } else {
-            // Small delay so the done-state UI settles before the next agent turn.
-            setTimeout(() => handleSend(pending.text, pending.opts), 50);
-          }
+          // Small delay so the done-state UI settles before the next agent turn.
+          setTimeout(() => handleSend(pending.text, pending.opts), 50);
         }
 
         // Auto-reopen the chat popover on a follow-up question. If the
