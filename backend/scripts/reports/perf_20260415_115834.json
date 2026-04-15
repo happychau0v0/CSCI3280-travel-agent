@@ -1,0 +1,121 @@
+{
+  "timestamp": "2026-04-15T11:58:34.307198",
+  "backend": "http://127.0.0.1:8000",
+  "prompt": "Build a 3-day itinerary for Tokyo staying at Park Hyatt Tokyo. Dates 2026-06-01 to 2026-06-03. Party: 2.",
+  "summary": {
+    "ttfb_ms": 1.2568339589051902,
+    "total_ms": 39960.66337497905,
+    "total_llm_ms": 36902.0,
+    "total_tool_ms": 3022.0,
+    "overhead_ms": 36.66337497904897,
+    "tool_rounds": 2,
+    "tools_called": [
+      "search_places",
+      "search_places",
+      "search_places",
+      "search_places",
+      "search_places",
+      "search_places",
+      "search_places",
+      "search_places",
+      "get_weather",
+      "get_weather",
+      "get_weather"
+    ]
+  },
+  "rounds": [
+    {
+      "round": 0,
+      "thinking_t": 0.0,
+      "ttft_ms": null,
+      "llm_dur_ms": 3704.0,
+      "first_token_t": null,
+      "last_token_t": null,
+      "tool_pairs": [
+        {
+          "name": "search_places",
+          "elapsed_ms": 480,
+          "start_t": 3706.0,
+          "end_t": 4188.0
+        },
+        {
+          "name": "search_places",
+          "elapsed_ms": 541,
+          "start_t": 3706.0,
+          "end_t": 4250.0
+        },
+        {
+          "name": "search_places",
+          "elapsed_ms": 545,
+          "start_t": 3706.0,
+          "end_t": 4252.0
+        },
+        {
+          "name": "search_places",
+          "elapsed_ms": 702,
+          "start_t": 3707.0,
+          "end_t": 4408.0
+        },
+        {
+          "name": "search_places",
+          "elapsed_ms": 737,
+          "start_t": 3707.0,
+          "end_t": 4444.0
+        },
+        {
+          "name": "search_places",
+          "elapsed_ms": 875,
+          "start_t": 3707.0,
+          "end_t": 4584.0
+        },
+        {
+          "name": "search_places",
+          "elapsed_ms": 882,
+          "start_t": 3707.0,
+          "end_t": 4590.0
+        },
+        {
+          "name": "search_places",
+          "elapsed_ms": 1069,
+          "start_t": 3708.0,
+          "end_t": 4777.0
+        },
+        {
+          "name": "get_weather",
+          "elapsed_ms": 1825,
+          "start_t": 3704.0,
+          "end_t": 5531.0
+        },
+        {
+          "name": "get_weather",
+          "elapsed_ms": 3014,
+          "start_t": 3704.0,
+          "end_t": 6719.0
+        },
+        {
+          "name": "get_weather",
+          "elapsed_ms": 3022,
+          "start_t": 3705.0,
+          "end_t": 6727.0
+        }
+      ],
+      "par_efficiency": 0.22071282500730355,
+      "max_elapsed_ms": 3022,
+      "sum_elapsed_ms": 13692,
+      "partials": []
+    },
+    {
+      "round": 1,
+      "thinking_t": 6727.0,
+      "ttft_ms": 7458.0,
+      "llm_dur_ms": 33198.0,
+      "first_token_t": 14185.0,
+      "last_token_t": 39925.0,
+      "tool_pairs": [],
+      "par_efficiency": null,
+      "max_elapsed_ms": 0,
+      "sum_elapsed_ms": 0,
+      "partials": []
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "timestamp": "2026-04-15T11:42:46.490026",
+  "backend": "http://127.0.0.1:8000",
+  "prompt": "Find hotels in Tokyo Shinjuku. Dates 2026-06-01 to 2026-06-03.",
+  "summary": {
+    "ttfb_ms": 1.6062079812400043,
+    "total_ms": 65828.8487920072,
+    "total_llm_ms": 63885.0,
+    "total_tool_ms": 1766.0,
+    "overhead_ms": 177.84879200719297,
+    "tool_rounds": 2,
+    "tools_called": [
+      "search_places",
+      "get_weather"
+    ]
+  },
+  "rounds": [
+    {
+      "round": 0,
+      "thinking_t": 0.0,
+      "ttft_ms": null,
+      "llm_dur_ms": 7623.0,
+      "first_token_t": null,
+      "last_token_t": null,
+      "tool_pairs": [
+        {
+          "name": "search_places",
+          "elapsed_ms": 818,
+          "start_t": 7623.0,
+          "end_t": 8442.0
+        },
+        {
+          "name": "get_weather",
+          "elapsed_ms": 1766,
+          "start_t": 7626.0,
+          "end_t": 9392.0
+        }
+      ],
+      "par_efficiency": 0.68343653250774,
+      "max_elapsed_ms": 1766,
+      "sum_elapsed_ms": 2584,
+      "partials": []
+    },
+    {
+      "round": 1,
+      "thinking_t": 9392.0,
+      "ttft_ms": 13632.0,
+      "llm_dur_ms": 56262.0,
+      "first_token_t": 23024.0,
+      "last_token_t": 65654.0,
+      "tool_pairs": [],
+      "par_efficiency": null,
+      "max_elapsed_ms": 0,
+      "sum_elapsed_ms": 0,
+      "partials": []
+    }
+  ]
+}

@@ -1,0 +1,261 @@
+{
+  "timestamp": "2026-04-15T11:45:39.247031",
+  "backend": "http://127.0.0.1:8000",
+  "prompt": "Build a 3-day itinerary for Tokyo staying at Park Hyatt Tokyo. Dates 2026-06-01 to 2026-06-03. Party: 2.",
+  "summary": {
+    "ttfb_ms": 2.1727089770138264,
+    "total_ms": 165688.58487496618,
+    "total_llm_ms": 161842.0,
+    "total_tool_ms": 3673.0,
+    "overhead_ms": 173.58487496618181,
+    "tool_rounds": 3,
+    "tools_called": [
+      "search_places",
+      "search_places",
+      "search_places",
+      "search_places",
+      "search_places",
+      "search_places",
+      "search_places",
+      "search_places",
+      "search_places",
+      "search_places",
+      "search_places",
+      "get_weather",
+      "get_weather",
+      "get_weather",
+      "get_place_details",
+      "get_place_details",
+      "get_place_details",
+      "get_place_details",
+      "get_place_details",
+      "get_place_details",
+      "get_place_details",
+      "get_place_details",
+      "get_directions",
+      "get_directions",
+      "get_directions",
+      "get_directions",
+      "get_directions",
+      "get_directions",
+      "search_places"
+    ]
+  },
+  "rounds": [
+    {
+      "round": 0,
+      "thinking_t": 0.0,
+      "ttft_ms": null,
+      "llm_dur_ms": 30153.0,
+      "first_token_t": null,
+      "last_token_t": null,
+      "tool_pairs": [
+        {
+          "name": "search_places",
+          "elapsed_ms": 516,
+          "start_t": 30156.0,
+          "end_t": 30673.0
+        },
+        {
+          "name": "search_places",
+          "elapsed_ms": 523,
+          "start_t": 30157.0,
+          "end_t": 30682.0
+        },
+        {
+          "name": "search_places",
+          "elapsed_ms": 523,
+          "start_t": 30157.0,
+          "end_t": 30682.0
+        },
+        {
+          "name": "search_places",
+          "elapsed_ms": 525,
+          "start_t": 30158.0,
+          "end_t": 30682.0
+        },
+        {
+          "name": "search_places",
+          "elapsed_ms": 523,
+          "start_t": 30158.0,
+          "end_t": 30683.0
+        },
+        {
+          "name": "search_places",
+          "elapsed_ms": 526,
+          "start_t": 30158.0,
+          "end_t": 30683.0
+        },
+        {
+          "name": "search_places",
+          "elapsed_ms": 525,
+          "start_t": 30159.0,
+          "end_t": 30684.0
+        },
+        {
+          "name": "search_places",
+          "elapsed_ms": 531,
+          "start_t": 30159.0,
+          "end_t": 30688.0
+        },
+        {
+          "name": "search_places",
+          "elapsed_ms": 569,
+          "start_t": 30159.0,
+          "end_t": 30729.0
+        },
+        {
+          "name": "search_places",
+          "elapsed_ms": 570,
+          "start_t": 30159.0,
+          "end_t": 30731.0
+        },
+        {
+          "name": "search_places",
+          "elapsed_ms": 746,
+          "start_t": 30160.0,
+          "end_t": 30903.0
+        },
+        {
+          "name": "get_weather",
+          "elapsed_ms": 1569,
+          "start_t": 30153.0,
+          "end_t": 31725.0
+        },
+        {
+          "name": "get_weather",
+          "elapsed_ms": 2725,
+          "start_t": 30155.0,
+          "end_t": 32878.0
+        },
+        {
+          "name": "get_weather",
+          "elapsed_ms": 2737,
+          "start_t": 30156.0,
+          "end_t": 32894.0
+        }
+      ],
+      "par_efficiency": 0.20880378394873358,
+      "max_elapsed_ms": 2737,
+      "sum_elapsed_ms": 13108,
+      "partials": []
+    },
+    {
+      "round": 1,
+      "thinking_t": 32894.0,
+      "ttft_ms": null,
+      "llm_dur_ms": 19452.0,
+      "first_token_t": null,
+      "last_token_t": null,
+      "tool_pairs": [
+        {
+          "name": "get_place_details",
+          "elapsed_ms": 189,
+          "start_t": 52346.0,
+          "end_t": 52537.0
+        },
+        {
+          "name": "get_place_details",
+          "elapsed_ms": 186,
+          "start_t": 52348.0,
+          "end_t": 52538.0
+        },
+        {
+          "name": "get_place_details",
+          "elapsed_ms": 195,
+          "start_t": 52349.0,
+          "end_t": 52544.0
+        },
+        {
+          "name": "get_place_details",
+          "elapsed_ms": 236,
+          "start_t": 52349.0,
+          "end_t": 52585.0
+        },
+        {
+          "name": "get_place_details",
+          "elapsed_ms": 236,
+          "start_t": 52349.0,
+          "end_t": 52586.0
+        },
+        {
+          "name": "get_place_details",
+          "elapsed_ms": 236,
+          "start_t": 52350.0,
+          "end_t": 52587.0
+        },
+        {
+          "name": "get_place_details",
+          "elapsed_ms": 239,
+          "start_t": 52350.0,
+          "end_t": 52590.0
+        },
+        {
+          "name": "get_place_details",
+          "elapsed_ms": 247,
+          "start_t": 52350.0,
+          "end_t": 52591.0
+        },
+        {
+          "name": "get_directions",
+          "elapsed_ms": 364,
+          "start_t": 52351.0,
+          "end_t": 52717.0
+        },
+        {
+          "name": "get_directions",
+          "elapsed_ms": 368,
+          "start_t": 52351.0,
+          "end_t": 52719.0
+        },
+        {
+          "name": "get_directions",
+          "elapsed_ms": 378,
+          "start_t": 52352.0,
+          "end_t": 52730.0
+        },
+        {
+          "name": "get_directions",
+          "elapsed_ms": 459,
+          "start_t": 52352.0,
+          "end_t": 52811.0
+        },
+        {
+          "name": "get_directions",
+          "elapsed_ms": 486,
+          "start_t": 52353.0,
+          "end_t": 52838.0
+        },
+        {
+          "name": "get_directions",
+          "elapsed_ms": 503,
+          "start_t": 52353.0,
+          "end_t": 52856.0
+        },
+        {
+          "name": "search_places",
+          "elapsed_ms": 936,
+          "start_t": 52350.0,
+          "end_t": 53288.0
+        }
+      ],
+      "par_efficiency": 0.17801445416508177,
+      "max_elapsed_ms": 936,
+      "sum_elapsed_ms": 5258,
+      "partials": []
+    },
+    {
+      "round": 2,
+      "thinking_t": 53289.0,
+      "ttft_ms": 16022.0,
+      "llm_dur_ms": 112237.0,
+      "first_token_t": 69311.0,
+      "last_token_t": 165526.0,
+      "tool_pairs": [],
+      "par_efficiency": null,
+      "max_elapsed_ms": 0,
+      "sum_elapsed_ms": 0,
+      "partials": []
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "timestamp": "2026-04-15T10:25:12.011995",
+  "backend": "http://127.0.0.1:8000",
+  "prompt": "Selected flight: HK Express, 06:30\u219211:35, HK$1100. Destination: Tokyo (35.68N, 139.69E). Dates: 2026-06-01 to 2026-06-03. Party: 2. Interests: food, temples. Budget: moderate. Find hotels near the city centre.",
+  "summary": {
+    "ttfb_ms": 1.2794589856639504,
+    "total_ms": 4998.44049999956,
+    "total_llm_ms": 4303.0,
+    "total_tool_ms": 0.0,
+    "overhead_ms": 695.4404999995604,
+    "tool_rounds": 2,
+    "tools_called": [
+      "get_weathersearch_places"
+    ]
+  },
+  "rounds": [
+    {
+      "round": 0,
+      "thinking_t": 0.0,
+      "ttft_ms": null,
+      "llm_dur_ms": 4303.0,
+      "first_token_t": null,
+      "last_token_t": null,
+      "tool_pairs": [
+        {
+          "name": "get_weathersearch_places",
+          "elapsed_ms": 0,
+          "start_t": 4303.0,
+          "end_t": 4303.0
+        }
+      ],
+      "par_efficiency": 1.0,
+      "max_elapsed_ms": 0,
+      "sum_elapsed_ms": 0,
+      "partials": []
+    },
+    {
+      "round": 1,
+      "thinking_t": 4303.0,
+      "ttft_ms": null,
+      "llm_dur_ms": null,
+      "first_token_t": null,
+      "last_token_t": null,
+      "tool_pairs": [],
+      "par_efficiency": null,
+      "max_elapsed_ms": 0,
+      "sum_elapsed_ms": 0,
+      "partials": []
+    }
+  ]
+}

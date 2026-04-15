@@ -1,0 +1,81 @@
+{
+  "timestamp": "2026-04-15T11:09:27.007173",
+  "backend": "http://127.0.0.1:8000",
+  "prompt": "Plan a 3-day trip from Hong Kong to Tokyo. START DATE: 2026-06-01. END DATE: 2026-06-03. Transport: plane. Party: 2 people. Interests: food, temples. Flight cabin: economy.",
+  "summary": {
+    "ttfb_ms": 106.20395897421986,
+    "total_ms": 48626.88266695477,
+    "total_llm_ms": 44865.0,
+    "total_tool_ms": 3694.0,
+    "overhead_ms": 67.88266695477068,
+    "tool_rounds": 2,
+    "tools_called": [
+      "get_phrasebook",
+      "geocode_city",
+      "search_flights",
+      "search_flights"
+    ]
+  },
+  "rounds": [
+    {
+      "round": 0,
+      "thinking_t": 3.0,
+      "ttft_ms": null,
+      "llm_dur_ms": 11219.0,
+      "first_token_t": null,
+      "last_token_t": null,
+      "tool_pairs": [
+        {
+          "name": "get_phrasebook",
+          "elapsed_ms": 1,
+          "start_t": 11353.0,
+          "end_t": 11353.0
+        },
+        {
+          "name": "geocode_city",
+          "elapsed_ms": 522,
+          "start_t": 11222.0,
+          "end_t": 11744.0
+        },
+        {
+          "name": "search_flights",
+          "elapsed_ms": 1833,
+          "start_t": 11224.0,
+          "end_t": 13056.0
+        },
+        {
+          "name": "search_flights",
+          "elapsed_ms": 3694,
+          "start_t": 11225.0,
+          "end_t": 14918.0
+        }
+      ],
+      "par_efficiency": 0.6105785123966943,
+      "max_elapsed_ms": 3694,
+      "sum_elapsed_ms": 6050,
+      "partials": [
+        {
+          "label": "flight",
+          "t": 13056.0
+        },
+        {
+          "label": "flight",
+          "t": 14918.0
+        }
+      ]
+    },
+    {
+      "round": 1,
+      "thinking_t": 14919.0,
+      "ttft_ms": 26219.0,
+      "llm_dur_ms": 33646.0,
+      "first_token_t": 41138.0,
+      "last_token_t": 48565.0,
+      "tool_pairs": [],
+      "par_efficiency": null,
+      "max_elapsed_ms": 0,
+      "sum_elapsed_ms": 0,
+      "partials": []
+    }
+  ]
+}

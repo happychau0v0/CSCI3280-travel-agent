@@ -1,0 +1,98 @@
+{
+  "timestamp": "2026-04-15T04:02:26.347580",
+  "backend": "http://localhost:8000",
+  "prompt": "Search flights from Hong Kong to Tokyo on 2026-05-10 for 2 adults economy.",
+  "summary": {
+    "ttfb_ms": 90.179666003678,
+    "total_ms": 48808.726124989334,
+    "total_llm_ms": 21179.0,
+    "total_tool_ms": 1918.0,
+    "overhead_ms": 25711.726124989334,
+    "tool_rounds": 3,
+    "tools_called": [
+      "request_input",
+      "get_phrasebook",
+      "get_day_windows",
+      "geocode_city",
+      "search_flights"
+    ]
+  },
+  "rounds": [
+    {
+      "round": 0,
+      "thinking_t": 3.0,
+      "ttft_ms": null,
+      "llm_dur_ms": null,
+      "first_token_t": null,
+      "last_token_t": null,
+      "tool_pairs": [
+        {
+          "name": "request_input",
+          "elapsed_ms": 3,
+          "start_t": 16992.0,
+          "end_t": 16995.0
+        }
+      ],
+      "par_efficiency": 1.0,
+      "max_elapsed_ms": 3,
+      "sum_elapsed_ms": 3,
+      "partials": []
+    },
+    {
+      "round": 1,
+      "thinking_t": 16995.0,
+      "ttft_ms": null,
+      "llm_dur_ms": null,
+      "first_token_t": null,
+      "last_token_t": null,
+      "tool_pairs": [
+        {
+          "name": "get_phrasebook",
+          "elapsed_ms": 0,
+          "start_t": 25685.0,
+          "end_t": 25800.0
+        },
+        {
+          "name": "get_day_windows",
+          "elapsed_ms": 0,
+          "start_t": 25800.0,
+          "end_t": 25800.0
+        },
+        {
+          "name": "geocode_city",
+          "elapsed_ms": 528,
+          "start_t": 25684.0,
+          "end_t": 26212.0
+        },
+        {
+          "name": "search_flights",
+          "elapsed_ms": 1915,
+          "start_t": 25685.0,
+          "end_t": 27600.0
+        }
+      ],
+      "par_efficiency": 0.7838722881702824,
+      "max_elapsed_ms": 1915,
+      "sum_elapsed_ms": 2443,
+      "partials": [
+        {
+          "label": "flight",
+          "t": 27600.0
+        }
+      ]
+    },
+    {
+      "round": 2,
+      "thinking_t": 27600.0,
+      "ttft_ms": 17139.0,
+      "llm_dur_ms": 21179.0,
+      "first_token_t": 44739.0,
+      "last_token_t": 48779.0,
+      "tool_pairs": [],
+      "par_efficiency": null,
+      "max_elapsed_ms": 0,
+      "sum_elapsed_ms": 0,
+      "partials": []
+    }
+  ]
+}

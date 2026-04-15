@@ -1,0 +1,107 @@
+{
+  "timestamp": "2026-04-15T11:10:48.426963",
+  "backend": "http://127.0.0.1:8000",
+  "prompt": "Find hotels in Tokyo (Shinjuku area). Destination lat: 35.6762, lng: 139.6503. Dates: 2026-06-01 to 2026-06-03. Budget: medium. Party: 2 people. Interests: food, temples.",
+  "summary": {
+    "ttfb_ms": 1.2024999596178532,
+    "total_ms": 66339.70787498401,
+    "total_llm_ms": 64454.0,
+    "total_tool_ms": 1817.0,
+    "overhead_ms": 68.70787498401478,
+    "tool_rounds": 3,
+    "tools_called": [
+      "search_places",
+      "get_weather",
+      "get_place_details",
+      "get_place_details",
+      "get_place_details",
+      "get_place_details",
+      "get_place_details"
+    ]
+  },
+  "rounds": [
+    {
+      "round": 0,
+      "thinking_t": 0.0,
+      "ttft_ms": null,
+      "llm_dur_ms": 13879.0,
+      "first_token_t": null,
+      "last_token_t": null,
+      "tool_pairs": [
+        {
+          "name": "search_places",
+          "elapsed_ms": 885,
+          "start_t": 13879.0,
+          "end_t": 14764.0
+        },
+        {
+          "name": "get_weather",
+          "elapsed_ms": 1628,
+          "start_t": 13880.0,
+          "end_t": 15507.0
+        }
+      ],
+      "par_efficiency": 0.6478312773577397,
+      "max_elapsed_ms": 1628,
+      "sum_elapsed_ms": 2513,
+      "partials": []
+    },
+    {
+      "round": 1,
+      "thinking_t": 15508.0,
+      "ttft_ms": null,
+      "llm_dur_ms": 12229.0,
+      "first_token_t": null,
+      "last_token_t": null,
+      "tool_pairs": [
+        {
+          "name": "get_place_details",
+          "elapsed_ms": 177,
+          "start_t": 27737.0,
+          "end_t": 27915.0
+        },
+        {
+          "name": "get_place_details",
+          "elapsed_ms": 182,
+          "start_t": 27738.0,
+          "end_t": 27921.0
+        },
+        {
+          "name": "get_place_details",
+          "elapsed_ms": 186,
+          "start_t": 27738.0,
+          "end_t": 27924.0
+        },
+        {
+          "name": "get_place_details",
+          "elapsed_ms": 189,
+          "start_t": 27738.0,
+          "end_t": 27925.0
+        },
+        {
+          "name": "get_place_details",
+          "elapsed_ms": 188,
+          "start_t": 27738.0,
+          "end_t": 27926.0
+        }
+      ],
+      "par_efficiency": 0.20498915401301518,
+      "max_elapsed_ms": 189,
+      "sum_elapsed_ms": 922,
+      "partials": []
+    },
+    {
+      "round": 2,
+      "thinking_t": 27927.0,
+      "ttft_ms": 9542.0,
+      "llm_dur_ms": 38346.0,
+      "first_token_t": 37469.0,
+      "last_token_t": 66273.0,
+      "tool_pairs": [],
+      "par_efficiency": null,
+      "max_elapsed_ms": 0,
+      "sum_elapsed_ms": 0,
+      "partials": []
+    }
+  ]
+}

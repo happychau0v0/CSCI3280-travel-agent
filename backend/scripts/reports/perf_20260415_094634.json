@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-04-15T09:46:34.475845",
+  "backend": "http://127.0.0.1:8000",
+  "prompt": "Plan a 3-day trip from Hong Kong to Tokyo. START DATE: 2026-06-01. END DATE: 2026-06-03. Transport: plane. Party: 2 people. Interests: food, temples. Flight cabin: economy.",
+  "summary": {
+    "ttfb_ms": 89.21700000064448,
+    "total_ms": 25226.479333010502,
+    "total_llm_ms": 0.0,
+    "total_tool_ms": 0.0,
+    "overhead_ms": 25226.479333010502,
+    "tool_rounds": 1,
+    "tools_called": []
+  },
+  "rounds": [
+    {
+      "round": 0,
+      "thinking_t": 2.0,
+      "ttft_ms": null,
+      "llm_dur_ms": null,
+      "first_token_t": null,
+      "last_token_t": null,
+      "tool_pairs": [],
+      "par_efficiency": null,
+      "max_elapsed_ms": 0,
+      "sum_elapsed_ms": 0,
+      "partials": []
+    }
+  ]
+}
