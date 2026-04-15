@@ -321,7 +321,7 @@ async def _run_loop(
     # Scoped calls (plan/hotels/days) must NOT see prior conversation history —
     # each is a fresh, single-purpose call. Only the system prompt + the one
     # structured user message go in. Chat keeps the full history for context.
-    if call_role in ("plan", "hotels", "days"):
+    if call_role in ("plan", "hotels", "days", "day_themes", "day_detail"):
         # messages[-1] is the structured user prompt built by the frontend
         full_messages: list[dict] = [
             {"role": "system", "content": system_content},
