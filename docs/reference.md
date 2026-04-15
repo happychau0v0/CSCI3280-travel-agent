@@ -41,7 +41,8 @@
    - Adding new hotkeys
 8. [Service Status Overlay](#8-service-status-overlay)
 9. [Data Schemas](#9-data-schemas)
-10. [Known Limitations & Gaps](#10-known-limitations--gaps)
+10. [Static Data Files](#10-static-data-files)
+11. [Known Limitations & Gaps](#11-known-limitations--gaps)
 
 ---
 
