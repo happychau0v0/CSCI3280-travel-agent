@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import airports as airports_router
-from app.routers import chat, geo, itinerary, photo, speech, status, visa
+from app.routers import chat, export, geo, itinerary, photo, speech, status, visa
 from app.routers.directions import router as directions_router
 
 # ─── Logging setup ──────────────────────────────────────────────────
@@ -46,6 +46,7 @@ app.include_router(status.router)
 app.include_router(directions_router, prefix="/api")
 app.include_router(visa.router, prefix="/visa", tags=["visa"])
 app.include_router(airports_router.router)
+app.include_router(export.router, prefix="/export", tags=["export"])
 
 
 @app.get("/health")

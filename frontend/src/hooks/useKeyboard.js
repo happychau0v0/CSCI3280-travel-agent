@@ -149,14 +149,6 @@ export function useKeyboard({
           onOpenHelp?.();
           break;
 
-        case "p":
-        case "P":
-          if (!e.metaKey && !e.ctrlKey) {
-            e.preventDefault();
-            onOpenPrint?.();
-          }
-          break;
-
         case "l":
         case "L":
           if (!e.metaKey && !e.ctrlKey) {

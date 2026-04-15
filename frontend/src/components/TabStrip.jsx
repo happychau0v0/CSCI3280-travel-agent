@@ -6,6 +6,7 @@ const TAB_LABELS = {
   FLIGHTS: "FLIGHTS",
   HOTELS: "HOTELS",
   DAYS: "DAYS",
+  EXPORT: "EXPORT",
 };
 
 function chipClass(ms) {
@@ -107,19 +108,23 @@ export default function TabStrip({
   agentState = "idle",
   toolTimings = [],
   requestStartedAt = null,
+  exportEnabled = false,
 }) {
   return (
     <nav className="tab-strip" aria-label="Menu sections">
       {PANELS.map((panel, i) => {
         const isActive = panel === activePanel;
         const inFocus = isActive && scope === "tabs";
+        const isDisabled = panel === "EXPORT" && !exportEnabled;
         return (
           <button
             key={panel}
             type="button"
-            className={`tab${isActive ? " active" : ""}${inFocus ? " focused" : ""}`}
-            onClick={() => onTabClick?.(panel)}
+            className={`tab${isActive ? " active" : ""}${inFocus ? " focused" : ""}${isDisabled ? " disabled" : ""}`}
+            onClick={() => !isDisabled && onTabClick?.(panel)}
             aria-current={isActive ? "page" : undefined}
+            aria-disabled={isDisabled || undefined}
+            title={isDisabled ? "Complete your itinerary first (PLAN → FLIGHTS → HOTELS → DAYS)" : undefined}
           >
             <span className="tab-bracket">◢</span>
             <span className="tab-num">{i + 1}</span>

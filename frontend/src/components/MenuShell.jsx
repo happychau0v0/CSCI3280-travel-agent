@@ -22,6 +22,7 @@ export default function MenuShell({
   agentState = "idle",
   toolTimings = [],
   requestStartedAt = null,
+  exportEnabled = false,
   children,
 }) {
   return (
@@ -33,6 +34,7 @@ export default function MenuShell({
         agentState={agentState}
         toolTimings={toolTimings}
         requestStartedAt={requestStartedAt}
+        exportEnabled={exportEnabled}
       />
       <main className={`panel-slot scope-${state.scope}`}>{children}</main>
       <FooterHints

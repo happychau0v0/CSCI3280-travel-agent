@@ -5,7 +5,7 @@ import { useCallback, useState } from "react";
  *
  * State shape:
  *   {
- *     panel:     "HOME" | "FLIGHTS" | "HOTELS" | "DAYS",
+ *     panel:     "HOME" | "FLIGHTS" | "HOTELS" | "DAYS" | "EXPORT",
  *     listIndex: number,          // which item in the left list is highlighted
  *     side:      "left" | "right", // which column has keyboard focus
  *     filter:    object | null,   // optional sort/filter set by the LLM
@@ -22,7 +22,7 @@ import { useCallback, useState } from "react";
  *  - The LLM via the navigate_menu tool, which emits a `navigate` SSE event
  *    that App.jsx routes through `navigate({panel, item, filter})`
  */
-export const PANELS = ["HOME", "FLIGHTS", "HOTELS", "DAYS"];
+export const PANELS = ["HOME", "FLIGHTS", "HOTELS", "DAYS", "EXPORT"];
 
 // All four panels have a left-list cursor (form fields on HOME,
 // flight/hotel/day rows on the others).

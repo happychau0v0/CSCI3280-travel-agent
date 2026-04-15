@@ -14,7 +14,6 @@ import SettingsOverlay, {
 } from "./components/SettingsOverlay";
 
 import HelpOverlay from "./components/HelpOverlay";
-import PrintView from "./components/PrintView";
 import TripChecklist from "./components/TripChecklist";
 import FavoritesOverlay from "./components/FavoritesOverlay";
 import ServiceStatusOverlay from "./components/ServiceStatusOverlay";
@@ -22,6 +21,7 @@ import PanelHome from "./components/panels/PanelHome";
 import PanelFlights from "./components/panels/PanelFlights";
 import PanelHotels from "./components/panels/PanelHotels";
 import PanelDays from "./components/panels/PanelDays";
+import PanelExport from "./components/panels/PanelExport";
 import { IATA_TO_ISO2 } from "./data/countries";
 import { streamChat, API_BASE } from "./api/client";
 import { useGeolocation } from "./hooks/useGeolocation";
@@ -221,7 +221,6 @@ function App() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [printOpen, setPrintOpen] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
@@ -514,11 +513,11 @@ function App() {
     onUndo: handleUndoPick,
     onRedo: handleRedoPick,
     onOpenHelp: () => setHelpOpen(true),
-    onOpenPrint: () => setPrintOpen(true),
+    onOpenPrint: () => menu.setPanel("EXPORT"),
     onOpenChecklist: () => setChecklistOpen(true),
     onOpenFavorites: () => setFavoritesOpen(true),
     onOpenStatus: () => { cues.select(); setStatusOpen(true); },
-    enabled: !historyOpen && !settingsOpen && !helpOpen && !printOpen && !checklistOpen && !favoritesOpen && !statusOpen,
+    enabled: !historyOpen && !settingsOpen && !helpOpen && !checklistOpen && !favoritesOpen && !statusOpen,
   });
 
   // Persist messages + itinerary
@@ -612,7 +611,6 @@ function App() {
       historyOpen,
       settingsOpen,
       helpOpen,
-      printOpen,
       checklistOpen,
       favoritesOpen,
       favorites,
@@ -1393,6 +1391,7 @@ function App() {
         agentState={agentState}
         toolTimings={toolTimings}
         requestStartedAt={requestStartedAtRef}
+        exportEnabled={!!(currentItinerary?.days?.length > 0)}
       >
         {menu.state.panel === "HOME" && (
           <PanelHome
@@ -1745,6 +1744,12 @@ function App() {
             theme={theme}
           />
         )}
+        {menu.state.panel === "EXPORT" && (
+          <PanelExport
+            itinerary={currentItinerary}
+            visaAlert={visaAlert}
+          />
+        )}
       </MenuShell>
 
       {/* HISTORY overlay (H key) */}
@@ -1769,12 +1774,6 @@ function App() {
       />
 
       <HelpOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
-      <PrintView
-        open={printOpen}
-        itinerary={currentItinerary}
-        currency={currency}
-        onClose={() => setPrintOpen(false)}
-      />
       <TripChecklist
         open={checklistOpen}
         destinationKey={currentItinerary?.destination || "default"}

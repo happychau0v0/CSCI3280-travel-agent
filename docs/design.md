@@ -508,3 +508,65 @@ GET /visa/check?destination=JP&passport=HK
 | `frontend/src/components/panels/PanelFlights.jsx` | Renders the badge |
 | `frontend/src/App.jsx` | `visaAlert` state + fetch effect |
 | `frontend/src/components/SettingsOverlay.jsx` | PASSPORT field in prefs |
+
+---
+
+## Export Tab (Round: Export)
+
+A dedicated 5th panel for exporting the trip as a PDF document or Google Maps KML file.
+
+### Panel
+
+`5 EXPORT` appears in the TabStrip after `4 DAYS`. It is disabled (greyed out, `cursor: not-allowed`) until `currentItinerary.days.length > 0`. Pressing `5` on the keyboard navigates to it (same number-key convention as other panels). The former `P`-key → PrintView shortcut now navigates to this tab instead.
+
+### PDF Export
+
+**Flow:** User clicks "Download PDF" → frontend calls `POST /export/pdf` → backend renders a Jinja2 HTML template with weasyprint → returns a binary PDF blob → browser triggers file download as `itinerary-{destination}.pdf`.
+
+**PDF sections (in order):**
+1. Trip header (title, route, dates, local transport)
+2. Visa requirements (status, free days, notes — sourced from `visaAlert` state)
+3. Flight details (outbound + return; selected or top 3 options if none picked)
+4. Hotel (selected or first option)
+5. Day-by-day itinerary (date, theme, weather, activities with times/addresses/descriptions/transport)
+6. Pre-trip checklist (items from `TripChecklist` localStorage state, with ☑/☐ markers)
+7. Phrasebook (language + phrase table, if present in itinerary)
+
+**Backend endpoint:** `POST /export/pdf`  
+Request: `{ itinerary: object, visa_data: object|null, checklist_items: [{key, label, critical, checked}] }`  
+Response: `application/pdf` blob with `Content-Disposition: attachment`
+
+**Library:** weasyprint 68+ (HTML→PDF). Requires system libs: pango, cairo (available via Homebrew on macOS).
+
+**Template files:**
+- `backend/app/templates/itinerary.html` — Jinja2 HTML
+- `backend/app/templates/itinerary.css` — Clean B&W print CSS (inlined by the router)
+
+### Google Maps KML Export
+
+**Flow:** User clicks "Download KML" → client-side `generateKml(itinerary)` builds KML 2.2 XML string → browser downloads as `itinerary-{destination}.kml`. No backend call.
+
+**KML structure:**
+- Folder: Airports (origin + destination pins, labeled with IATA + city)
+- Folder: Hotel (1 pin)
+- Folder per day: "Day N — Theme" (activity pins with lat/lng, only those with coordinates)
+
+**Import into Google My Maps:** `mymaps.google.com → Create map → Import → select .kml`
+
+### Checklist data source
+
+Checklist items are read from `localStorage["travel-checklist"]` keyed by destination string. `PanelExport` reads this directly via `JSON.parse` to avoid prop-drilling through `TripChecklist`.
+
+### Files
+
+| File | Role |
+|------|------|
+| `backend/app/routers/export.py` | `POST /export/pdf` endpoint |
+| `backend/app/templates/itinerary.html` | Jinja2 PDF template |
+| `backend/app/templates/itinerary.css` | Print CSS (inlined) |
+| `frontend/src/components/panels/PanelExport.jsx` | 5th panel UI (two export cards) |
+| `frontend/src/utils/exportKml.js` | Client-side KML generator + download trigger |
+| `frontend/src/api/client.js` | `exportPdf()` function |
+| `frontend/src/hooks/useMenuState.js` | `"EXPORT"` added to PANELS array |
+| `frontend/src/components/TabStrip.jsx` | `exportEnabled` prop + disabled tab styling |
+| `frontend/src/components/MenuShell.jsx` | `exportEnabled` prop forwarded to TabStrip |

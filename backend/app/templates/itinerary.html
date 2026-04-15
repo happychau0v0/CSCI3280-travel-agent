@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{{ itinerary.title or itinerary.destination or "Trip Itinerary" }}</title>
+<style>
+{{ css }}
+</style>
+</head>
+<body>
+
+<!-- ── Trip Header ─────────────────────────────── -->
+<div class="trip-header">
+  <div class="trip-title">{{ itinerary.title or itinerary.destination or "Trip Itinerary" }}</div>
+  <div class="trip-route">
+    {% if itinerary.origin %}{{ itinerary.origin }}{% endif %}
+    {% if itinerary.origin and itinerary.destination %} → {% endif %}
+    {% if itinerary.destination %}{{ itinerary.destination }}{% endif %}
+    {% if days|length > 0 %} · {{ days|length }} day{% if days|length != 1 %}s{% endif %}{% endif %}
+  </div>
+  <div class="trip-meta">
+    {% if flight and flight.date %}Departure: {{ flight.date }}{% endif %}
+    {% if flight and flight.return_date %} · Return: {{ flight.return_date }}{% endif %}
+    {% if itinerary.local_transport_mode %} · Local transport: {{ itinerary.local_transport_mode }}{% endif %}
+  </div>
+</div>
+
+<!-- ── 1. Visa Requirements ──────────────────────── -->
+{% if visa_data %}
+<section>
+  <h2>Visa Requirements</h2>
+  {% set status = visa_data.status %}
+  <div class="visa-status {% if status == 'visa_free' %}visa-free{% elif status == 'visa_on_arrival' %}visa-on-arrival{% else %}visa-required{% endif %}">
+    {% if status == 'visa_free' %}Visa Free
+    {% elif status == 'visa_on_arrival' %}Visa on Arrival
+    {% elif status == 'visa_required' %}Visa Required
+    {% else %}Status Unknown{% endif %}
+  </div>
+  {% if visa_data.free_days %}
+  <div class="visa-notes">Allowed stay: {{ visa_data.free_days }} days</div>
+  {% endif %}
+  {% if visa_data.notes %}
+  <div class="visa-notes">{{ visa_data.notes }}</div>
+  {% endif %}
+  <div class="visa-notes dim">Passport: {{ visa_data.passport | upper }} · Destination: {{ visa_data.destination | upper }}</div>
+</section>
+{% endif %}
+
+<!-- ── 2. Flight ─────────────────────────────────── -->
+{% if flight %}
+<section>
+  <h2>Flight</h2>
+  <table class="flight-table">
+    <tr>
+      <th>Route</th>
+      <th>Date</th>
+      <th>Airline</th>
+      <th>Times</th>
+      <th>Stops</th>
+      <th>Price (est.)</th>
+    </tr>
+    <!-- Outbound -->
+    {% if selected_flight %}
+    <tr>
+      <td>{{ flight.from_iata }} → {{ flight.to_iata }}</td>
+      <td>{{ flight.date or "—" }}</td>
+      <td>{{ selected_flight.airline or "—" }}</td>
+      <td>
+        {% if selected_flight.departure_time %}{{ selected_flight.departure_time }}{% endif %}
+        {% if selected_flight.departure_time and selected_flight.arrival_time %} → {% endif %}
+        {% if selected_flight.arrival_time %}{{ selected_flight.arrival_time }}{% endif %}
+        {% if not selected_flight.departure_time %}—{% endif %}
+      </td>
+      <td>{{ selected_flight.stops if selected_flight.stops is not none else "—" }}</td>
+      <td>
+        {% if selected_flight.price_low %}
+          HKD {{ "{:,.0f}".format(selected_flight.price_low) }}
+          {% if selected_flight.price_high and selected_flight.price_high != selected_flight.price_low %}
+            – {{ "{:,.0f}".format(selected_flight.price_high) }}
+          {% endif %}
+        {% else %}—{% endif %}
+      </td>
+    </tr>
+    {% elif flight.options %}
+    {% for opt in flight.options[:3] %}
+    <tr>
+      <td>{{ flight.from_iata }} → {{ flight.to_iata }}</td>
+      <td>{{ flight.date or "—" }}</td>
+      <td>{{ opt.airline or "—" }}</td>
+      <td>
+        {% if opt.departure_time %}{{ opt.departure_time }}{% endif %}
+        {% if opt.departure_time and opt.arrival_time %} → {% endif %}
+        {% if opt.arrival_time %}{{ opt.arrival_time }}{% endif %}
+        {% if not opt.departure_time %}—{% endif %}
+      </td>
+      <td>{{ opt.stops if opt.stops is not none else "—" }}</td>
+      <td>
+        {% if opt.price_low %}HKD {{ "{:,.0f}".format(opt.price_low) }}{% else %}—{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    {% endif %}
+
+    <!-- Return flight -->
+    {% if selected_return_flight %}
+    <tr class="flight-label-row"><td colspan="6">Return Flight</td></tr>
+    <tr>
+      <td>{{ flight.to_iata }} → {{ flight.from_iata }}</td>
+      <td>{{ flight.return_date or "—" }}</td>
+      <td>{{ selected_return_flight.airline or "—" }}</td>
+      <td>
+        {% if selected_return_flight.departure_time %}{{ selected_return_flight.departure_time }}{% endif %}
+        {% if selected_return_flight.departure_time and selected_return_flight.arrival_time %} → {% endif %}
+        {% if selected_return_flight.arrival_time %}{{ selected_return_flight.arrival_time }}{% endif %}
+        {% if not selected_return_flight.departure_time %}—{% endif %}
+      </td>
+      <td>{{ selected_return_flight.stops if selected_return_flight.stops is not none else "—" }}</td>
+      <td>
+        {% if selected_return_flight.price_low %}
+          HKD {{ "{:,.0f}".format(selected_return_flight.price_low) }}
+        {% else %}—{% endif %}
+      </td>
+    </tr>
+    {% endif %}
+  </table>
+  {% if flight.google_flights_url %}
+  <div class="visa-notes dim" style="margin-top:5pt;">Book at: {{ flight.google_flights_url }}</div>
+  {% endif %}
+</section>
+{% endif %}
+
+<!-- ── 3. Hotel ──────────────────────────────────── -->
+{% if hotel %}
+<section>
+  <h2>Hotel</h2>
+  <div class="hotel-name">{{ hotel.name }}</div>
+  <div class="hotel-meta">
+    {% if hotel.address %}{{ hotel.address }}{% endif %}
+    {% if hotel.rating %} · ★ {{ "%.1f"|format(hotel.rating) }}{% endif %}
+    {% if hotel.price_level %} · {{ hotel.price_level | replace("PRICE_LEVEL_", "") | title }}{% endif %}
+  </div>
+</section>
+{% endif %}
+
+<!-- ── 4. Day-by-Day Itinerary ───────────────────── -->
+{% if days %}
+<section>
+  <h2>Day-by-Day Itinerary</h2>
+  {% for day in days %}
+  <div class="day-block">
+    <div class="day-heading">
+      Day {{ day.day }}
+      {% if day.date %} · {{ day.date }}{% endif %}
+      {% if day.theme %} · {{ day.theme }}{% endif %}
+    </div>
+    {% if day.weather %}
+    <div class="day-weather">
+      {{ day.weather.condition | capitalize }}
+      {% if day.weather.temp is not none %} · {{ day.weather.temp | round | int }}°C{% endif %}
+    </div>
+    {% endif %}
+    <ul class="activity-list">
+      {% for act in day.activities %}
+      <li class="activity-row">
+        <div class="activity-time">{{ act.time }}</div>
+        <div class="activity-body">
+          <div class="activity-name">{{ act.name }}</div>
+          {% if act.address %}<div class="activity-address">{{ act.address }}</div>{% endif %}
+          {% if act.description %}<div class="activity-desc">{{ act.description }}</div>{% endif %}
+          {% if act.duration_min %}<div class="activity-desc dim">{{ act.duration_min }} min</div>{% endif %}
+          {% if act.user_note %}<div class="activity-note">◇ {{ act.user_note }}</div>{% endif %}
+        </div>
+      </li>
+      {% if act.transport_to_next and not loop.last %}
+      <li class="transport-row">
+        ↓ {{ act.transport_to_next.mode | upper }}
+        {% if act.transport_to_next.duration %} · {{ act.transport_to_next.duration }}{% endif %}
+        {% if act.transport_to_next.distance %} · {{ act.transport_to_next.distance }}{% endif %}
+      </li>
+      {% endif %}
+      {% endfor %}
+    </ul>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+
+<!-- ── 5. Pre-Trip Checklist ─────────────────────── -->
+{% if checklist_items %}
+<section>
+  <h2>Pre-Trip Checklist</h2>
+  <table class="checklist-table">
+    {% for item in checklist_items %}
+    <tr>
+      <td class="checklist-box">{% if item.checked %}☑{% else %}☐{% endif %}</td>
+      <td class="{% if item.critical %}checklist-critical{% endif %}">
+        {{ item.label }}
+        {% if item.critical %}<span class="checklist-flag">CRITICAL</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+{% endif %}
+
+<!-- ── 6. Phrasebook ─────────────────────────────── -->
+{% if phrasebook and phrasebook.phrases %}
+<section>
+  <h2>Phrasebook · {{ phrasebook.language }}</h2>
+  <table class="phrase-table">
+    <tr>
+      <th>English</th>
+      <th>{{ phrasebook.language }}</th>
+      {% if phrasebook.phrases[0].romanization is defined %}<th>Pronunciation</th>{% endif %}
+    </tr>
+    {% for phrase in phrasebook.phrases %}
+    <tr>
+      <td>{{ phrase.english }}</td>
+      <td>{{ phrase.local }}</td>
+      {% if phrase.romanization %}<td class="dim">{{ phrase.romanization }}</td>{% endif %}
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+{% endif %}
+
+<!-- ── Footer ────────────────────────────────────── -->
+<div class="pdf-footer">
+  Generated by CSCI3280 Travel Agent · {{ generated_at }}
+</div>
+
+</body>
+</html>

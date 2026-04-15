@@ -258,6 +258,44 @@ export async function optimizeRoute(activities) {
 }
 
 /**
+ * Export the itinerary as a PDF.
+ * Sends itinerary + visa data + checklist items to POST /export/pdf
+ * and triggers a browser file download of the returned PDF blob.
+ */
+export async function exportPdf({ itinerary, visaData = null, checklistItems = [] }) {
+  const res = await fetch(`${API_BASE}/export/pdf`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      itinerary,
+      visa_data: visaData,
+      checklist_items: checklistItems,
+    }),
+  });
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const err = await res.json();
+      detail = err.detail || detail;
+    } catch {
+      // ignore
+    }
+    throw new Error(detail);
+  }
+  const blob = await res.blob();
+  const dest = (itinerary?.destination || "trip").replace(/\s+/g, "-").toLowerCase();
+  const filename = `itinerary-${dest}.pdf`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/**
  * Search airports by name, IATA code, city, or country.
  * Returns [{iata, name, city, country, lat, lng}, …].
  */

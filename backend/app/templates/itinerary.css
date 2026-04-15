@@ -1,0 +1,268 @@
+/* PDF Export Stylesheet — clean, B&W-safe, print-ready */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 11pt;
+  line-height: 1.5;
+  color: #111;
+  background: #fff;
+  padding: 20mm 18mm 18mm 18mm;
+}
+
+/* ── Header ─────────────────────────────────── */
+.trip-header {
+  border-bottom: 2px solid #111;
+  padding-bottom: 10pt;
+  margin-bottom: 16pt;
+}
+
+.trip-title {
+  font-size: 20pt;
+  font-weight: bold;
+  letter-spacing: 0.5pt;
+  text-transform: uppercase;
+  margin-bottom: 4pt;
+}
+
+.trip-route {
+  font-size: 12pt;
+  color: #333;
+}
+
+.trip-meta {
+  font-size: 9pt;
+  color: #555;
+  margin-top: 4pt;
+}
+
+/* ── Sections ────────────────────────────────── */
+section {
+  margin-bottom: 18pt;
+  page-break-inside: avoid;
+}
+
+section h2 {
+  font-size: 10pt;
+  font-weight: bold;
+  letter-spacing: 1.5pt;
+  text-transform: uppercase;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 3pt;
+  margin-bottom: 8pt;
+  color: #222;
+}
+
+/* ── Visa ────────────────────────────────────── */
+.visa-status {
+  display: inline-block;
+  font-weight: bold;
+  padding: 1pt 6pt;
+  border: 1px solid #999;
+  border-radius: 3pt;
+  font-size: 9pt;
+  text-transform: uppercase;
+  letter-spacing: 0.5pt;
+  margin-bottom: 4pt;
+}
+
+.visa-free { border-color: #333; }
+.visa-on-arrival { border-color: #555; }
+.visa-required { border-color: #111; background: #eee; }
+
+.visa-notes {
+  font-size: 9.5pt;
+  color: #444;
+  margin-top: 4pt;
+}
+
+/* ── Flight ──────────────────────────────────── */
+.flight-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10pt;
+}
+
+.flight-table th {
+  text-align: left;
+  font-size: 8.5pt;
+  letter-spacing: 0.5pt;
+  text-transform: uppercase;
+  color: #555;
+  border-bottom: 1px solid #ddd;
+  padding: 3pt 6pt;
+}
+
+.flight-table td {
+  padding: 4pt 6pt;
+  border-bottom: 1px solid #eee;
+  vertical-align: top;
+}
+
+.flight-label-row td {
+  font-size: 9pt;
+  font-weight: bold;
+  background: #f5f5f5;
+  padding: 3pt 6pt;
+}
+
+.dim { color: #777; }
+
+/* ── Hotel ───────────────────────────────────── */
+.hotel-name {
+  font-size: 12pt;
+  font-weight: bold;
+}
+
+.hotel-meta {
+  font-size: 10pt;
+  color: #444;
+  margin-top: 2pt;
+}
+
+/* ── Day Itinerary ───────────────────────────── */
+.day-block {
+  margin-bottom: 14pt;
+  page-break-inside: avoid;
+}
+
+.day-heading {
+  font-size: 10.5pt;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5pt;
+  margin-bottom: 3pt;
+}
+
+.day-weather {
+  font-size: 9pt;
+  color: #555;
+  margin-bottom: 5pt;
+}
+
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.activity-row {
+  display: table;
+  width: 100%;
+  border-bottom: 1px solid #eee;
+  padding: 4pt 0;
+}
+
+.activity-time {
+  display: table-cell;
+  width: 46pt;
+  font-weight: bold;
+  font-size: 9.5pt;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.activity-body {
+  display: table-cell;
+  vertical-align: top;
+  padding-left: 8pt;
+}
+
+.activity-name {
+  font-weight: bold;
+  font-size: 10pt;
+}
+
+.activity-address {
+  font-size: 9pt;
+  color: #555;
+}
+
+.activity-desc {
+  font-size: 9pt;
+  color: #444;
+  margin-top: 2pt;
+}
+
+.activity-note {
+  font-size: 9pt;
+  font-style: italic;
+  color: #333;
+  margin-top: 2pt;
+  padding-left: 6pt;
+  border-left: 2px solid #ccc;
+}
+
+.transport-row {
+  font-size: 8.5pt;
+  color: #888;
+  padding: 2pt 0 2pt 54pt;
+  font-style: italic;
+}
+
+/* ── Checklist ───────────────────────────────── */
+.checklist-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.checklist-table td {
+  padding: 3pt 6pt;
+  font-size: 10pt;
+  border-bottom: 1px solid #eee;
+}
+
+.checklist-box {
+  width: 16pt;
+  text-align: center;
+  font-size: 11pt;
+}
+
+.checklist-critical {
+  font-weight: bold;
+}
+
+.checklist-flag {
+  font-size: 7.5pt;
+  letter-spacing: 0.5pt;
+  color: #888;
+  margin-left: 4pt;
+}
+
+/* ── Phrasebook ──────────────────────────────── */
+.phrase-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10pt;
+}
+
+.phrase-table th {
+  text-align: left;
+  font-size: 8.5pt;
+  letter-spacing: 0.5pt;
+  text-transform: uppercase;
+  color: #555;
+  border-bottom: 1px solid #ddd;
+  padding: 3pt 6pt;
+}
+
+.phrase-table td {
+  padding: 4pt 6pt;
+  border-bottom: 1px solid #eee;
+  vertical-align: top;
+}
+
+/* ── Footer ──────────────────────────────────── */
+.pdf-footer {
+  margin-top: 24pt;
+  border-top: 1px solid #ccc;
+  padding-top: 6pt;
+  font-size: 8pt;
+  color: #999;
+  text-align: right;
+}
