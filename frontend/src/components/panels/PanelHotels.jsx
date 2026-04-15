@@ -53,6 +53,7 @@ export default function PanelHotels({
   autoReplan = true,
   onToggleAutoReplan,
   theme = "dark",
+  suggestedIdx = null,
 }) {
   const hotelsRaw = itinerary?.hotels || [];
   const [priceFilter, setPriceFilter] = useState("any");
@@ -203,7 +204,8 @@ export default function PanelHotels({
                   `panel-list-item hotel-option-row` +
                   (i === selectedIdx ? " active" : "") +
                   (i === pickedIdx ? " picked" : "") +
-                  (h._preview ? " hotel-card-preview" : "")
+                  (h._preview ? " hotel-card-preview" : "") +
+                  (i === suggestedIdx ? " hotel-suggested" : "")
                 }
                 onClick={() => onSelect?.(i)}
                 data-testid={`hotel-option-${i}`}
@@ -213,6 +215,9 @@ export default function PanelHotels({
                     {h.name}
                     {i === pickedIdx && (
                       <span className="panel-list-picked-tag"> ✓ PICKED</span>
+                    )}
+                    {i === suggestedIdx && (
+                      <span className="hotel-suggested-badge">✦ Suggested</span>
                     )}
                   </div>
                   <div className="hotel-option-meta">

@@ -269,6 +269,8 @@ function App() {
   const [pendingFormPrefill, setPendingFormPrefill] = useState(null);
   // LLM-suggested flight index — set when pick_flight SSE fires, cleared on user pick.
   const [suggestedFlightIdx, setSuggestedFlightIdx] = useState(null);
+  // LLM-suggested hotel index — set when pick_hotel SSE fires, cleared on user pick.
+  const [suggestedHotelIdx, setSuggestedHotelIdx] = useState(null);
   // Tracks the in-flight done→idle setTimeout so a new request can
   // cancel it before it overwrites the new "working" state (B6).
   const idleTimerRef = useRef(null);
@@ -540,6 +542,7 @@ function App() {
       if (panel === "HOTELS") {
         const hotel = currentItinerary?.hotels?.[idx];
         if (hotel) {
+          setSuggestedHotelIdx(null);
           pushPickSnapshot();
           setCurrentItinerary({ ...currentItinerary, selected_hotel: hotel });
           cues.chime();
@@ -942,6 +945,7 @@ function App() {
       if (reset) {
         setCurrentItinerary(initialItinerary);
         setSuggestedFlightIdx(null);
+        setSuggestedHotelIdx(null);
       }
 
       // Edit-and-rerun: truncate the conversation back to before a
@@ -1138,27 +1142,16 @@ function App() {
                 menu.navigate({ panel: "FLIGHTS" });
               }
             } else if (type === "pick_hotel") {
-              // Chat mode — LLM picked a hotel on the user's behalf.
-              // Queue the days replan to fire AFTER this stream's done event.
+              // Chat suggestion — navigate to HOTELS and highlight the card.
+              // Do NOT select the hotel or chain day planning; user clicks PICK.
               const { name, index } = payload || {};
               const hotels = currentItineraryRef.current?.hotels;
-              const hotel = name
-                ? hotels?.find(
-                    (h) => h.name?.toLowerCase() === name?.toLowerCase(),
-                  )
-                : hotels?.[index ?? 0];
-              if (hotel) {
-                pushPickSnapshot();
-                setCurrentItinerary((prev) => ({
-                  ...prev,
-                  selected_hotel: hotel,
-                }));
-                cues.chime();
-                // Trigger two-phase day planning after this stream completes.
-                pendingChainedSendRef.current = {
-                  __planDays: true,
-                  hotel,
-                };
+              const idx = name != null
+                ? (hotels?.findIndex((h) => h.name?.toLowerCase() === name?.toLowerCase()) ?? -1)
+                : (index ?? 0);
+              if (idx >= 0 && hotels?.[idx]) {
+                setSuggestedHotelIdx(idx);
+                menu.navigate({ panel: "HOTELS" });
               }
             } else if (type === "replace_activity") {
               // Chat mode — LLM wants to replace a day activity.
@@ -1770,7 +1763,9 @@ function App() {
             onSelect={selectListItem}
             autoReplan={autoReplan}
             onToggleAutoReplan={toggleAutoReplan}
+            suggestedIdx={suggestedHotelIdx}
             onPick={(i) => {
+              setSuggestedHotelIdx(null);
               const hotel = currentItinerary?.hotels?.[i];
               if (!hotel) return;
               if (!currentItinerary?.hotels?.length) {

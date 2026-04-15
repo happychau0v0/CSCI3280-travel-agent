@@ -413,7 +413,7 @@ Available UI actions:
   navigate_menu(panel)                       — switch to PLAN / FLIGHTS / HOTELS / DAYS
   toggle_setting(key, value)                 — change a user preference (tts_enabled, theme, currency, subtitle_size, auto_replan)
   pick_flight(label?, index?)               — navigate to FLIGHTS and highlight a suggested option; the user confirms by clicking PICK
-  pick_hotel(name?, index?)                 — select a hotel from the HOTELS panel (pass hotel name OR 0-based index)
+  pick_hotel(name?, index?)                 — navigate to HOTELS and highlight a suggested hotel; the user confirms by clicking PICK
   replace_activity(day, activity_name, query?) — replace a day activity and trigger a days replan
 
 MUST NOT call: search_flights, search_places, get_directions, get_weather, get_place_details.
