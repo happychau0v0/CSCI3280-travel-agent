@@ -21,6 +21,7 @@ const GROUPS = [
     rows: [
       ["Space", "Activate focused row"],
       ["Enter", "Submit form / open flight or hotel PICK"],
+      ["Q (hold)", "Start a new trip (keeps plan history)"],
       ["⌘Z", "Undo the last flight / hotel pick"],
       ["⌘⇧Z / ⌘Y", "Redo"],
     ],

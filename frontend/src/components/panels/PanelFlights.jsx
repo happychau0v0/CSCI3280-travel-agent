@@ -61,6 +61,7 @@ export default function PanelFlights({
   visaAlert = null,
   side = "left",
   isLoading = false,
+  backgroundHotelSearch = false,
   onSelect,
   onPick,
   onSkipFlight,
@@ -291,7 +292,7 @@ export default function PanelFlights({
               type="button"
               className="trip-plan-btn"
               onClick={() => onPick?.(selectedIdx, activeTab)}
-              disabled={isLoading || selectedIdx === pickedIdx}
+              disabled={(isLoading && !(activeTab === "return" && backgroundHotelSearch)) || selectedIdx === pickedIdx}
               data-testid="flight-pick-btn"
               style={{ marginTop: 16 }}
             >

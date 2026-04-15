@@ -160,6 +160,23 @@ function savePlanHistory(history) {
   }
 }
 
+// Generate blank day stubs [{day, date}] from a date range string pair.
+// Used to seed currentItinerary when PLAN fires so stubs are always
+// present regardless of whether the LLM emits them in Turn 1.
+function generateDayStubs(startDate, endDate) {
+  const stubs = [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  let cur = new Date(start);
+  let n = 1;
+  while (cur <= end) {
+    stubs.push({ day: n, date: cur.toISOString().slice(0, 10) });
+    cur.setUTCDate(cur.getUTCDate() + 1);
+    n++;
+  }
+  return stubs;
+}
+
 // Build a lightweight plan history entry from a finished itinerary.
 // Returns null if the itinerary is missing essential fields (destination).
 function buildHistoryEntry(itinerary, messages) {
@@ -358,9 +375,33 @@ function App() {
     setChatPopoverOpen(true);
   }, []);
 
+  // Bumping this key forces PanelHome to remount so its local form state
+  // re-initialises from (now-cleared) localStorage on a new trip.
+  const [panelHomeResetKey, setPanelHomeResetKey] = useState(0);
+
+  // Incrementing this triggers the globe explode-and-reform animation.
+  const [globeExplodeTrigger, setGlobeExplodeTrigger] = useState(0);
+
+  // Q (long-press) — start a new trip. Clears current conversation +
+  // itinerary and returns to HOME; plan history is preserved.
+  const handleNewTrip = useCallback(() => {
+    if (isLoading) return;
+    try {
+      localStorage.removeItem(STATE_KEY);
+      localStorage.removeItem(TRIP_DATES_KEY);
+      localStorage.removeItem("travel-trip-form");
+    } catch { /* ignore */ }
+    setMessages([]);
+    setCurrentItinerary(null);
+    setError(null);
+    setPanelHomeResetKey((k) => k + 1);
+    menu.reset();
+  }, [isLoading, menu]);
+
   // SETTINGS → "clear all data" handler. Wipes conversation, itinerary
   // and trip form, leaves preferences alone.
   const handleClearAll = useCallback(() => {
+    setGlobeExplodeTrigger((t) => t + 1);
     try {
       localStorage.removeItem(STATE_KEY);
       localStorage.removeItem(TRIP_DATES_KEY);
@@ -480,7 +521,7 @@ function App() {
             selected_flight: opt,
             hotels: undefined,
             selected_hotel: null,
-            days: undefined,
+            // days (stubs) intentionally preserved so planDaysActivities has dates to loop over
           });
           cues.chime();
           const label = [
@@ -497,13 +538,13 @@ function App() {
         const hotel = currentItinerary?.hotels?.[idx];
         if (hotel) {
           pushPickSnapshot();
-          setCurrentItinerary({ ...currentItinerary, selected_hotel: hotel, days: undefined });
+          setCurrentItinerary({ ...currentItinerary, selected_hotel: hotel });
           cues.chime();
-          handleSend(
-            `Set "${hotel.name}" as the base hotel in ${currentItinerary?.destination}. ` +
-            `Flight arrives ${currentItinerary?.flight?.arrival_time} at ${currentItinerary?.flight?.to_iata} on ${currentItinerary?.flight?.date}. ` +
-            `Plan the day-by-day itinerary with activities, meals, and directions.`,
-          );
+          if (autoReplan) {
+            planDaysActivities({ ...currentItinerary, selected_hotel: hotel });
+          } else {
+            setPanelWithCue("DAYS");
+          }
         }
         return;
       }
@@ -525,6 +566,7 @@ function App() {
       cues.select();
       setSettingsOpen(true);
     },
+    onNewTrip: handleNewTrip,
     onUndo: handleUndoPick,
     onRedo: handleRedoPick,
     onOpenHelp: () => setHelpOpen(true),
@@ -727,17 +769,21 @@ function App() {
   function buildThemeMessage(itinerary) {
     const { destination, flight, days } = itinerary;
     const totalDays = days?.length ?? 0;
+    // Use the picked outbound flight for arrival constraints on Day 1.
     const arrivalTime = itinerary.selected_flight?.arrival_time ?? "unknown";
     const arrivalIata = flight?.to_iata ?? "";
-    const returnFlight = flight?.return_options?.[0];
+    // Use the picked return flight (not return_options[0]) for last-day
+    // departure constraints. The return departs FROM the destination
+    // airport (to_iata), not the origin airport (from_iata).
+    const returnFlight = itinerary.selected_return_flight ?? null;
     const departureTime = returnFlight?.departure_time ?? null;
-    const departureIata = flight?.from_iata ?? arrivalIata;
+    const departureIata = flight?.to_iata ?? arrivalIata;
     const lastDate = days?.[totalDays - 1]?.date ?? "";
 
     let msg = `Plan themes for a ${totalDays}-day trip to ${destination}. `;
     msg += `Day 1 (${days?.[0]?.date ?? ""}): flight arrives at ${arrivalTime} at ${arrivalIata}. `;
     if (departureTime) {
-      msg += `Day ${totalDays} (${lastDate}): flight departs at ${departureTime} from ${departureIata}. `;
+      msg += `Day ${totalDays} (${lastDate}): return flight departs at ${departureTime} from ${departureIata}. `;
     } else {
       msg += `Day ${totalDays} (${lastDate}): departure day — plan a morning before the airport. `;
     }
@@ -746,20 +792,22 @@ function App() {
   }
 
   function buildDayDetailMessage(day, itinerary) {
-    const { destination, selected_hotel, days } = itinerary;
+    const { destination, selected_hotel, days, local_transport_mode } = itinerary;
     const totalDays = days?.length ?? 0;
     const hotel = selected_hotel;
     const areas = day.suggested_areas?.join(", ") ?? destination;
+    const transport = local_transport_mode ?? "transit";
 
     let msg = `Plan activities for Day ${day.day} of ${totalDays} (${day.date}) in ${destination}. `;
-    msg += `Theme: ${day.theme}. Focus areas: ${areas}. `;
+    msg += `Transport mode: ${transport}. `;
+    msg += `Theme: ${day.theme ?? "General sightseeing"}. Focus areas: ${areas}. `;
     msg += `Base hotel: ${hotel?.name} at lat ${hotel?.lat}, lng ${hotel?.lng}. `;
 
     if (day.key_constraints?.arrival_time) {
       msg += `Flight arrives at ${day.key_constraints.airport_iata} at ${day.key_constraints.arrival_time} — first activity must be airport arrival. `;
     }
     if (day.key_constraints?.departure_time) {
-      msg += `Flight departs ${day.key_constraints.airport_iata} at ${day.key_constraints.departure_time} — plan to finish activities 3 hours before. `;
+      msg += `Return flight departs ${day.key_constraints.airport_iata} at ${day.key_constraints.departure_time} — all activities must finish 3 hours before departure. `;
     }
     return msg.trim();
   }
@@ -810,9 +858,23 @@ function App() {
     if (isPlanningDaysRef.current) return;
     isPlanningDaysRef.current = true;
     try {
+      // Day stubs ({day, date}) are seeded at PLAN time from the form dates
+      // and survive through flight/hotel picks. If missing here, something
+      // upstream is broken — bail rather than papering over with a fallback.
+      let rawDays = itinerary.days ?? [];
+      if (rawDays.length === 0) {
+        isPlanningDaysRef.current = false;
+        return;
+      }
+      // Normalize: ensure every stub has a 1-based day number.
+      const normalizedDays = rawDays.map((d, i) =>
+        d.day != null ? d : { ...d, day: i + 1 }
+      );
+      itinerary = { ...itinerary, days: normalizedDays };
+
       // Reset all day statuses to pending before starting.
       const initial = {};
-      (itinerary.days ?? []).forEach((d) => { initial[d.day] = "pending"; });
+      itinerary.days.forEach((d) => { initial[d.day] = "pending"; });
       setDayStatuses(initial);
 
       // Phase 1: theme pass — assign each day a theme + suggested areas.
@@ -867,14 +929,15 @@ function App() {
   }
 
   const handleSend = useCallback(
-    async (text, { editLast = false, truncateBefore = null, reset = false, callRole = null } = {}) => {
+    async (text, { editLast = false, truncateBefore = null, reset = false, callRole = null, initialItinerary = null } = {}) => {
       const userMsg = { role: "user", content: text };
 
       // New trip from the PLAN page: wipe the previous itinerary and
       // conversation so stale Busan/wherever data doesn't bleed into the
-      // new Taipei trip while the agent is working.
+      // new Taipei trip while the agent is working. initialItinerary seeds
+      // day stubs so planDaysActivities always has dates to loop over.
       if (reset) {
-        setCurrentItinerary(null);
+        setCurrentItinerary(initialItinerary);
       }
 
       // Edit-and-rerun: truncate the conversation back to before a
@@ -1214,9 +1277,12 @@ function App() {
             let base = { ...prevSnapshot };
             if (newData.flight && !newData.hotels?.length && !newData.days?.length) {
               delete base.hotels;
-              delete base.days;
               delete base.selected_hotel;
               delete base.selected_flight;
+              // Only wipe days that have activities (completed plan from a previous
+              // trip). Bare stubs {day, date} seeded at PLAN time are current-trip
+              // anchors — keep them so planDaysActivities can drive its loop.
+              if (base.days?.some(d => d.activities?.length)) delete base.days;
             }
 
             // Smart days merge: if the LLM returned a partial days array
@@ -1541,6 +1607,9 @@ function App() {
 
   return (
     <div className={`app panel-active-${menu.state.panel.toLowerCase()}`}>
+      {/* Q long-press glow — CSS class on <html> drives the animation,
+          no React state involved so the timer in useKeyboard isn't cancelled */}
+      <div className="q-hold-glow" aria-hidden="true" />
       <ErrorBanner error={error} onDismiss={() => setError(null)} />
 
       {/* Background globe */}
@@ -1552,6 +1621,7 @@ function App() {
           drawerOpen={false}
           focus={globeFocus}
           theme={theme}
+          explodeTrigger={globeExplodeTrigger}
         />
       </Suspense>
 
@@ -1568,6 +1638,7 @@ function App() {
       >
         {menu.state.panel === "HOME" && (
           <PanelHome
+            key={panelHomeResetKey}
             itinerary={currentItinerary}
             userLocation={userLocation}
             listIndex={menu.state.listIndex}
@@ -1589,7 +1660,16 @@ function App() {
                 setPanelWithCue(panel);
               }
             }}
-            onPlan={(prompt) => handleSend(prompt, { reset: true, callRole: "plan" })}
+            onPlan={(prompt, formDates) => {
+              const stubs = formDates?.start_date && formDates?.end_date
+                ? generateDayStubs(formDates.start_date, formDates.end_date)
+                : null;
+              handleSend(prompt, {
+                reset: true,
+                callRole: "plan",
+                initialItinerary: stubs ? { days: stubs } : null,
+              });
+            }}
             onResolveInput={(field, value, fieldIdx) => {
               if (typeof fieldIdx === "number" && fieldIdx >= 0) {
                 menu.setListIndex(fieldIdx);
@@ -1603,13 +1683,22 @@ function App() {
             }}
             rowDispatchRef={activeRowDispatchRef}
             formPrefill={pendingFormPrefill}
-            onFormPrefilled={(prompt) => {
+            onFormPrefilled={(prompt, formDates) => {
               setPendingFormPrefill(null);
-              // Guard: only fire planning if dates are set. submit_trip_form
-              // from chat sometimes omits dates; [not set] in the prompt means
-              // the LLM should have asked via request_input first.
+              // Validation is performed inside PanelHome before this is called.
+              // Belt-and-suspenders: reject if any field is still [not set].
               if (prompt.includes("[not set]")) return;
-              handleSend(prompt, { callRole: "plan" });
+              const stubs = formDates?.start_date && formDates?.end_date
+                ? generateDayStubs(formDates.start_date, formDates.end_date)
+                : null;
+              // Navigate to HOME so the user sees the pre-filled form,
+              // then fire planning exactly as if they clicked START PLANNING.
+              menu.setPanel("HOME");
+              handleSend(prompt, {
+                reset: true,
+                callRole: "plan",
+                initialItinerary: stubs ? { days: stubs } : null,
+              });
             }}
             side={menu.state.side}
           />
@@ -1622,6 +1711,7 @@ function App() {
             visaAlert={visaAlert}
             side={menu.state.side}
             isLoading={isLoading}
+            backgroundHotelSearch={suppressHotelNavRef.current}
             onSelect={selectListItem}
             onPick={(i, tab) => {
               const isReturn = tab === "return";
@@ -1642,12 +1732,14 @@ function App() {
                 f.price_low ? `HK$${f.price_low}` : null,
               ].filter(Boolean).join(", ") : null;
               // Helper: strip downstream data that must be regenerated after
-              // a new flight is picked — hotels/days/picks are now stale.
+              // a new flight is picked. Hotels and hotel pick are stale;
+              // day stubs ({day, date}) are kept because planDaysActivities
+              // needs them to drive its per-day loop — they depend only on
+              // trip dates, not the specific flight chosen.
               const itinWithNewFlight = (extra = {}) => ({
                 ...currentItinerary,
                 hotels: undefined,
                 selected_hotel: null,
-                days: undefined,
                 ...extra,
               });
               if (isReturn) {
@@ -1709,13 +1801,7 @@ function App() {
                 return;
               }
               pushPickSnapshot();
-              // Stamp the hotel pick locally and clear stale days —
-              // a new days plan will be generated for this hotel.
-              setCurrentItinerary({
-                ...currentItinerary,
-                selected_hotel: hotel,
-                days: undefined,
-              });
+              setCurrentItinerary({ ...currentItinerary, selected_hotel: hotel });
               cues.chime();
               if (autoReplan) {
                 // Fire two-phase day planning so the LLM builds days around this hotel

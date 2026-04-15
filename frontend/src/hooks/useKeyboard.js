@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { PANELS, PANELS_WITH_LIST } from "./useMenuState";
 
 /**
@@ -37,10 +37,15 @@ export function useKeyboard({
   onRedo,
   onOpenHelp,
   onOpenPrint,
+  onNewTrip,
   onOpenChecklist,
   onOpenFavorites,
   enabled = true,
 }) {
+  // Long-press Q timer ref — lives outside the effect so keydown/keyup
+  // handlers share the same timer reference across re-registrations.
+  const longPressTimerRef = useRef(null);
+
   useEffect(() => {
     if (!enabled) return;
 
@@ -105,6 +110,26 @@ export function useKeyboard({
           if (state.panel === "FLIGHTS" || state.panel === "HOTELS") {
             e.preventDefault();
             onActivate?.();
+          }
+          break;
+
+        // Q (long-press, 600 ms) — start a new trip.
+        // Only arm on the first keydown (e.repeat=false) so key-repeat
+        // events don't reset the timer. The keyup handler cancels it if
+        // released early. No modifier guard needed (Q is unused elsewhere).
+        case "q":
+        case "Q":
+          // Long-press 2 s — start new trip. Toggle a CSS class on the
+          // root element instead of React state so no re-render fires,
+          // keeping the effect (and its timer) alive until it fires.
+          if (!e.metaKey && !e.ctrlKey && !e.repeat) {
+            clearTimeout(longPressTimerRef.current);
+            document.documentElement.classList.add("q-holding");
+            longPressTimerRef.current = setTimeout(() => {
+              longPressTimerRef.current = null;
+              document.documentElement.classList.remove("q-holding");
+              onNewTrip?.();
+            }, 2000);
           }
           break;
 
@@ -207,8 +232,23 @@ export function useKeyboard({
       }
     };
 
+    const handleKeyUp = (e) => {
+      if (e.key === "q" || e.key === "Q") {
+        if (longPressTimerRef.current) {
+          clearTimeout(longPressTimerRef.current);
+          longPressTimerRef.current = null;
+        }
+        document.documentElement.classList.remove("q-holding");
+      }
+    };
+
     document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
+    document.addEventListener("keyup", handleKeyUp);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.removeEventListener("keyup", handleKeyUp);
+      clearTimeout(longPressTimerRef.current);
+    };
   }, [
     enabled,
     state.panel,
@@ -232,6 +272,7 @@ export function useKeyboard({
     onRedo,
     onOpenHelp,
     onOpenPrint,
+    onNewTrip,
     onOpenChecklist,
     onOpenFavorites,
   ]);

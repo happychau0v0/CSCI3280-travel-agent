@@ -344,8 +344,9 @@ export default function PanelHome({
   }, [pendingInputRequest]);
 
   // OBJ3 — when the LLM calls submit_trip_form, merge prefill into form
-  // state and then call onFormPrefilled with the built prompt so App.jsx
-  // can fire handleSend automatically.
+  // state. Auto-submit only if all required fields pass the same
+  // validation as the START PLANNING button; otherwise just pre-fill
+  // so the user can fix missing/invalid fields and submit manually.
   useEffect(() => {
     if (!formPrefill || Object.keys(formPrefill).length === 0) return;
     const next = { ...form };
@@ -358,9 +359,18 @@ export default function PanelHome({
     if (formPrefill.interests) next.interests = formPrefill.interests;
     setForm(next);
     saveForm(next);
-    // Build the prompt from the merged form and trigger planning
+    // Run the same validation as the PLAN button. Only auto-submit when
+    // every required field is present and logically valid.
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const allValid = (
+      next.destination?.trim() &&
+      next.start_date && next.start_date >= todayStr &&
+      next.end_date && next.end_date >= next.start_date &&
+      next.transport
+    );
+    if (!allValid) return; // leave form pre-filled; user clicks START PLANNING
     const prompt = buildPrompt(next);
-    onFormPrefilled?.(prompt);
+    onFormPrefilled?.(prompt, { start_date: next.start_date, end_date: next.end_date });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formPrefill]);
 
@@ -425,7 +435,7 @@ export default function PanelHome({
   const handlePlan = () => {
     if (!validateForm()) return;
     setFormErrors({});
-    onPlan?.(prompt);
+    onPlan?.(prompt, { start_date: form.start_date, end_date: form.end_date });
   };
 
   // Clear all errors once planning starts (isLoading flips to true)

@@ -41,10 +41,14 @@ export default function GlobeView({
   drawerOpen = false,
   focus = null,
   theme = "dark",
+  explodeTrigger = 0,
 }) {
   const globeRef = useRef(null);
+  const prevFocusRef = useRef(null);
+  const animationFrameRef = useRef(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [countries, setCountries] = useState({ features: [] });
+  const [isExploding, setIsExploding] = useState(false);
 
   const globeMaterial = useMemo(() => buildGlobeMaterial(theme), [theme]);
 
@@ -174,7 +178,30 @@ export default function GlobeView({
       window.__debug = window.__debug || {};
       window.__debug.globeFocus = focus ? { ...focus } : null;
     }
-    if (!globeRef.current || !focus) return;
+    // Track focus transitions so we can detect focused → unfocused regardless
+    // of the current camera altitude (which may be mid-animation).
+    const wasFocused = prevFocusRef.current !== null;
+    prevFocusRef.current = focus;
+
+    if (!globeRef.current) return;
+
+    if (!focus) {
+      // Returning to HOME/FLIGHTS — re-enable autoRotate and zoom back out.
+      // Use wasFocused instead of checking pov.altitude: if Q is pressed while
+      // the zoom-in animation is still running the intermediate altitude may be
+      // ≥ 0.5 and the old altitude guard would silently skip the reset.
+      const controls = globeRef.current.controls?.();
+      if (controls) controls.autoRotate = true;
+      if (wasFocused) {
+        const pov = globeRef.current.pointOfView();
+        globeRef.current.pointOfView(
+          { lat: pov?.lat ?? 0, lng: pov?.lng ?? 0, altitude: 2.0 },
+          1500,
+        );
+      }
+      return;
+    }
+
     const controls = globeRef.current.controls?.();
     if (controls) controls.autoRotate = false;
     // Round 11 — longer flight (2200ms) gives the camera time to
@@ -195,6 +222,119 @@ export default function GlobeView({
     return () => clearTimeout(reArm);
   }, [focus]);
 
+  // Explode-and-reform particle animation — fires whenever explodeTrigger increments.
+  // 2500 particles are sampled on the globe surface, fly radially outward, float briefly,
+  // then converge back and fade out — creating a "shattering and rebuilding" effect.
+  useEffect(() => {
+    if (!explodeTrigger || !globeRef.current) return;
+    const scene = globeRef.current.scene?.();
+    if (!scene) return;
+
+    const GLOBE_R = 100;
+    const N = 2500;
+    const origPos = new Float32Array(N * 3);
+    const velocities = new Float32Array(N * 3);
+
+    for (let i = 0; i < N; i++) {
+      const phi = Math.acos(2 * Math.random() - 1);
+      const theta = 2 * Math.PI * Math.random();
+      const nx = Math.sin(phi) * Math.cos(theta);
+      const ny = Math.sin(phi) * Math.sin(theta);
+      const nz = Math.cos(phi);
+      origPos[i * 3]     = GLOBE_R * nx;
+      origPos[i * 3 + 1] = GLOBE_R * ny;
+      origPos[i * 3 + 2] = GLOBE_R * nz;
+      const speed = 0.7 + Math.random() * 0.6;
+      const jitter = 0.25;
+      velocities[i * 3]     = nx * speed + (Math.random() - 0.5) * jitter;
+      velocities[i * 3 + 1] = ny * speed + (Math.random() - 0.5) * jitter;
+      velocities[i * 3 + 2] = nz * speed + (Math.random() - 0.5) * jitter;
+    }
+
+    const pos = new Float32Array(origPos);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    const mat = new THREE.PointsMaterial({
+      color: theme === "light" ? 0x1a9b8f : 0x00d9ff,
+      size: 1.4,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const particles = new THREE.Points(geometry, mat);
+    scene.add(particles);
+
+    // Hide the globe sphere and its data layers while particles are visible.
+    setIsExploding(true);
+    globeMaterial.transparent = true;
+    globeMaterial.opacity = 0;
+
+    const EXPLODE = 900, FLOAT = 400, REFORM = 1200, TOTAL = EXPLODE + FLOAT + REFORM;
+    const MAX_DIST = 200;
+    const easeOut   = (t) => 1 - Math.pow(1 - t, 3);
+    const easeInOut = (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+    let startTime = null;
+    const frame = (time) => {
+      if (!startTime) startTime = time;
+      const elapsed = time - startTime;
+
+      let explodeT = 0, reformT = 0;
+      if (elapsed < EXPLODE) {
+        explodeT = easeOut(elapsed / EXPLODE);
+      } else if (elapsed < EXPLODE + FLOAT) {
+        explodeT = 1;
+      } else {
+        explodeT = 1;
+        reformT = easeInOut((elapsed - EXPLODE - FLOAT) / REFORM);
+      }
+
+      for (let i = 0; i < N; i++) {
+        const ox = origPos[i * 3], oy = origPos[i * 3 + 1], oz = origPos[i * 3 + 2];
+        const vx = velocities[i * 3], vy = velocities[i * 3 + 1], vz = velocities[i * 3 + 2];
+        const ex = ox + vx * MAX_DIST * explodeT;
+        const ey = oy + vy * MAX_DIST * explodeT;
+        const ez = oz + vz * MAX_DIST * explodeT;
+        pos[i * 3]     = ex + (ox - ex) * reformT;
+        pos[i * 3 + 1] = ey + (oy - ey) * reformT;
+        pos[i * 3 + 2] = ez + (oz - ez) * reformT;
+      }
+      geometry.attributes.position.needsUpdate = true;
+      mat.opacity = reformT > 0.6 ? 0.95 * (1 - (reformT - 0.6) / 0.4) : 0.95;
+
+      if (elapsed < TOTAL) {
+        animationFrameRef.current = requestAnimationFrame(frame);
+      } else {
+        scene.remove(particles);
+        geometry.dispose();
+        mat.dispose();
+        animationFrameRef.current = null;
+        // Restore globe visibility
+        globeMaterial.opacity = 1;
+        globeMaterial.transparent = false;
+        setIsExploding(false);
+      }
+    };
+
+    animationFrameRef.current = requestAnimationFrame(frame);
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      scene.remove(particles);
+      geometry.dispose();
+      mat.dispose();
+      // Restore globe visibility on early unmount
+      globeMaterial.opacity = 1;
+      globeMaterial.transparent = false;
+      setIsExploding(false);
+    };
+  }, [explodeTrigger, globeMaterial, theme]);
+
   // Build the rings dataset from points that have ring=true
   const ringsData = useMemo(
     () =>
@@ -213,17 +353,17 @@ export default function GlobeView({
         backgroundColor="rgba(0,0,0,0)"
         globeImageUrl={null}
         globeMaterial={globeMaterial}
-        showAtmosphere={true}
+        showAtmosphere={!isExploding}
         atmosphereColor={theme === "light" ? "#2bbfb0" : "#4cc9f0"}
         atmosphereAltitude={0.25}
         // Hexagonal country polygons — the dot-matrix look
-        hexPolygonsData={countries.features}
+        hexPolygonsData={isExploding ? [] : countries.features}
         hexPolygonResolution={3}
         hexPolygonMargin={0.35}
         hexPolygonUseDots={true}
         hexPolygonColor={() => theme === "light" ? "rgba(26, 155, 143, 0.9)" : "rgba(0, 217, 255, 0.75)"}
         // Arcs (flight paths)
-        arcsData={arcs}
+        arcsData={isExploding ? [] : arcs}
         arcStartLat={(d) => d.startLat}
         arcStartLng={(d) => d.startLng}
         arcEndLat={(d) => d.endLat}
@@ -236,7 +376,7 @@ export default function GlobeView({
         arcDashAnimateTime={2500}
         arcLabel={(d) => d.label || ""}
         // Points (origin / destination / activities)
-        pointsData={points}
+        pointsData={isExploding ? [] : points}
         pointLat={(d) => d.lat}
         pointLng={(d) => d.lng}
         pointColor={(d) => d.color || "#00d9ff"}
@@ -244,7 +384,7 @@ export default function GlobeView({
         pointRadius={(d) => d.size || 0.4}
         pointLabel={(d) => d.label || ""}
         // Pulsing rings on key points (origin/destination)
-        ringsData={ringsData}
+        ringsData={isExploding ? [] : ringsData}
         ringColor={(d) => () => d.color}
         ringMaxRadius={3}
         ringPropagationSpeed={2}
