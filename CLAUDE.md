@@ -63,6 +63,16 @@ User ◄── SpeechSynthesis (TTS) ◄── Response ◄──────┘
 - **Clarify ambiguity:** Ask users about trip duration, budget, interests when the request is vague
 - **OpenRouter, not OpenAI direct:** Use `OPENROUTER_API_KEY` with OpenAI SDK's `base_url` override
 
+## Design Doc Discipline
+
+- **Always update `docs/design.md`** when making behavior changes — new features,
+  prompt changes, tool additions/removals, state flow changes, UI panel changes.
+  The update must be in the same commit as the code change.
+- **Ask the user before implementing non-trivial behavior changes.** Non-trivial means:
+  anything that changes what the LLM does, alters a user-visible flow, adds/removes
+  a UI element, or modifies how data is stored or sent. Surface the change and get
+  explicit approval first — do not assume consent.
+
 ## Claude Code Plugins
 
 These plugins are enabled and should be used during development:

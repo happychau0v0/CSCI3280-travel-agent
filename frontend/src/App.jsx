@@ -23,7 +23,8 @@ import PanelHome from "./components/panels/PanelHome";
 import PanelFlights from "./components/panels/PanelFlights";
 import PanelHotels from "./components/panels/PanelHotels";
 import PanelDays from "./components/panels/PanelDays";
-import { streamChat } from "./api/client";
+import { IATA_TO_ISO2 } from "./data/countries";
+import { streamChat, API_BASE } from "./api/client";
 import { useGeolocation } from "./hooks/useGeolocation";
 import { useMenuState } from "./hooks/useMenuState";
 import { useKeyboard } from "./hooks/useKeyboard";
@@ -212,6 +213,8 @@ function App() {
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
+  // Visa alert — fetched from /visa/check when the user reaches FLIGHTS panel.
+  const [visaAlert, setVisaAlert] = useState(null);
   // Agent status state used by the AgentStatusBar — addresses the
   // round-7 "feels unresponsive" complaint with overlapping indicators.
   const [agentState, setAgentState] = useState("idle"); // idle|working|done|error
@@ -485,6 +488,29 @@ function App() {
   useEffect(() => {
     saveState(messages, currentItinerary);
   }, [messages, currentItinerary]);
+
+  // Visa alert — check visa requirements when the user reaches the FLIGHTS panel.
+  // Uses IATA_TO_ISO2 to convert the destination airport code to a country ISO-2,
+  // then calls /visa/check with the user's passport (from preferences, default HK).
+  // Clears whenever the destination airport changes (new plan).
+  useEffect(() => {
+    if (menu.state.panel !== "FLIGHTS") return;
+    const toIata = currentItinerary?.flight?.to_iata;
+    if (!toIata) { setVisaAlert(null); return; }
+
+    const destIso2 = IATA_TO_ISO2[toIata];
+    if (!destIso2) { setVisaAlert(null); return; }
+
+    const passport = preferences?.passport_country || "HK";
+
+    // Same country as passport — no alert needed
+    if (destIso2 === passport) { setVisaAlert(null); return; }
+
+    fetch(`${API_BASE}/visa/check?destination=${destIso2}&passport=${passport}`)
+      .then((r) => r.json())
+      .then((data) => setVisaAlert(data))
+      .catch(() => setVisaAlert(null));
+  }, [menu.state.panel, currentItinerary?.flight?.to_iata, preferences?.passport_country]);
 
   // Round 12 — apply the persisted theme on mount so the page
   // opens in the user's last-chosen palette without a flash.
@@ -1358,6 +1384,7 @@ function App() {
             itinerary={currentItinerary}
             listIndex={menu.state.listIndex}
             currency={currency}
+            visaAlert={visaAlert}
             onSelect={selectListItem}
             onPick={(i, tab) => {
               const isReturn = tab === "return";

@@ -1,6 +1,6 @@
 # Design Spec: Button-First Interaction Model
 
-> Last updated: 2026-04-15
+> Last updated: 2026-04-15 (added visa alert feature)
 
 ---
 
@@ -434,3 +434,69 @@ After the split is implemented, run these checks:
 
 6. **Error stays on panel:** Disconnect the backend mid-Call B. Frontend
    must stay on FLIGHTS panel with an error banner — not navigate to HOTELS.
+
+---
+
+## Visa Alert Feature
+
+### What it does
+
+When a user advances to the FLIGHTS panel, a persistent visa status badge appears
+inline in the panel header next to the route label (e.g. `✈ FLIGHT · HKG → NRT`).
+The badge shows the traveller's visa requirement for the destination country based
+on their passport.
+
+### When it triggers
+
+The badge is computed once when `menu.state.panel === "FLIGHTS"` and
+`currentItinerary.flight.to_iata` is set. It re-fires if the destination airport
+changes (new plan). It does NOT appear if the destination country matches the
+passport country (same-country trips).
+
+### Badge states
+
+| Status | Color | Label |
+|--------|-------|-------|
+| `visa_free` | Green | `VISA FREE · 90D` |
+| `visa_on_arrival` | Amber | `VISA ON ARRIVAL · 30D` |
+| `visa_required` | Red | `VISA REQUIRED` |
+| `unknown` | Grey | `VISA ?` |
+
+Hover over the badge to see extended notes (e.g. "eTA required; apply at immi.homeaffairs.gov.au").
+
+### Data source
+
+Static JSON files in `backend/app/data/`:
+- `visa_hk.json` — real HKSAR passport data for ~150 countries, keyed by ISO 3166-1 alpha-2 code
+- `visa_mock.json` — placeholder response (`status: "unknown"`) for all other passports
+
+Loaded once at process start; no network request per check. To add a new passport,
+create `visa_{iso2_lower}.json` and add a branch in `backend/app/routers/visa.py`.
+
+### API
+
+```
+GET /visa/check?destination=JP&passport=HK
+→ { destination: "JP", passport: "HK", status: "visa_free", free_days: 90 }
+```
+
+### How nationality propagates
+
+1. User sets PASSPORT in `SettingsOverlay` → stored in `localStorage["travel-prefs"].passport_country`
+2. `preferencesForApi()` includes `passport_country` in the preferences dict
+3. `App.jsx` reads `preferences.passport_country` (defaults to `"HK"`) in the visa check effect
+4. The IATA code `flight.to_iata` is converted to ISO-2 via `IATA_TO_ISO2` map in `frontend/src/data/countries.js`
+5. `GET /visa/check` is called; result stored in `visaAlert` state → passed to `PanelFlights` → rendered by `VisaAlertBanner`
+
+### Files
+
+| File | Role |
+|------|------|
+| `backend/app/data/visa_hk.json` | HK passport visa data |
+| `backend/app/data/visa_mock.json` | Placeholder for other passports |
+| `backend/app/routers/visa.py` | `/visa/check` endpoint |
+| `frontend/src/data/countries.js` | `COUNTRIES` list, `IATA_TO_ISO2`, `COUNTRY_NAME_TO_ISO2` |
+| `frontend/src/components/VisaAlertBanner.jsx` | Pill badge component |
+| `frontend/src/components/panels/PanelFlights.jsx` | Renders the badge |
+| `frontend/src/App.jsx` | `visaAlert` state + fetch effect |
+| `frontend/src/components/SettingsOverlay.jsx` | PASSPORT field in prefs |
