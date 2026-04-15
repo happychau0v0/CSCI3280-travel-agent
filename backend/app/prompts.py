@@ -554,12 +554,13 @@ DAY 1 — if key_constraints.arrival_time is present, use this exact order:
 
 LAST DAY — if key_constraints.departure_time is present, use this exact order:
   1. Hotel check-out: time=09:00, duration_min=30
-  2+ Real activities (must complete with 3 hours before departure_time)
+  2+ Real activities including at least 1 meal — must complete with 3 hours before departure_time
   Last. Departure airport: name="{airport_iata} Airport · Departure", duration_min=180
 
 MIDDLE DAYS — 09:00-21:00 windows:
   Pattern: hotel depart, breakfast, sight, lunch, sight, dinner, hotel return.
-  MUST have 3-4 real (non-hotel) activities including 1-2 meals.
+  MUST have 3-4 real (non-hotel) activities.
+  MUST include at least 2 meals — one around midday (breakfast or lunch) and one in the evening (dinner).
 
 ALL DAYS — universal rules:
 - Every non-hotel/airport activity MUST have place_id, lat, lng, address, photo_url copied VERBATIM from search_places.
