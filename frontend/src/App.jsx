@@ -178,6 +178,57 @@ function buildHistoryEntry(itinerary, messages) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Activity time cascade helpers (pure functions — defined outside App)
+// ---------------------------------------------------------------------------
+
+function parseTimeToMinutes(timeStr) {
+  if (!timeStr) return 0;
+  const [h, m] = timeStr.split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+function minutesToTimeStr(totalMin) {
+  const h = Math.floor(totalMin / 60) % 24;
+  const m = totalMin % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function cascadeActivityTimes(activities, fromIdx) {
+  // Recalculate start times for all activities after fromIdx based on:
+  // next_start = prev_start + prev_duration + transit_duration
+  const result = [...activities];
+  for (let i = fromIdx + 1; i < result.length; i++) {
+    const prev = result[i - 1];
+    const curr = result[i];
+    // Stop cascading when we hit a fixed time anchor (hotel check-in on
+    // day 1, or the final hotel-return placeholder).
+    const isLocked =
+      curr.address === "hotel" ||
+      (curr.name && curr.name.includes("Airport · Arrival"));
+    if (isLocked) break;
+    const prevStartMin = parseTimeToMinutes(prev.time);
+    const prevDuration = prev.duration_min ?? 0;
+    // Parse transit duration from strings like "22 min" or "1 hr 5 min".
+    const transitStr = prev.transport_to_next?.duration ?? "0 min";
+    const transitMin = transitStr.includes("hr")
+      ? (() => {
+          const hrMatch = transitStr.match(/(\d+)\s*hr/);
+          const minMatch = transitStr.match(/(\d+)\s*min/);
+          return (
+            (hrMatch ? parseInt(hrMatch[1]) * 60 : 0) +
+            (minMatch ? parseInt(minMatch[1]) : 0)
+          );
+        })()
+      : parseInt(transitStr) || 0;
+    const newStartMin = prevStartMin + prevDuration + transitMin;
+    result[i] = { ...curr, time: minutesToTimeStr(newStartMin) };
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+
 function App() {
   const initial = loadState();
   const [messages, setMessages] = useState(initial.messages);
@@ -1107,10 +1158,17 @@ function App() {
               // Chat mode — LLM wants to replace a day activity.
               // Queue the days replan to fire AFTER this stream's done event.
               const { day, activity_name, query } = payload || {};
-              const dest = currentItinerary?.destination || "the destination";
+              const dest = currentItineraryRef.current?.destination || "the destination";
+              // Look up the original activity to pass its timing to the LLM.
+              const origDay = currentItineraryRef.current?.days?.find((d) => d.day === day);
+              const origAct = origDay?.activities?.find((a) => a.name === activity_name);
+              const timeContext =
+                origAct?.time
+                  ? ` Original activity time: ${origAct.time}, duration: ${origAct.duration_min ?? 60} min. Keep the same start time and duration unless the replacement logically requires otherwise.`
+                  : "";
               const q = query
-                ? `Day ${day}, replace "${activity_name}" with: ${query}. Destination city: ${dest}.`
-                : `Day ${day}, replace "${activity_name}" with a different but similar place in ${dest}.`;
+                ? `Day ${day}, replace "${activity_name}" with: ${query}. Destination city: ${dest}.${timeContext}`
+                : `Day ${day}, replace "${activity_name}" with a different but similar place in ${dest}.${timeContext}`;
               pendingChainedSendRef.current = { text: q, opts: { callRole: "replace" } };
             } else if (type === "partial_itinerary") {
               // Progressive disclosure — show raw tool results before the LLM
@@ -1154,11 +1212,19 @@ function App() {
               if (!prev?.days) return prev;
               const days = prev.days.map((d) => {
                 if (d.day !== dayNum) return d;
-                const activities = d.activities.map((a) =>
+                let activities = d.activities.map((a) =>
                   a.name === old_name
                     ? { ...a, ...newAct, time: newAct.time ?? a.time, duration_min: newAct.duration_min ?? a.duration_min }
                     : a
                 );
+                // Cascade start times for activities after the replaced one
+                // so downstream times stay consistent if duration changed.
+                const changedIdx = activities.findIndex(
+                  (a) => a.name === (newAct.name ?? old_name)
+                );
+                if (changedIdx >= 0) {
+                  activities = cascadeActivityTimes(activities, changedIdx);
+                }
                 return { ...d, activities };
               });
               return { ...prev, days };
@@ -1758,7 +1824,13 @@ function App() {
               const act = day?.activities?.[actIdx];
               if (!act) return;
               const dest = currentItinerary?.destination || "the destination";
-              pendingReplaceRef.current = { actName: act.name, dayNum: day.day, dest };
+              pendingReplaceRef.current = {
+                actName: act.name,
+                dayNum: day.day,
+                dest,
+                actTime: act.time,
+                actDuration: act.duration_min,
+              };
               setChatPopoverPromptLabel(
                 `What would you like to replace "${act.name}" with? (Leave empty for a similar alternative)`
               );
@@ -1974,11 +2046,15 @@ function App() {
           } else if (replaceCtx) {
             // User answered the "replace with what?" question — use the
             // lightweight replace role (1 search_places call, surgical swap).
-            const { actName, dayNum, dest } = replaceCtx;
+            const { actName, dayNum, dest, actTime, actDuration } = replaceCtx;
             const preference = text.trim();
+            const timeContext =
+              actTime
+                ? ` Original activity time: ${actTime}, duration: ${actDuration ?? 60} min. Keep the same start time and duration unless the replacement logically requires otherwise.`
+                : "";
             const msg = preference
-              ? `Day ${dayNum}, replace "${actName}" with: ${preference}. Destination city: ${dest}.`
-              : `Day ${dayNum}, replace "${actName}" with a different but similar place in ${dest}.`;
+              ? `Day ${dayNum}, replace "${actName}" with: ${preference}. Destination city: ${dest}.${timeContext}`
+              : `Day ${dayNum}, replace "${actName}" with a different but similar place in ${dest}.${timeContext}`;
             handleSend(msg, { callRole: "replace" });
           } else if (pendingInputRequestRef.current) {
             // User answered a request_input question (e.g., clicked an airport option).

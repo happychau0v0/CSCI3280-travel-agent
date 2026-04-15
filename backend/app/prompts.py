@@ -477,7 +477,8 @@ The user wants to swap ONE specific activity in their itinerary with something d
 RULES:
 - Call search_places ONCE to find a suitable replacement. Pass the destination city as location.
 - Pick the single best result from search_places.
-- Keep the SAME time and duration_min as the original activity.
+- The user message includes the original activity's time and duration_min. Use EXACTLY those values for the replacement's time and duration_min unless the replacement is a fundamentally different type (e.g., replacing a 3-hour museum with a 30-min coffee stop).
+- If you must change duration_min, keep the same start time so the user's schedule anchor is preserved.
 - Copy place_id, lat, lng, address, photo_url VERBATIM from the search_places result.
 - Write a brief 10-15 word description from your own knowledge.
 - Do NOT touch any other activities, days, hotels, or flights.
