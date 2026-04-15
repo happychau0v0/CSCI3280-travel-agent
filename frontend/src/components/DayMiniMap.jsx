@@ -160,7 +160,13 @@ function TransportBadge({ activity }) {
  *   airport: {lat, lng, iata, label} | null — reference pin for
  *            Day 1 (arrival) / last day (departure). Round 10.
  */
-export default function DayMiniMap({ activities, airport = null, activeActivityIdx = -1 }) {
+export default function DayMiniMap({
+  activities,
+  airport = null,
+  activeActivityIdx = -1,
+  liveRoute = null,
+  liveRouteLoading = false,
+}) {
   const { points, polylines } = useMemo(() => {
     const pts = [];
     const lines = [];
@@ -180,15 +186,23 @@ export default function DayMiniMap({ activities, airport = null, activeActivityI
   }, [activities]);
 
   // focusPoints: when an activity is selected, zoom to just the active pair.
+  // If a live route polyline is available, use its endpoints for tighter fit.
   // Must be called before any early return (Rules of Hooks).
   const focusPoints = useMemo(() => {
     const actPts = points.map((p) => [p.lat, p.lng]);
     if (activeActivityIdx < 0 || points.length < 2) return actPts;
+    // Prefer live route endpoints for the most accurate fit.
+    if (liveRoute?.polyline) {
+      const decoded = decodePolyline(liveRoute.polyline);
+      if (decoded.length >= 2) {
+        return [decoded[0], decoded[decoded.length - 1]];
+      }
+    }
     const a = points.find((p) => p.idx === activeActivityIdx + 1);
     const b = points.find((p) => p.idx === activeActivityIdx + 2);
     const pair = [a, b].filter(Boolean).map((p) => [p.lat, p.lng]);
     return pair.length >= 2 ? pair : actPts;
-  }, [activeActivityIdx, points]);
+  }, [activeActivityIdx, points, liveRoute]);
 
   const hasAirport =
     airport && airport.lat != null && airport.lng != null;
@@ -302,11 +316,26 @@ export default function DayMiniMap({ activities, airport = null, activeActivityI
             />
           );
         })}
+        {/* Live route overlay — dashed animated polyline fetched on activity click */}
+        {liveRoute?.polyline && (() => {
+          const coords = decodePolyline(liveRoute.polyline);
+          const color = MODE_COLOR[liveRoute.mode] || MODE_DEFAULT_COLOR;
+          return coords.length > 1 ? (
+            <Polyline
+              positions={coords}
+              pathOptions={{ color, weight: 5, opacity: 0.9, dashArray: "10 6" }}
+              className="live-route-line"
+            />
+          ) : null;
+        })()}
         <FitBounds points={focusPoints} />
         {hasAirport && airportIsOutlier && (
           <AirportBadge airport={airport} distanceKm={distanceKm} />
         )}
       </MapContainer>
+      {liveRouteLoading && (
+        <div className="map-live-loading" aria-live="polite">ROUTING…</div>
+      )}
       {activeActivity?.transport_to_next?.mode && (
         <TransportBadge activity={activeActivity} />
       )}

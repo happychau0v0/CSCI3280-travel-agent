@@ -5097,6 +5097,32 @@ body.theme-light .history-overlay-scroll::-webkit-scrollbar-thumb {
   text-transform: uppercase;
 }
 
+/* Live route overlay — animated marching dashes on the Leaflet polyline */
+@keyframes dash-march {
+  to { stroke-dashoffset: -32; }
+}
+.live-route-line path {
+  animation: dash-march 0.5s linear infinite;
+}
+
+/* "ROUTING…" chip that floats over the map while the live fetch is in flight */
+.map-live-loading {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  background: rgba(0, 0, 0, 0.75);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  padding: 3px 12px;
+  border: 1px solid var(--accent);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 /* ─── Itinerary card (rendered inside drawer) ────────────── */
 
 .itinerary-card {

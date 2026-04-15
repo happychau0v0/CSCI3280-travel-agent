@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import DayMiniMap from "../DayMiniMap";
 import PhotoGallery from "../PhotoGallery";
+import { getDirections } from "../../api/client";
 
 /**
  * DAYS panel — shares the .panel-grid layout with HOME/FLIGHTS/HOTELS.
@@ -318,6 +319,13 @@ export default function PanelDays({
   const hotelName =
     itinerary?.selected_hotel?.name || itinerary?.hotels?.[0]?.name || null;
   const [activeActivityIdx, setActiveActivityIdx] = useState(-1);
+
+  // Live route state — fetched from /api/directions when user clicks an activity.
+  // Null when no activity is selected or fetch failed.
+  const [liveRoute, setLiveRoute] = useState(null);
+  const [liveRouteLoading, setLiveRouteLoading] = useState(false);
+  const liveRouteTimer = useRef(null);
+
   // Add Activity inline form state
   const [addingActivity, setAddingActivity] = useState(false);
   const [addTime, setAddTime] = useState("");
@@ -329,6 +337,46 @@ export default function PanelDays({
   // false = all collapsed.
   const [expandAllOverride, setExpandAllOverride] = useState(null);
 
+  // Compute activities before the early return so the live-route useEffect
+  // (a hook) can reference it without violating Rules of Hooks.
+  const selectedIdx = days.length > 0 ? Math.min(Math.max(0, listIndex), days.length - 1) : 0;
+  const selected = days[selectedIdx];
+  const activities = selected?.activities || [];
+
+  // When the user clicks an activity, fire a live directions request (debounced
+  // 400ms) and overlay the returned polyline on the map as a dashed line.
+  useEffect(() => {
+    setLiveRoute(null);
+    clearTimeout(liveRouteTimer.current);
+    setLiveRouteLoading(false);
+
+    if (activeActivityIdx < 0 || !activities.length) return;
+
+    const dest = activities[activeActivityIdx];
+    if (!dest?.lat || !dest?.lng) return;
+
+    // Origin: previous activity if it has coords, otherwise fall back to hotel.
+    const prevAct = activeActivityIdx > 0 ? activities[activeActivityIdx - 1] : null;
+    const originObj =
+      prevAct?.lat && prevAct?.lng ? prevAct : itinerary?.selected_hotel;
+    if (!originObj?.lat || !originObj?.lng) return;
+
+    const originStr = `${originObj.lat},${originObj.lng}`;
+    const destStr = `${dest.lat},${dest.lng}`;
+    // Infer mode from the previous activity's stored transport, or default TRANSIT.
+    const mode = prevAct?.transport_to_next?.mode || "TRANSIT";
+
+    setLiveRouteLoading(true);
+    liveRouteTimer.current = setTimeout(async () => {
+      const result = await getDirections(originStr, destStr, mode);
+      setLiveRouteLoading(false);
+      if (result?.polyline) setLiveRoute({ ...result, mode });
+    }, 400);
+
+    return () => clearTimeout(liveRouteTimer.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeActivityIdx, selectedIdx, itinerary?.selected_hotel?.lat]);
+
   if (days.length === 0) {
     return (
       <section className="panel panel-grid panel-days" aria-label="Days">
@@ -339,10 +387,6 @@ export default function PanelDays({
       </section>
     );
   }
-
-  const selectedIdx = Math.min(Math.max(0, listIndex), days.length - 1);
-  const selected = days[selectedIdx];
-  const activities = selected?.activities || [];
 
   // Round 13 — drag-to-reorder handlers. Only non-hotel, non-airport
   // activities can be dragged. The target row is highlighted via
@@ -539,7 +583,13 @@ export default function PanelDays({
 
       {/* CENTER — mini-map of the selected day */}
       <div className="panel-grid-center panel-day-map-center" data-testid="day-map-center">
-        <DayMiniMap activities={activities} airport={airportPin} activeActivityIdx={activeActivityIdx} />
+        <DayMiniMap
+          activities={activities}
+          airport={airportPin}
+          activeActivityIdx={activeActivityIdx}
+          liveRoute={liveRoute}
+          liveRouteLoading={liveRouteLoading}
+        />
       </div>
 
       {/* RIGHT — activity timeline + R17 phrasebook + R18 weather hint */}
