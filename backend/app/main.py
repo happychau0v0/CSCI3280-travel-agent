@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import chat, geo, itinerary, photo, speech
+from app.routers import chat, geo, itinerary, photo, speech, status
 from app.routers.directions import router as directions_router
 
 # ─── Logging setup ──────────────────────────────────────────────────
@@ -41,6 +41,7 @@ app.include_router(itinerary.router)
 app.include_router(photo.router)
 app.include_router(geo.router)
 app.include_router(speech.router)
+app.include_router(status.router)
 app.include_router(directions_router, prefix="/api")
 
 

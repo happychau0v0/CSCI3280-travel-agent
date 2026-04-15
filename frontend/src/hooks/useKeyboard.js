@@ -42,6 +42,7 @@ export function useKeyboard({
   onToggleMute,
   onOpenHistory,
   onOpenSettings,
+  onOpenStatus,
   onUndo,
   onRedo,
   onOpenHelp,
@@ -247,6 +248,14 @@ export function useKeyboard({
           }
           break;
 
+        case "c":
+        case "C":
+          if (!e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            onOpenStatus?.();
+          }
+          break;
+
         case " ":
           if (state.scope === "list") {
             e.preventDefault();
@@ -289,6 +298,7 @@ export function useKeyboard({
     onToggleMute,
     onOpenHistory,
     onOpenSettings,
+    onOpenStatus,
     onUndo,
     onRedo,
     onOpenHelp,

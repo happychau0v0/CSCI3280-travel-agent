@@ -6,7 +6,6 @@ import ChatPopover from "./components/ChatPopover";
 import AgentStatusBar from "./components/AgentStatusBar";
 import HistoryOverlay from "./components/HistoryOverlay";
 import SettingsOverlay, {
-  loadTts,
   loadTheme,
   applyTheme,
   loadCurrency,
@@ -19,6 +18,7 @@ import HelpOverlay from "./components/HelpOverlay";
 import PrintView from "./components/PrintView";
 import TripChecklist from "./components/TripChecklist";
 import FavoritesOverlay from "./components/FavoritesOverlay";
+import ServiceStatusOverlay from "./components/ServiceStatusOverlay";
 import PanelHome from "./components/panels/PanelHome";
 import PanelFlights from "./components/panels/PanelFlights";
 import PanelHotels from "./components/panels/PanelHotels";
@@ -211,6 +211,7 @@ function App() {
   const [printOpen, setPrintOpen] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [favoritesOpen, setFavoritesOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
   // Agent status state used by the AgentStatusBar — addresses the
   // round-7 "feels unresponsive" complaint with overlapping indicators.
   const [agentState, setAgentState] = useState("idle"); // idle|working|done|error
@@ -271,15 +272,10 @@ function App() {
   const tripDates = loadTripDates(); // edited via PanelProfile in the future
   const { location: userLocation, requestPermission } = useGeolocation();
   const menu = useMenuState();
-  const [tts, setTts] = useState(() => loadTts());
   const [currency, setCurrency] = useState(() => loadCurrency());
   const [llmModel, setLlmModel] = useState(() => loadLlmModel());
   const [theme, setTheme] = useState(() => loadTheme());
-  const subtitles = useSubtitleQueue({
-    muted,
-    rate: tts.rate,
-    voiceName: tts.voiceName,
-  });
+  const subtitles = useSubtitleQueue({ muted });
   const cues = useAudioCues({ muted });
 
   // Compute the size of the active panel's left list so the keyboard
@@ -484,7 +480,8 @@ function App() {
     onOpenPrint: () => setPrintOpen(true),
     onOpenChecklist: () => setChecklistOpen(true),
     onOpenFavorites: () => setFavoritesOpen(true),
-    enabled: !historyOpen && !settingsOpen && !helpOpen && !printOpen && !checklistOpen && !favoritesOpen,
+    onOpenStatus: () => { cues.select(); setStatusOpen(true); },
+    enabled: !historyOpen && !settingsOpen && !helpOpen && !printOpen && !checklistOpen && !favoritesOpen && !statusOpen,
   });
 
   // Persist messages + itinerary
@@ -1543,7 +1540,6 @@ function App() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onChange={setPreferences}
-        onTtsChange={setTts}
         onCurrencyChange={setCurrency}
         onLlmModelChange={setLlmModel}
         onThemeChange={setTheme}
@@ -1575,6 +1571,11 @@ function App() {
             return next;
           });
         }}
+      />
+
+      <ServiceStatusOverlay
+        open={statusOpen}
+        onClose={() => setStatusOpen(false)}
       />
 
       {/* Bottom-center subtitle bar with auto-TTS + R16 history */}
