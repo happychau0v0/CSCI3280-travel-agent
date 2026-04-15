@@ -170,6 +170,16 @@ def _format_user_location(user_location: dict | None) -> str:
     )
 
 
+def _format_today() -> str:
+    """Inject today's date so the LLM never generates past-date itineraries."""
+    from datetime import date
+    today = date.today().isoformat()
+    return (
+        f"\n\nTODAY'S DATE: {today}. All trip dates you generate or suggest MUST "
+        "be on or after today. Never fill in dates from the past."
+    )
+
+
 def _format_trip_dates(trip_dates: dict | None) -> str:
     """Render a TRIP DATES block telling the agent which dates to plan for."""
     if not trip_dates:
@@ -293,6 +303,7 @@ async def _run_loop(
     base_prompt = ROLE_PROMPTS.get(call_role, SYSTEM_PROMPT) if call_role else SYSTEM_PROMPT
     system_content = (
         base_prompt
+        + _format_today()
         + _format_user_location(user_location)
         + _format_trip_dates(trip_dates)
         + _format_preferences(preferences)

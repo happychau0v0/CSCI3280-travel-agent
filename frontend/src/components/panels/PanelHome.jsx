@@ -299,6 +299,7 @@ export default function PanelHome({
   onFormPrefilled,
 }) {
   const [form, setForm] = useState(() => loadForm());
+  const [formErrors, setFormErrors] = useState({});
   // Per-row refs keyed by field key so we can focus a specific input
   // when request_input arrives or when the user clicks a row.
   const rowRefs = useRef({});
@@ -364,11 +365,13 @@ export default function PanelHome({
     const next = { ...form, [key]: val };
     setForm(next);
     saveForm(next);
+    if (formErrors[key]) setFormErrors((e) => { const n = { ...e }; delete n[key]; return n; });
   };
   const update = (key) => (e) => {
     const next = { ...form, [key]: e.target.value };
     setForm(next);
     saveForm(next);
+    if (formErrors[key]) setFormErrors((e) => { const n = { ...e }; delete n[key]; return n; });
   };
 
   const handleResolveSubmit = () => {
@@ -391,7 +394,31 @@ export default function PanelHome({
   };
 
   const prompt = useMemo(() => buildPrompt(form), [form]);
-  const handlePlan = () => onPlan?.(prompt);
+
+  const validateForm = () => {
+    const errors = {};
+    if (!form.destination?.trim()) {
+      errors.destination = "Required";
+    }
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (!form.start_date) {
+      errors.start_date = "Required";
+    } else if (form.start_date < todayStr) {
+      errors.start_date = "Must be today or later";
+    }
+    if (!form.end_date) {
+      errors.end_date = "Required";
+    } else if (form.start_date && form.end_date < form.start_date) {
+      errors.end_date = "Must be on or after start date";
+    }
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handlePlan = () => {
+    if (!validateForm()) return;
+    onPlan?.(prompt);
+  };
 
   // Register a row activator for the Space hotkey — focus the row
   // matching the current listIndex so the user can start typing
@@ -587,6 +614,11 @@ export default function PanelHome({
                     testId={`home-input-${field.key}`}
                   />
                 )}
+                {formErrors[field.key] && (
+                  <div className="home-form-error" role="alert">
+                    ✗ {formErrors[field.key]}
+                  </div>
+                )}
                 {isFocused && pendingInputRequest?.prompt && (
                   <div className="home-form-prompt" role="status">
                     {pendingInputRequest.prompt}
@@ -614,12 +646,12 @@ export default function PanelHome({
           type="button"
           className="trip-plan-btn"
           onClick={handlePlan}
-          disabled={isLoading || !form.destination?.trim()}
+          disabled={isLoading}
           data-testid="trip-plan-btn"
         >
           {isLoading ? "PLANNING…" : planLabel}
         </button>
-        {!isLoading && !form.destination?.trim() && (
+        {!isLoading && !form.destination?.trim() && Object.keys(formErrors).length === 0 && (
           <div className="trip-plan-hint" data-testid="trip-plan-hint">
             ↑ Type a destination above to get started
           </div>

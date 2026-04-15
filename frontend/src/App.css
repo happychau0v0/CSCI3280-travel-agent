@@ -668,6 +668,10 @@ li[tabindex]:focus-visible {
   background: rgba(0, 0, 0, 0.3);
   cursor: zoom-in;
   overflow: hidden;
+  /* Prevent browser smart-zoom (double-tap / double-click on macOS) from
+     corrupting the panel layout when clicking the hero photo. */
+  touch-action: manipulation;
+  -webkit-user-drag: none;
 }
 
 .photo-gallery-hero img {
@@ -675,6 +679,10 @@ li[tabindex]:focus-visible {
   height: 100%;
   object-fit: cover;
   display: block;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
 }
 
 .photo-gallery-thumbs {
@@ -693,6 +701,7 @@ li[tabindex]:focus-visible {
   cursor: pointer;
   overflow: hidden;
   transition: border-color 0.15s ease;
+  touch-action: manipulation;
 }
 
 .photo-gallery-thumb.active {
@@ -970,6 +979,15 @@ li[tabindex]:focus-visible {
   align-items: flex-start;
   padding-top: 5px;
   padding-bottom: 6px;
+}
+
+.home-form-error {
+  flex: 1 0 100%;
+  margin-top: 3px;
+  font-size: 10px;
+  font-family: var(--mono);
+  letter-spacing: 0.06em;
+  color: var(--danger);
 }
 
 .home-form-prompt {
@@ -3058,27 +3076,27 @@ li[tabindex]:focus-visible {
 
 .agent-status-bar {
   position: fixed;
-  top: 56px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 100;
+  top: 8px;
+  right: 24px;
+  left: auto;
+  transform: none;
+  z-index: 200;
   display: flex;
   align-items: center;
-  gap: 16px;
-  min-width: 480px;
-  max-width: 80vw;
-  padding: 14px 20px;
+  gap: 12px;
+  max-width: 420px;
+  padding: 8px 14px;
   background: var(--status-bar-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   font-family: var(--mono);
   pointer-events: auto;
-  animation: status-slide-in 0.3s ease;
+  animation: status-slide-in 0.25s ease;
 }
 
 @keyframes status-slide-in {
-  from { opacity: 0; transform: translate(-50%, -8px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 .agent-status-bar.status-working {
@@ -4711,6 +4729,46 @@ body.theme-light .history-overlay-scroll::-webkit-scrollbar-thumb {
 }
 
 .flight-source-badge.estimate {
+  color: var(--text-dim);
+  border-color: var(--border);
+  background: transparent;
+}
+
+/* ── Visa alert badge ─────────────────────────────────────────── */
+.visa-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid;
+  margin-left: 8px;
+  cursor: default;
+  vertical-align: middle;
+  position: relative;
+}
+
+.visa-badge--free {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.5);
+  background: rgba(74, 222, 128, 0.1);
+}
+
+.visa-badge--arrival {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.5);
+  background: rgba(251, 191, 36, 0.1);
+}
+
+.visa-badge--required {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.visa-badge--unknown {
   color: var(--text-dim);
   border-color: var(--border);
   background: transparent;
