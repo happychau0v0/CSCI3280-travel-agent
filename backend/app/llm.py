@@ -38,6 +38,7 @@ import os
 import re
 import time
 from pathlib import Path
+from types import SimpleNamespace
 from typing import AsyncIterator, Awaitable, Callable
 
 import httpx
@@ -54,7 +55,7 @@ from app.config import (
     XAI_BASE_URL,
     check_key,
 )
-from app.prompts import BENCH_EVAL_ADDENDUM, SYSTEM_PROMPT
+from app.prompts import BENCH_EVAL_ADDENDUM, ROLE_ALLOWED_TOOLS, ROLE_PROMPTS, SYSTEM_PROMPT
 from app.tools import TOOL_DEFINITIONS, TOOL_DISPATCH, ToolUnavailableError
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,15 @@ def _build_tools_list(model: str = LLM_MODEL) -> list[dict]:
 # calling tools without producing a final reply.
 MAX_TOOL_ROUNDS = 20
 
+# Role-specific model defaults. Only applied when preferred_model is unset or
+# matches the global default (i.e., no explicit user override from Settings).
+ROLE_DEFAULT_MODELS: dict[str, str] = {
+    "plan":   "grok-4.20-0309-non-reasoning",
+    "hotels": "grok-4.20-0309-non-reasoning",
+    "days":   "grok-4.20-0309-non-reasoning",
+    "chat":   "grok-4.20-0309-non-reasoning",
+}
+
 _client: AsyncOpenAI | None = None
 _fallback_client: AsyncOpenAI | None = None
 
@@ -86,7 +96,11 @@ def _get_client() -> AsyncOpenAI:
             raise RuntimeError(
                 "XAI_API_KEY not configured. Add it to .env to enable the LLM."
             )
-        timeout = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=5.0)
+        # read=45s: each SSE chunk from the LLM must arrive within 45 s.
+        # With streaming, chunks come continuously — 45 s is enough headroom
+        # even for slow reasoning, while cutting hangs from stalled API
+        # connections (was 120 s, which felt like "hung forever" to users).
+        timeout = httpx.Timeout(connect=10.0, read=45.0, write=30.0, pool=5.0)
         http_client = httpx.AsyncClient(timeout=timeout, trust_env=False)
         _client = AsyncOpenAI(
             api_key=XAI_API_KEY,
@@ -109,7 +123,7 @@ def _get_fallback_client() -> AsyncOpenAI:
             raise RuntimeError(
                 "GEMINI_API_KEY not configured. Add it to .env for LLM fallback."
             )
-        timeout = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=5.0)
+        timeout = httpx.Timeout(connect=10.0, read=45.0, write=30.0, pool=5.0)
         _fallback_client = AsyncOpenAI(
             api_key=GEMINI_API_KEY,
             base_url=GEMINI_BASE_URL,
@@ -252,6 +266,7 @@ async def _run_loop(
     on_event: EventCallback | None = None,
     bench_eval: bool = False,
     preferred_model: str | None = None,
+    call_role: str | None = None,
 ) -> dict:
     """Internal: shared tool-call loop used by both chat() and chat_stream().
 
@@ -261,22 +276,47 @@ async def _run_loop(
     """
     # Pick the right client for whichever model is active — Gemini models use
     # the Gemini client; everything else uses the xAI client.
-    active_model = preferred_model or LLM_MODEL
+    # Resolution: explicit user choice > role default > global env default
+    _user_chose_explicitly = preferred_model and preferred_model != LLM_MODEL
+    if _user_chose_explicitly:
+        active_model = preferred_model
+    elif call_role and call_role in ROLE_DEFAULT_MODELS:
+        active_model = ROLE_DEFAULT_MODELS[call_role]
+    else:
+        active_model = preferred_model or LLM_MODEL
     client = _get_fallback_client() if active_model.startswith("gemini") else _get_client()
 
-    # User preferences and live location are injected as addenda to the system
-    # prompt rather than separate messages — this keeps them visible to the
-    # model on every tool-call iteration without polluting the conversation
-    # history.
+    # Pick system prompt and tool allow-list based on call_role.
+    # Scoped calls (plan/hotels/days/chat) get a focused prompt and a strict
+    # tool allow-list; legacy calls (call_role=None) keep the monolithic prompt.
+    base_prompt = ROLE_PROMPTS.get(call_role, SYSTEM_PROMPT) if call_role else SYSTEM_PROMPT
     system_content = (
-        SYSTEM_PROMPT
+        base_prompt
         + _format_user_location(user_location)
         + _format_trip_dates(trip_dates)
         + _format_preferences(preferences)
     )
     if bench_eval:
         system_content += BENCH_EVAL_ADDENDUM
-    full_messages: list[dict] = [{"role": "system", "content": system_content}] + list(messages)
+
+    # Filter TOOL_DEFINITIONS to the allow-list for this role.
+    allowed = ROLE_ALLOWED_TOOLS.get(call_role) if call_role else None
+    tools_for_role = (
+        [t for t in TOOL_DEFINITIONS if t["function"]["name"] in allowed]
+        if allowed else list(TOOL_DEFINITIONS)
+    )
+
+    # Scoped calls (plan/hotels/days) must NOT see prior conversation history —
+    # each is a fresh, single-purpose call. Only the system prompt + the one
+    # structured user message go in. Chat keeps the full history for context.
+    if call_role in ("plan", "hotels", "days"):
+        # messages[-1] is the structured user prompt built by the frontend
+        full_messages: list[dict] = [
+            {"role": "system", "content": system_content},
+            messages[-1],
+        ]
+    else:
+        full_messages = [{"role": "system", "content": system_content}] + list(messages)
     tool_calls_made: list[str] = []
     last_text = ""
 
@@ -285,12 +325,102 @@ async def _run_loop(
         # to call tools (by returning .tool_calls) or to produce a final text
         # reply (by leaving .tool_calls empty).
         try:
-            response = await client.chat.completions.create(
-                model=active_model,
-                messages=full_messages,
-                tools=_build_tools_list(active_model),
-                tool_choice="auto",
-            )
+            if on_event is not None:
+                # Signal that the LLM is now processing — this fires before
+                # the first token arrives so the status bar always has context
+                # during the silent thinking phase (up to 3-5s for Grok).
+                await on_event("thinking", {"round": round_idx})
+                # Streaming path: forward tokens to the client as they arrive.
+                # This cuts time-to-first-visible-text from ~3-5s to ~200ms.
+                stream = await client.chat.completions.create(
+                    model=active_model,
+                    messages=full_messages,
+                    tools=tools_for_role,
+                    tool_choice="auto",
+                    stream=True,
+                )
+                content_chunks: list[str] = []
+                # tc_accum keys are logical slot indices.
+                # We key first by (index, id) when Gemini sends all tools as
+                # index=0 with distinct ids, falling back to bare index for
+                # providers (xAI) that correctly number each tool call.
+                tc_accum: dict[int, dict] = {}
+                # id_to_slot: maps call_id → slot index so chunks for the same
+                # call land in the right slot regardless of streaming order.
+                _id_to_slot: dict[str, int] = {}
+                _next_slot = 0
+                async for chunk in stream:
+                    if not chunk.choices:
+                        continue
+                    delta = chunk.choices[0].delta
+                    if delta.content:
+                        content_chunks.append(delta.content)
+                        await on_event("token", {"text": delta.content})
+                    if delta.tool_calls:
+                        for tc_chunk in delta.tool_calls:
+                            # Determine which logical slot this chunk belongs to.
+                            #
+                            # xAI / standard OpenAI: sends sequential index values
+                            #   (0, 1, 2…) with a non-empty id on the first chunk.
+                            # Gemini OpenAI-compat: sends index=None with a
+                            #   distinct id per call. We key by id instead.
+                            call_id = tc_chunk.id or ""
+                            raw_idx = tc_chunk.index  # may be None (Gemini)
+
+                            if call_id and call_id in _id_to_slot:
+                                # Continuation chunk for a call we've already seen.
+                                slot = _id_to_slot[call_id]
+                            elif call_id:
+                                # New call id → allocate a fresh slot, ignoring
+                                # raw_idx (handles index=None and index-collision).
+                                slot = _next_slot
+                                _next_slot += 1
+                                _id_to_slot[call_id] = slot
+                                tc_accum[slot] = {"id": call_id, "type": "function",
+                                                  "function": {"name": "", "arguments": ""}}
+                            elif raw_idx is not None:
+                                # No id yet (first chunk of an xAI call carries
+                                # the id; subsequent chunks may omit it).
+                                if raw_idx not in tc_accum:
+                                    tc_accum[raw_idx] = {"id": "", "type": "function",
+                                                         "function": {"name": "", "arguments": ""}}
+                                    _next_slot = max(_next_slot, raw_idx + 1)
+                                slot = raw_idx
+                            else:
+                                # No id, no index — skip malformed chunk.
+                                continue
+
+                            if tc_chunk.id:
+                                tc_accum[slot]["id"] = tc_chunk.id
+                            if tc_chunk.function:
+                                if tc_chunk.function.name:
+                                    tc_accum[slot]["function"]["name"] += tc_chunk.function.name
+                                if tc_chunk.function.arguments:
+                                    tc_accum[slot]["function"]["arguments"] += tc_chunk.function.arguments
+                content = "".join(content_chunks)
+                tcs = [
+                    SimpleNamespace(
+                        id=tc_accum[i]["id"],
+                        function=SimpleNamespace(
+                            name=tc_accum[i]["function"]["name"],
+                            arguments=tc_accum[i]["function"]["arguments"],
+                        ),
+                    )
+                    for i in sorted(tc_accum.keys())
+                ]
+                msg = SimpleNamespace(
+                    content=content or None,
+                    tool_calls=tcs if tcs else None,
+                )
+            else:
+                # Non-streaming path: used by chat() for the /chat endpoint.
+                response = await client.chat.completions.create(
+                    model=active_model,
+                    messages=full_messages,
+                    tools=tools_for_role,
+                    tool_choice="auto",
+                )
+                msg = response.choices[0].message
         except (openai.APIStatusError, openai.APIConnectionError) as exc:
             # On round 0 only: if the primary provider is down (outage) or
             # geo-restricted, transparently retry with the Gemini fallback.
@@ -300,6 +430,7 @@ async def _run_loop(
             already_on_fallback = active_model.startswith("gemini")
             should_fallback = is_first_round and not already_on_fallback and (
                 _is_provider_outage(exc) or _is_region_error(exc)
+                or isinstance(exc, openai.APITimeoutError)
             )
             if should_fallback:
                 reason = "outage" if _is_provider_outage(exc) else "region_restricted"
@@ -316,8 +447,6 @@ async def _run_loop(
                     })
                 continue
             raise
-
-        msg = response.choices[0].message
         last_text = msg.content or last_text
 
         if not msg.tool_calls:
@@ -418,7 +547,9 @@ async def _run_loop(
 
         tool_results = await asyncio.gather(*(_run_one(tc) for tc in msg.tool_calls))
         full_messages.extend(tool_results)
-        full_messages = _prune_tool_results(full_messages, keep_recent_rounds=PRUNE_KEEP_ROUNDS)
+        _is_reasoning = "reasoning" in active_model and "non-reasoning" not in active_model
+        keep_rounds = 3 if _is_reasoning else 2
+        full_messages = _prune_tool_results(full_messages, keep_recent_rounds=keep_rounds)
     else:
         logger.warning("Hit MAX_TOOL_ROUNDS=%d without final reply", MAX_TOOL_ROUNDS)
 
@@ -453,6 +584,7 @@ async def chat(
     trip_dates: dict | None = None,
     bench_eval: bool = False,
     preferred_model: str | None = None,
+    call_role: str | None = None,
 ) -> dict:
     """Run the LLM with a tool-call loop and return the final response.
 
@@ -476,6 +608,7 @@ async def chat(
         on_event=None,
         bench_eval=bench_eval,
         preferred_model=preferred_model,
+        call_role=call_role,
     )
 
 
@@ -486,6 +619,7 @@ async def chat_stream(
     trip_dates: dict | None = None,
     bench_eval: bool = False,
     preferred_model: str | None = None,
+    call_role: str | None = None,
 ) -> AsyncIterator[dict]:
     """Run the LLM and yield events as tool calls fire.
 
@@ -497,8 +631,13 @@ async def chat_stream(
       - {"type": "error",      "data": {"message": ...}}  on failure
     """
     queue: asyncio.Queue = asyncio.Queue()
+    _t0 = time.monotonic()
 
     async def emit(event_type: str, payload: dict) -> None:
+        # Inject a server-side timestamp (ms since this request started) into
+        # every event so the bench script can build a precise waterfall without
+        # relying on client-side clock skew.
+        payload["t"] = int((time.monotonic() - _t0) * 1000)
         await queue.put({"type": event_type, "data": payload})
 
     async def run() -> None:
@@ -511,6 +650,7 @@ async def chat_stream(
                 on_event=emit,
                 bench_eval=bench_eval,
                 preferred_model=preferred_model,
+                call_role=call_role,
             )
             await queue.put({"type": "done", "data": result})
         except RuntimeError as e:

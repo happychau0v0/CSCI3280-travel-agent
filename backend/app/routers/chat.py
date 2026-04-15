@@ -27,6 +27,8 @@ ALLOWED_MODELS = {
     "gemini-3.1-pro-preview",
 }
 
+ALLOWED_ROLES = {None, "plan", "hotels", "days", "chat"}
+
 
 class ChatRequest(BaseModel):
     message: str
@@ -36,6 +38,7 @@ class ChatRequest(BaseModel):
     trip_dates: dict | None = None
     bench_eval: bool = False
     preferred_model: str | None = None
+    call_role: str | None = None
 
 
 class ChatResponse(BaseModel):
@@ -53,6 +56,8 @@ async def post_chat(req: ChatRequest) -> ChatResponse:
 
     if req.preferred_model and req.preferred_model not in ALLOWED_MODELS:
         raise HTTPException(status_code=400, detail=f"Unknown model: {req.preferred_model}")
+    if req.call_role not in ALLOWED_ROLES:
+        raise HTTPException(status_code=400, detail=f"Unknown call_role: {req.call_role}")
 
     try:
         result = await llm.chat(
@@ -62,6 +67,7 @@ async def post_chat(req: ChatRequest) -> ChatResponse:
             trip_dates=req.trip_dates,
             bench_eval=req.bench_eval,
             preferred_model=req.preferred_model,
+            call_role=req.call_role,
         )
     except RuntimeError as e:
         # Missing API key — surface as 503 Service Unavailable
@@ -103,6 +109,8 @@ async def post_chat_stream(req: ChatRequest):
 
     if req.preferred_model and req.preferred_model not in ALLOWED_MODELS:
         raise HTTPException(status_code=400, detail=f"Unknown model: {req.preferred_model}")
+    if req.call_role not in ALLOWED_ROLES:
+        raise HTTPException(status_code=400, detail=f"Unknown call_role: {req.call_role}")
 
     async def event_generator():
         async for event in llm.chat_stream(
@@ -112,6 +120,7 @@ async def post_chat_stream(req: ChatRequest):
             trip_dates=req.trip_dates,
             bench_eval=req.bench_eval,
             preferred_model=req.preferred_model,
+            call_role=req.call_role,
         ):
             yield _format_sse(event)
 
