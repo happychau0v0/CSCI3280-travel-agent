@@ -31,6 +31,7 @@ export default function ChatPopover({
   isLoading,
   initialText = "",
   onRecallLast,
+  promptLabel = "",
 }) {
   const [text, setText] = useState("");
   // The "this popover session is an edit" flag lives here, NOT in the
@@ -123,6 +124,9 @@ export default function ChatPopover({
         <div className="chat-popover-bracket chat-popover-bracket-tr" />
         <div className="chat-popover-bracket chat-popover-bracket-bl" />
         <div className="chat-popover-bracket chat-popover-bracket-br" />
+        {promptLabel && (
+          <p className="chat-popover-prompt-label">{promptLabel}</p>
+        )}
         <VoiceRecorder onResult={handleVoiceResult} disabled={isLoading} />
         <input
           ref={inputRef}

@@ -2424,22 +2424,6 @@ li[tabindex]:focus-visible {
   letter-spacing: 0.08em;
 }
 
-.home-card-sub {
-  font-size: 11px;
-  color: var(--text);
-  letter-spacing: 0.04em;
-}
-
-.home-card.agent-working {
-  border-color: var(--accent);
-  background: rgba(0, 217, 255, 0.1);
-  animation: home-card-pulse 1.6s ease-in-out infinite;
-}
-
-.home-card.agent-error {
-  border-color: var(--danger);
-  background: rgba(255, 85, 119, 0.1);
-}
 
 @keyframes home-card-pulse {
   0%, 100% { box-shadow: 0 0 16px rgba(0, 217, 255, 0.2); }
@@ -3083,227 +3067,6 @@ li[tabindex]:focus-visible {
   color: #c4b5fd;
 }
 
-/* AgentStatusBar — compact banner pinned to the top-right corner.
- * Sits in the empty column-3 / row-1 space on FLIGHTS/HOTELS/DAYS.
- * On HOME the history card shifts down to make room (see .home-card-tr rule). */
-
-.agent-status-bar {
-  position: fixed;
-  top: 56px;
-  right: 0;
-  left: auto;
-  transform: none;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 220px;
-  max-width: min(300px, 28vw);
-  padding: 8px 14px;
-  background: var(--status-bar-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  font-family: var(--mono);
-  pointer-events: auto;
-  animation: status-slide-in 0.3s ease;
-}
-
-@keyframes status-slide-in {
-  from { opacity: 0; transform: translateX(8px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-/* On HOME the history card occupies the same top-right spot.
- * Reserve space for the status bar only while it is mounted (non-idle). */
-.panel-active-home .home-card-tr {
-  transition: margin-top 0.25s ease;
-}
-.panel-active-home:has(.agent-status-bar) .home-card-tr {
-  margin-top: 72px;
-}
-
-.agent-status-bar.status-working {
-  border: 1px solid var(--accent);
-  box-shadow: 0 0 32px rgba(0, 217, 255, 0.4);
-}
-
-.agent-status-bar.status-done {
-  border: 1px solid var(--success);
-  box-shadow: 0 0 32px var(--success-glow);
-}
-
-.agent-status-bar.status-error {
-  border: 1px solid var(--danger);
-  box-shadow: 0 0 32px rgba(255, 85, 119, 0.5);
-}
-
-.status-icon {
-  font-size: 24px;
-  font-weight: 700;
-}
-
-.status-working .status-icon {
-  color: var(--accent);
-  animation: status-icon-pulse 1.6s ease-in-out infinite;
-}
-
-.status-done .status-icon {
-  color: var(--success);
-}
-
-.status-error .status-icon {
-  color: var(--danger);
-}
-
-@keyframes status-icon-pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
-
-.status-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.status-heading {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--text-h);
-}
-
-.status-tool {
-  color: var(--accent);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-}
-
-.status-detail {
-  font-size: 11px;
-  color: var(--text);
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.status-progress {
-  position: relative;
-  height: 3px;
-  background: rgba(0, 217, 255, 0.15);
-  overflow: hidden;
-}
-
-.status-progress-sweep {
-  position: absolute;
-  top: 0;
-  left: -30%;
-  width: 30%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--accent),
-    transparent
-  );
-  animation: status-sweep 1.4s linear infinite;
-}
-
-@keyframes status-sweep {
-  to { left: 100%; }
-}
-
-.status-progress-fill {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  background: var(--accent);
-  transition: width 0.8s linear;
-}
-
-.status-progress-eta-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.status-progress-eta-row .status-progress {
-  flex: 1;
-}
-
-.status-eta {
-  font-size: 10px;
-  color: var(--accent);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.status-elapsed {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--accent);
-  letter-spacing: 0.04em;
-  min-width: 48px;
-  text-align: right;
-}
-
-/* Per-tool timing chips — shown during "working" (live) and "done" (summary) */
-.status-timings {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 5px;
-}
-
-.status-timing-chip {
-  font-size: 10px;
-  letter-spacing: 0.03em;
-  padding: 1px 6px;
-  border: 1px solid rgba(0, 217, 255, 0.3);
-  color: rgba(0, 217, 255, 0.7);
-  border-radius: 2px;
-  white-space: nowrap;
-  background: rgba(0, 217, 255, 0.05);
-}
-
-/* Warn: 3–10 s */
-.status-timing-chip.timing-warn {
-  border-color: rgba(251, 191, 36, 0.5);
-  color: rgba(251, 191, 36, 0.9);
-  background: rgba(251, 191, 36, 0.07);
-}
-
-/* Slow: > 10 s — red flag */
-.status-timing-chip.timing-slow {
-  border-color: rgba(239, 68, 68, 0.6);
-  color: rgba(239, 68, 68, 0.95);
-  background: rgba(239, 68, 68, 0.08);
-  font-weight: 600;
-}
-
-.status-dismiss {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text);
-  width: 28px;
-  height: 28px;
-  cursor: pointer;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-}
-
-.status-dismiss:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-h);
-}
 
 @keyframes field-pulse {
   0%, 100% {
@@ -3509,6 +3272,19 @@ select.panel-input {
   right: -2px;
   border-left: none;
   border-top: none;
+}
+
+.chat-popover-prompt-label {
+  width: 100%;
+  margin: 0 0 0.5rem;
+  padding: 0.45rem 0.75rem;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-left: 2px solid var(--accent);
+  border-radius: 3px;
+  color: var(--text-h);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  text-align: left;
 }
 
 .chat-popover input[type="text"] {
@@ -3846,6 +3622,38 @@ body.theme-light .tab-strip {
 
 .tab-label {
   font-size: 11px;
+}
+
+/* TabStrip agent-working indicator — far right, subtle */
+.tab-status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 8px;
+  opacity: 0.75;
+}
+
+.tab-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: tab-dot-pulse 1.2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes tab-dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.35; transform: scale(0.7); }
+}
+
+.tab-status-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  text-transform: uppercase;
 }
 
 
