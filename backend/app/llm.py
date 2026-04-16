@@ -199,6 +199,36 @@ def _format_trip_dates(trip_dates: dict | None) -> str:
     )
 
 
+def _format_local_form(local_form: dict | None) -> str:
+    """Render a UI FORM STATE block telling the agent about user-filled fields."""
+    if not local_form:
+        return ""
+    parts: list[str] = []
+    if local_form.get("destination"):
+        parts.append(f"- destination: {local_form['destination']}")
+    if local_form.get("origin"):
+        parts.append(f"- origin: {local_form['origin']}")
+    if local_form.get("start_date"):
+        parts.append(f"- start_date: {local_form['start_date']}")
+    if local_form.get("end_date"):
+        parts.append(f"- end_date: {local_form['end_date']}")
+    if local_form.get("transport"):
+        parts.append(f"- transport: {local_form['transport']}")
+    if local_form.get("party_size"):
+        parts.append(f"- party_size: {local_form['party_size']}")
+    if local_form.get("interests"):
+        parts.append(f"- interests: {local_form['interests']}")
+    
+    if not parts:
+        return ""
+        
+    return (
+        "\n\nUI FORM STATE (the user has already typed these into the UI trip form. "
+        "Treat them as confirmed facts. DO NOT call request_input for these fields "
+        "unless the user explicitly says they want to change them):\n" + "\n".join(parts)
+    )
+
+
 def _map_partial(fn_name: str, fn_args: dict, result: dict) -> dict | None:
     """Map a completed tool result to a partial_itinerary payload, or return None."""
     if result.get("error"):
@@ -273,6 +303,7 @@ async def _run_loop(
     preferences: dict | None = None,
     user_location: dict | None = None,
     trip_dates: dict | None = None,
+    local_form: dict | None = None,
     on_event: EventCallback | None = None,
     bench_eval: bool = False,
     preferred_model: str | None = None,
@@ -307,6 +338,7 @@ async def _run_loop(
         + _format_user_location(user_location)
         + _format_trip_dates(trip_dates)
         + _format_preferences(preferences)
+        + _format_local_form(local_form)
     )
     if bench_eval:
         system_content += BENCH_EVAL_ADDENDUM
@@ -586,18 +618,17 @@ async def _run_loop(
             }
 
         # If request_input is in this batch, execute ONLY request_input and
-        # break immediately. Running search_flights or navigate_menu alongside
-        # request_input causes confusing UI state — the user hasn't answered
-        # yet so the LLM must wait. Filtering here prevents the LLM from
-        # sneaking through a search+navigate in the same tool-call batch.
+        # submit_trip_form, then break immediately. Running search_flights or 
+        # navigate_menu alongside request_input causes confusing UI state.
+        # Filtering here prevents the LLM from sneaking through a search+navigate.
         has_request_input = any(
             tc.function.name == "request_input" for tc in msg.tool_calls
         )
-        calls_to_run = (
-            [tc for tc in msg.tool_calls if tc.function.name == "request_input"]
-            if has_request_input
-            else list(msg.tool_calls)
-        )
+        if has_request_input:
+            allowed_names = {"request_input", "submit_trip_form"}
+            calls_to_run = [tc for tc in msg.tool_calls if tc.function.name in allowed_names]
+        else:
+            calls_to_run = list(msg.tool_calls)
         tool_results = await asyncio.gather(*(_run_one(tc) for tc in calls_to_run))
         full_messages.extend(tool_results)
 
@@ -641,6 +672,7 @@ async def chat(
     preferences: dict | None = None,
     user_location: dict | None = None,
     trip_dates: dict | None = None,
+    local_form: dict | None = None,
     bench_eval: bool = False,
     preferred_model: str | None = None,
     call_role: str | None = None,
@@ -664,6 +696,7 @@ async def chat(
         preferences=preferences,
         user_location=user_location,
         trip_dates=trip_dates,
+        local_form=local_form,
         on_event=None,
         bench_eval=bench_eval,
         preferred_model=preferred_model,
@@ -676,6 +709,7 @@ async def chat_stream(
     preferences: dict | None = None,
     user_location: dict | None = None,
     trip_dates: dict | None = None,
+    local_form: dict | None = None,
     bench_eval: bool = False,
     preferred_model: str | None = None,
     call_role: str | None = None,
@@ -713,6 +747,7 @@ async def chat_stream(
                 preferences=preferences,
                 user_location=user_location,
                 trip_dates=trip_dates,
+                local_form=local_form,
                 on_event=emit,
                 bench_eval=bench_eval,
                 preferred_model=preferred_model,

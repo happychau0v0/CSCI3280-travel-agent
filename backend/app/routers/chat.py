@@ -38,6 +38,7 @@ class ChatRequest(BaseModel):
     preferences: dict | None = None
     user_location: dict | None = None
     trip_dates: dict | None = None
+    local_form: dict | None = None
     bench_eval: bool = False
     preferred_model: str | None = None
     call_role: str | None = None
@@ -67,6 +68,7 @@ async def post_chat(req: ChatRequest) -> ChatResponse:
             preferences=req.preferences,
             user_location=req.user_location,
             trip_dates=req.trip_dates,
+            local_form=req.local_form,
             bench_eval=req.bench_eval,
             preferred_model=req.preferred_model,
             call_role=req.call_role,
@@ -122,6 +124,7 @@ async def post_chat_stream(req: ChatRequest):
             preferences=req.preferences,
             user_location=req.user_location,
             trip_dates=req.trip_dates,
+            local_form=req.local_form,
             bench_eval=req.bench_eval,
             preferred_model=req.preferred_model,
             call_role=req.call_role,

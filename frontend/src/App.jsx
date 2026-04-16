@@ -1078,6 +1078,13 @@ function App() {
       setIsLoading(true);
       setError(null);
 
+      // BUG FIX: The LLM could ask request_input("start_date") which opens the native date picker.
+      // If the user answers using the ChatPopover's voice input, the native date picker remains open.
+      // Call document.activeElement.blur() here immediately on send to close any native pickers.
+      if (document.activeElement && typeof document.activeElement.blur === "function") {
+        document.activeElement.blur();
+      }
+
       // ── Immediate "received" feedback. The user sees something
       // happening within ~16ms of pressing send, which is the most
       // important responsiveness fix in round 8. The status bar
@@ -1113,6 +1120,16 @@ function App() {
       subtitles.push(`▸ ${preview}`, { spoken: false });
       cues.tick();
 
+      // --- START BUG FIX: Fetch current form state from localStorage ---
+      let localForm = null;
+      try {
+        const raw = localStorage.getItem("travel-trip-form");
+        if (raw) localForm = JSON.parse(raw);
+      } catch (e) {
+        // ignore parse error
+      }
+      // --- END BUG FIX ---
+
       try {
         const data = await streamChat({
           message: text,
@@ -1120,6 +1137,7 @@ function App() {
           preferences,
           userLocation,
           tripDates,
+          localForm,
           llmModel,
           callRole,
           onEvent: ({ type, data: payload }) => {

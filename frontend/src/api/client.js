@@ -98,6 +98,7 @@ export async function streamChat({
   preferences = null,
   userLocation = null,
   tripDates = null,
+  localForm = null,
   llmModel = null,
   callRole = null,
   onEvent,
@@ -106,6 +107,7 @@ export async function streamChat({
   if (preferences) body.preferences = preferences;
   if (userLocation) body.user_location = userLocation;
   if (tripDates) body.trip_dates = tripDates;
+  if (localForm) body.local_form = localForm;
   if (llmModel) body.preferred_model = llmModel;
   if (callRole) body.call_role = callRole;
 
