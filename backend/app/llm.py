@@ -75,6 +75,18 @@ ROLE_DEFAULT_MODELS: dict[str, str] = {
     "chat":   "grok-4.20-0309-non-reasoning",
 }
 
+# Per-role round caps — closes R-HOTELS-001 / R-DAYS-001 / R-DETAIL-001.
+# The three scoped planner roles are specced for exactly 2 tool-call rounds
+# (round 1: batch every search_places/get_directions/get_weather; round 2:
+# final JSON + navigate_menu). Enforcing in code stops the LLM from sneaking
+# a 3rd round that would contradict the system prompt.
+# Roles not listed here fall through to MAX_TOOL_ROUNDS.
+ROLE_MAX_ROUNDS: dict[str, int] = {
+    "hotels": 2,
+    "days": 2,
+    "day_detail": 2,
+}
+
 _client: AsyncOpenAI | None = None
 _fallback_client: AsyncOpenAI | None = None
 
@@ -366,7 +378,12 @@ async def _run_loop(
     tool_calls_detail: list[dict] = []
     last_text = ""
 
-    for round_idx in range(MAX_TOOL_ROUNDS):
+    # Per-role round budget: scoped planners are capped at 2 rounds
+    # (R-HOTELS-001 / R-DAYS-001 / R-DETAIL-001). Other roles use the
+    # global MAX_TOOL_ROUNDS.
+    effective_max_rounds = ROLE_MAX_ROUNDS.get(call_role, MAX_TOOL_ROUNDS)
+
+    for round_idx in range(effective_max_rounds):
         # Each iteration is a full chat completion. The model decides whether
         # to call tools (by returning .tool_calls) or to produce a final text
         # reply (by leaving .tool_calls empty).
@@ -645,7 +662,10 @@ async def _run_loop(
         keep_rounds = 3 if _is_reasoning else 2
         full_messages = _prune_tool_results(full_messages, keep_recent_rounds=keep_rounds)
     else:
-        logger.warning("Hit MAX_TOOL_ROUNDS=%d without final reply", MAX_TOOL_ROUNDS)
+        logger.warning(
+            "Hit round cap (%d) for role=%s without final reply",
+            effective_max_rounds, call_role,
+        )
 
     # Debug: dump raw LLM text when DUMP_LLM=1 so we can record golden
     # fixtures for schema validation tests (P1 of the testing plan).

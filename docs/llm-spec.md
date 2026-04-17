@@ -359,14 +359,14 @@ bottom of this section.
 | R-PLAN-009 `days` count = trip_days | COVERED | `TestGoldenTaipeiSparse::test_days_match_trip_length` (2-day) + `TestRoundTripFlight::test_day_count_matches_trip_length` (6-day). |
 | R-PLAN-010 Output shape | COVERED | `TestGoldenTokyoFull::test_pydantic_validates` + `_has_title_and_destination` + `_has_multiple_days` + `_phrasebook_present`. |
 | R-PLAN-011 `navigate_menu("FLIGHTS")` at end | PARTIAL | Playwright walkthrough step 3 (`CLAUDE.md:115`) — real browser observes panel change. No unit test. |
-| R-HOTELS-001 2-round cap | GAP | No test counts LLM rounds per role. |
+| R-HOTELS-001 2-round cap | COVERED (runtime) | `llm.py::ROLE_MAX_ROUNDS["hotels"]=2` enforces the cap; `test_role_round_caps.py::test_scoped_planner_halts_at_two_rounds[hotels]` + `::test_role_cap_stops_before_third_llm_call` assert the loop halts before any 3rd LLM call. |
 | R-HOTELS-002 Destination = actual flight city | RUBRIC READY | `rubrics.py::check_R_HOTELS_002_hotels_near_destination` + `test_eval_rubrics.py::TestR_HOTELS_002` (4 unit tests) — haversine-checks every hotel lat/lng is within 80 km of `context.flight_to_lat`/`flight_to_lng`. Awaits live eval run. |
 | R-HOTELS-003 MUST call `search_places` | RUBRIC READY | `rubrics.py::check_R_HOTELS_003_must_call_search_places` + `test_eval_rubrics.py::TestR_HOTELS_003` (4 unit tests). Awaits live eval run. |
 | R-HOTELS-004 Allow-list (post-D2: `search_places`, `get_weather`, `navigate_menu`) | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[hotels]` + `test_hotels_allow_list_excludes_get_place_details`. |
 | R-HOTELS-005 5-8 hotels (post-D3) | PARTIAL · WONTFIX-UPPER-BOUND | `TestGoldenTokyoFull::test_has_enough_hotels` (≥3) covers the lower bound. **Wontfix (strict 8-upper bound + neighborhood-diversity check):** the lower bound is load-bearing for the UI (≥3 avoids a sparse panel); an extra hotel or two above 8 is a harmless quality issue, not a regression. Neighborhood diversity is subjective and already nudged in the prompt. |
 | R-HOTELS-006 Output shape | COVERED | `TestGoldenTokyoFull::test_hotels_have_required_fields`. |
 | R-HOTELS-007 `navigate_menu("HOTELS")` | PARTIAL | Playwright step 5 (`CLAUDE.md:121`). |
-| R-DAYS-001 2-round cap | GAP | — |
+| R-DAYS-001 2-round cap | COVERED (runtime) | `llm.py::ROLE_MAX_ROUNDS["days"]=2`; `test_role_round_caps.py::test_scoped_planner_halts_at_two_rounds[days]` asserts the loop halts after round 2. |
 | R-DAYS-002 `search_places` + `get_directions` each pair | PARTIAL | `TestGoldenTokyoFull::test_middle_days_have_enough_activities` (≥4 mid-day) and indirectly `_activity_times_monotonic`. `get_directions` call count not asserted. |
 | R-DAYS-003 Allow-list (post-D2: `search_places`, `get_directions`, `get_weather`, `navigate_menu`) | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[days]` + `test_days_allow_list_excludes_get_place_details`. |
 | R-DAYS-004 Time formula + monotonic | COVERED (shape-level) | Pydantic `Day._activity_times_monotonic` validator (`prompts.py`) rejects any day with out-of-order activity times — blocks ingest of non-monotonic LLM output at parse time. `TestGoldenTokyoFull::test_activity_times_monotonic` covers the behavioral half. Transit-duration arithmetic still GAP. |
@@ -402,7 +402,7 @@ bottom of this section.
 | R-THEMES-004 Day 1 / last-day theming | RUBRIC READY | `rubrics.py::check_R_THEMES_004_day_timing` (async LLM-judge via `judge.py`) + `test_eval_rubrics.py::TestR_THEMES_004` (2 unit tests). Only days with `key_constraints.arrival_time`/`departure_time` are judged; middle days skip. Awaits live eval run. |
 | R-THEMES-005 `key_constraints` only on flight days | COVERED | `TestDayThemesOutput::test_key_constraints_only_on_flight_days` — asserts day 1 has `arrival_time`, last day has `departure_time`, middle days have no `key_constraints`. |
 | R-THEMES-006 Specific neighborhood names | COVERED | `TestDayThemesOutput::test_every_day_has_theme_and_areas` (3-5 areas) + `::test_suggested_areas_not_generic` (no "downtown"/"city center"). |
-| R-DETAIL-001 2-round cap | GAP | — |
+| R-DETAIL-001 2-round cap | COVERED (runtime) | `llm.py::ROLE_MAX_ROUNDS["day_detail"]=2`; `test_role_round_caps.py::test_scoped_planner_halts_at_two_rounds[day_detail]` asserts the loop halts after round 2. Supporting tests show `plan`/`chat` still use the global cap so their multi-round flows keep working. |
 | R-DETAIL-002 search_places per area, directions per pair | RUBRIC READY | `rubrics.py::check_R_DETAIL_002_search_and_directions_counts` + `test_eval_rubrics.py::TestR_DETAIL_002` (3 unit tests) — fails when `search_places` count < `suggested_areas_count` (from context) or `get_directions` count < activity pairs emitted. Awaits live eval run. |
 | R-DETAIL-003 Mode matches transport | RUBRIC READY | `rubrics.py::check_R_DETAIL_003_directions_mode_matches_transport` + `test_eval_rubrics.py::TestR_DETAIL_003` (4 unit tests) — checks every `get_directions.mode` arg equals the TRANSPORT_MODE_MAP entry for `context.local_transport_mode` (`transit→TRANSIT`, `driving→DRIVE`, etc.). Missing `mode` also fails. Awaits live eval run. |
 | R-DETAIL-004 Allow-list | COVERED | `test_prompts_roles.py::test_day_detail_allowed_tools` + `test_prompts_roles.py::test_day_detail_does_not_allow_navigate_menu` + `test_day_planning_roles.py::test_day_detail_allowed_tools`. |
@@ -421,6 +421,7 @@ bottom of this section.
 | Fresh-context for scoped calls | `llm.py:358-363` | `test_role_allow_lists.py::test_scoped_role_drops_conversation_history[*]` covers all 5 scoped roles; `test_chat_role_preserves_full_history` covers the chat exception. COVERED. |
 | `request_input` stopping rule | `llm.py:620-638` | `test_request_input_stops.py::test_request_input_in_batch_skips_concurrent_tools` + `::test_request_input_plus_submit_trip_form_both_run`. COVERED. |
 | `MAX_TOOL_ROUNDS = 20` halt | `llm.py` | `test_llm_loop.py::test_max_tool_rounds_halts_runaway_loop`. |
+| Per-role round cap (`ROLE_MAX_ROUNDS`) | `llm.py:78-88, 383-388` | `test_role_round_caps.py` (7 tests) — halts `hotels`/`days`/`day_detail` at 2 rounds; `plan`/`chat` still use global cap. Closes R-HOTELS-001, R-DAYS-001, R-DETAIL-001. |
 | Region-error fallback to Gemini | `llm.py` | `test_llm_loop.py::test_region_error_swaps_to_fallback_model_on_round_zero`, `::test_is_region_error_recognises_common_phrasings`. |
 | Gemini `thought_signature` preservation | `llm.py` | `test_llm_loop.py::test_gemini_thought_signature_is_preserved_in_history`, `::test_thought_signature_absent_when_not_in_model_extra`. |
 | Itinerary extraction (fenced / bare / sanitized) | `_extract_itinerary`, `_sanitize_json` | `test_llm_loop.py::test_extract_itinerary_from_*`, `test_itinerary_schema.py::TestBadEscapes`, `::TestSanitizeJson`, `::TestExtractItineraryEdgeCases`. |
@@ -438,7 +439,9 @@ After Tier A+C+F (2026-04-17 morning), Tier B+D+E (2026-04-17 afternoon),
 and the third verification pass (2026-04-17 evening — closes the long-tail GAPs):
 
 - **Total numbered requirements:** 69
-- **COVERED (explicit assertion):** 29 — unchanged; flips to COVERED only
+- **COVERED (explicit assertion):** 32 — +3 from this pass via the
+  per-role round cap (R-HOTELS-001, R-DAYS-001, R-DETAIL-001 are
+  now runtime-enforced via `ROLE_MAX_ROUNDS`). Flips to higher still
   after a live eval run confirms the RUBRIC READY rows below.
 - **RUBRIC READY (offline rubric logic + unit tests; awaits live LLM
   eval run):** 30 — 8 from the prior pass (R-G-002/003/004/005/006/015,
@@ -454,7 +457,7 @@ and the third verification pass (2026-04-17 evening — closes the long-tail GAP
   one-fixture-shape-tested. Includes R-G-008, R-G-013, R-HOTELS-005,
   R-REPLACE-001, R-DETAIL-005 which have meaningful coverage but
   behavioral halves marked wontfix or out of scope.
-- **GAP:** ~3 — only the wontfix cluster remains:
+- **GAP:** 3 — only the wontfix cluster remains:
   R-DAYS-013 (frontend-owned), R-MONO-002 (superseded by D1),
   R-MONO-004 (frontend-owned). Each row carries a WONTFIX tag and a
   reason. See "Wontfix tags" below.
