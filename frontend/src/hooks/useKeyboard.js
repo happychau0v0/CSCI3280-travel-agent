@@ -11,7 +11,7 @@ import { PANELS, PANELS_WITH_LIST } from "./useMenuState";
  *   - Space        — pick the focused item on FLIGHTS or HOTELS
  *   - ←/→          — reserved for sub-components
  *
- * Overlays (H, S, ?, P, L, F, C) are open-only — Esc closes them.
+ * Overlays (H, S, ?, L, F, C) are open-only — Esc closes them.
  * The hook is disabled entirely while any overlay is open so each overlay
  * can own its own keyboard handling without leaking events.
  *
@@ -36,7 +36,6 @@ export function useKeyboard({
   onUndo,
   onRedo,
   onOpenHelp,
-  onOpenPrint,
   onNewTrip,
   onOpenChecklist,
   onOpenFavorites,
@@ -271,7 +270,6 @@ export function useKeyboard({
     onUndo,
     onRedo,
     onOpenHelp,
-    onOpenPrint,
     onNewTrip,
     onOpenChecklist,
     onOpenFavorites,

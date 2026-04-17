@@ -77,7 +77,6 @@ const TOOL_NARRATIONS = {
   geocode_city: "Locating the city…",
   navigate_menu: "Switching panels…",
   request_input: "Awaiting your input…",
-  web_search: "Searching the web…",
 };
 
 function loadState() {
@@ -593,7 +592,6 @@ function App() {
     onUndo: handleUndoPick,
     onRedo: handleRedoPick,
     onOpenHelp: () => setHelpOpen(true),
-    onOpenPrint: () => menu.setPanel("EXPORT"),
     onOpenChecklist: () => setChecklistOpen(true),
     onOpenFavorites: () => setFavoritesOpen(true),
     onOpenStatus: () => { cues.select(); setStatusOpen(true); },

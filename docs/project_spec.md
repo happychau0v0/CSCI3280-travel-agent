@@ -157,7 +157,6 @@ User ──► The Interface ──► The Brain ──► The Interface ──�
 | `get_place_details` | place_id | {name, description, hours, reviews, photos, price_level} | Google Places |
 | `get_directions` | origin, destination, mode | {duration, distance, steps[], polyline} | Google Maps |
 | `get_weather` | city, date? | {temp, condition, humidity, forecast[]} | OpenWeatherMap |
-| `web_search` | query | Array of {title, snippet, url} | SerpAPI / Tavily (if added) |
 
 ---
 
@@ -203,7 +202,6 @@ travel-agent/
 │       ├── components/
 │       │   ├── ChatWindow.jsx
 │       │   ├── VoiceRecorder.jsx
-│       │   ├── AudioPlayer.jsx
 │       │   ├── ItineraryCard.jsx
 │       │   └── MapView.jsx
 │       └── api/
