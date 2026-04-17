@@ -76,15 +76,19 @@ ROLE_DEFAULT_MODELS: dict[str, str] = {
 }
 
 # Per-role round caps — closes R-HOTELS-001 / R-DAYS-001 / R-DETAIL-001.
-# The three scoped planner roles are specced for exactly 2 tool-call rounds
+# The three scoped planner roles are specced for exactly 2 TOOL-CALL rounds
 # (round 1: batch every search_places/get_directions/get_weather; round 2:
-# final JSON + navigate_menu). Enforcing in code stops the LLM from sneaking
-# a 3rd round that would contradict the system prompt.
+# final JSON + navigate_menu). We cap at 3 loop iterations, not 2, because
+# round 3 is a zero-tool wrap-up where the LLM emits the final spoken
+# subtitle (R-G-004 requires prose outside the JSON block). Capping at 2
+# observed in the live eval truncated the subtitle and broke R-G-004.
+# Spec intent: prevent a 4th tool-call round (a rogue get_place_details
+# retry), not prevent the natural wrap-up.
 # Roles not listed here fall through to MAX_TOOL_ROUNDS.
 ROLE_MAX_ROUNDS: dict[str, int] = {
-    "hotels": 2,
-    "days": 2,
-    "day_detail": 2,
+    "hotels": 3,
+    "days": 3,
+    "day_detail": 3,
 }
 
 _client: AsyncOpenAI | None = None

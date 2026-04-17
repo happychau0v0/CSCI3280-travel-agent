@@ -42,10 +42,11 @@ async def _noop(**kwargs):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("call_role", ["hotels", "days", "day_detail"])
-async def test_scoped_planner_halts_at_two_rounds(call_role):
-    """hotels / days / day_detail must stop after round 2 even when the
-    LLM keeps trying to call tools. This matches R-HOTELS-001/DAYS-001/
-    DETAIL-001 in docs/llm-spec.md."""
+async def test_scoped_planner_halts_at_three_rounds(call_role):
+    """hotels / days / day_detail stop after round 3 even when the LLM
+    keeps trying to call tools. This matches R-HOTELS-001/DAYS-001/
+    DETAIL-001: the spec allows 2 TOOL-call rounds plus 1 wrap-up round
+    (where the LLM emits the final prose subtitle with no tool calls)."""
 
     # Use tools from the role's allow-list so the filter doesn't drop them.
     # search_places is in all three allow-lists.
@@ -69,9 +70,9 @@ async def test_scoped_planner_halts_at_two_rounds(call_role):
             call_role=call_role,
         )
 
-    # Exactly 2 LLM calls — the 3rd would be a spec violation.
-    assert fake_client.chat.completions.create.await_count == 2
-    assert len(result["tool_calls_made"]) == 2
+    # Exactly 3 LLM calls — a 4th would be a spec violation.
+    assert fake_client.chat.completions.create.await_count == 3
+    assert len(result["tool_calls_made"]) == 3
     assert result["reply"] == "still thinking…"
 
 
@@ -162,10 +163,11 @@ async def test_role_cap_does_not_interfere_when_llm_finishes_early():
 
 
 @pytest.mark.asyncio
-async def test_role_cap_stops_before_third_llm_call():
-    """The halt must occur BEFORE the 3rd LLM call is made — not after.
-    A model that emits tools in rounds 1 and 2 must never see a round 3
-    prompt, because sending it would waste a Grok/Gemini request."""
+async def test_role_cap_stops_before_fourth_llm_call():
+    """The halt must occur BEFORE the 4th LLM call is made — not after.
+    The scoped planner pattern is round 1 tools, round 2 tools+JSON,
+    round 3 wrap-up. A 4th round would either be an illegal extra
+    tool-call round or wasted compute."""
 
     call_count = 0
 
@@ -188,4 +190,4 @@ async def test_role_cap_stops_before_third_llm_call():
             call_role="days",
         )
 
-    assert call_count == 2
+    assert call_count == 3
