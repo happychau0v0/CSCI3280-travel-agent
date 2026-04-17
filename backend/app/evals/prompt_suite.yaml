@@ -79,6 +79,57 @@
     - R-G-015
     - R-HOTELS-003   # must call search_places when hotels returned
 
+# ─── Day-detail role — single-day planner (one day, no flight/hotels) ─────
+
+- id: day-detail-tokyo-day2
+  call_role: day_detail
+  user_message: |
+    Plan DAY 2 only — Tokyo. Date: 2026-05-16. Transport: TRANSIT.
+    Hotel base: Park Hyatt Tokyo (35.6858, 139.6908).
+    Theme: Shibuya & Harajuku. Suggested areas: Shibuya, Harajuku, Omotesando.
+    Party: 2. Interests: food, fashion. Full day 09:00-21:00.
+  context:
+    user_location: Hong Kong
+    today: "2026-04-17"
+  rubrics:
+    - R-DETAIL-006   # exactly one day in output
+    - R-G-004
+    - R-G-005
+    - R-G-015
+
+# ─── Days role — full days output, no flight/hotels re-emit ────────────────
+
+- id: days-tokyo-full-trip
+  call_role: days
+  user_message: |
+    Selected hotel: Park Hyatt Tokyo (35.6858, 139.6908), check-in 15:00.
+    Flight: ANA NH821 arrives NRT 13:15 on 2026-05-15; returns NRT→HKG 17:00 on 2026-05-17.
+    Dates: 2026-05-15 to 2026-05-17 (3 days). Party: 2. Interests: food, temples. Transport: TRANSIT.
+    Generate the full 3-day activity plan.
+  context:
+    user_location: Hong Kong
+    today: "2026-04-17"
+  rubrics:
+    - R-DAYS-012   # no re-emit of flight or hotels
+    - R-G-002
+    - R-G-003
+    - R-G-004
+
+# ─── Plan role — text-question discipline ──────────────────────────────────
+
+- id: plan-prose-discipline-requires-request-input
+  call_role: plan
+  user_message: |
+    Plan a 4-day trip from Hong Kong (HKG) to Tokyo Narita (NRT).
+    START DATE: 2026-06-01. END DATE: 2026-06-04.
+    Transport: plane. Party: 1. Interests: ramen, shrines. Cabin: economy.
+  context:
+    user_location: Hong Kong
+    today: "2026-04-17"
+  rubrics:
+    - R-PLAN-003   # no text-only questions; use request_input
+    - R-PLAN-004   # must call search_flights + geocode_city
+
 # ─── Chat role — must not call data-fetch tools ────────────────────────────
 
 - id: chat-change-destination
@@ -89,6 +140,7 @@
     today: "2026-04-17"
   rubrics:
     - R-CHAT-001  # no search_flights/search_places/etc.
+    - R-CHAT-008  # one-sentence reply, no JSON
     - R-G-005
 
 - id: chat-multi-airport-tokyo
@@ -99,6 +151,7 @@
     today: "2026-04-17"
   rubrics:
     - R-CHAT-001
+    - R-CHAT-008
     - R-G-005
 
 # ─── Chat role — pick flight suggestion ────────────────────────────────────
@@ -111,3 +164,4 @@
     today: "2026-04-17"
   rubrics:
     - R-CHAT-001
+    - R-CHAT-008

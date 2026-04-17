@@ -350,7 +350,7 @@ bottom of this section.
 | R-G-016d Chat cannot call data-fetch tools | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[chat]` asserts the 8-tool allow-list exactly; `search_flights`, `search_places`, `get_directions`, `get_weather`, `get_place_details` all absent. |
 | R-PLAN-001 Missing-date → `request_input` + STOP | COVERED (runtime) | `test_request_input_stops.py::test_request_input_in_batch_skips_concurrent_tools` asserts the loop breaks and concurrent `search_flights` / `navigate_menu` are dropped when `request_input` is in the batch. Behavioral half (LLM chooses `request_input`) is still GAP. |
 | R-PLAN-002 Country → `request_input` | RUBRIC READY | `rubrics.py::check_R_PLAN_002_country_triggers_request_input` + `test_eval_rubrics.py::TestR_PLAN_002` (3 unit tests). Awaits live eval run. |
-| R-PLAN-003 No text questions | GAP | Needs LLM-judge rubric (detect whether reply ends in a question mark in prose instead of going through `request_input`). |
+| R-PLAN-003 No text questions | RUBRIC READY | `rubrics.py::check_R_PLAN_003_no_text_question` + `test_eval_rubrics.py::TestR_PLAN_003` (4 unit tests) — fails when prose ends with '?' and no `request_input` was called. Awaits live eval run. |
 | R-PLAN-004 MUST call `search_flights` + `geocode_city` | RUBRIC READY | `rubrics.py::check_R_PLAN_004_must_call_search_flights_and_geocode` + `test_eval_rubrics.py::TestR_PLAN_004` (5 unit tests). Awaits live eval run. |
 | R-PLAN-005 MUST NOT call `search_places` / `get_weather` / `get_place_details` | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[plan]` asserts the exact allow-list. |
 | R-PLAN-006 IATA extraction | GAP | — |
@@ -377,7 +377,7 @@ bottom of this section.
 | R-DAYS-009 Activity required fields | PARTIAL | Pydantic `Activity._place_fields_consistent` validator rejects any activity with `place_id` set but missing `lat`/`lng`. `photo_url` is not yet required — still GAP on that field. |
 | R-DAYS-010 Weather shape | COVERED | Pydantic `Weather` model validates shape (`:691-700`); `_coerce_temp` handles both number and `"22°C"` string. |
 | R-DAYS-011 Self-written description | GAP | — |
-| R-DAYS-012 Output shape (no re-emit flight/hotels) | GAP | No test asserts absence. |
+| R-DAYS-012 Output shape (no re-emit flight/hotels) | RUBRIC READY | `rubrics.py::check_R_DAYS_012_no_flight_or_hotels_re_emit` + `test_eval_rubrics.py::TestR_DAYS_012` (4 unit tests). Awaits live eval run. |
 | R-DAYS-013 Complete `days[]` on single replace | GAP | Frontend-handled per `test_day_planning_roles.py:193-196` comment; no backend test. |
 | R-DAYS-014 `navigate_menu("DAYS")` | PARTIAL | Playwright step 6 (`CLAUDE.md:128`). |
 | R-CHAT-001 No planning tools | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[chat]` (static allow-list) + `rubrics.py::check_R_CHAT_001_no_data_fetch_tools` + `test_eval_rubrics.py::TestR_CHAT_001` (3 unit tests; catches runtime behavior). |
@@ -387,7 +387,7 @@ bottom of this section.
 | R-CHAT-005 4 fields for `submit_trip_form` | GAP | — |
 | R-CHAT-006 Relative date computation | GAP | — |
 | R-CHAT-007 Suggest, don't execute | PARTIAL | `design.md:260-261` documents; frontend state vars (`suggestedFlightIdx` etc.) would need UI tests. Playwright walkthrough covers via PICK button flow. |
-| R-CHAT-008 One-sentence reply | GAP | — |
+| R-CHAT-008 One-sentence reply | RUBRIC READY | `rubrics.py::check_R_CHAT_008_one_sentence_reply` + `test_eval_rubrics.py::TestR_CHAT_008` (4 unit tests) — rejects JSON blocks and >2-sentence replies. Awaits live eval run. |
 | R-REPLACE-001 Single `search_places` call | PARTIAL | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[replace]` asserts allow-list is exactly `{search_places}` — any other tool call is impossible at runtime. Call count (≤1 round) still not asserted. |
 | R-REPLACE-002 Copy fields verbatim | PARTIAL | `test_itinerary_schema.py::TestReplaceActivityOutput::test_activity_has_required_fields` asserts the required fields are present. Strict verbatim-match-to-`search_places` check needs a live-eval rubric. |
 | R-REPLACE-003 Preserve `time` / `duration_min` | GAP | Needs rubric that compares replacement time/duration to the original activity — requires eval context to pass the original. |
@@ -407,7 +407,7 @@ bottom of this section.
 | R-DETAIL-003 Mode matches transport | GAP | — |
 | R-DETAIL-004 Allow-list | COVERED | `test_prompts_roles.py::test_day_detail_allowed_tools` + `test_prompts_roles.py::test_day_detail_does_not_allow_navigate_menu` + `test_day_planning_roles.py::test_day_detail_allowed_tools`. |
 | R-DETAIL-005 Day/time structure (inherits R-DAYS-*) | PARTIAL | Inherits R-DAYS-004 / R-DAYS-010 coverage. |
-| R-DETAIL-006 Exactly one day in output | GAP | — |
+| R-DETAIL-006 Exactly one day in output | RUBRIC READY | `rubrics.py::check_R_DETAIL_006_exactly_one_day` + `test_eval_rubrics.py::TestR_DETAIL_006` (4 unit tests). Awaits live eval run. |
 | R-MONO-001 `stop_cities` for stops | COVERED | `test_itinerary_schema.py::TestMultiStopFlight` (4 tests) — asserts stops=0 → `stop_cities==[]`, stops=1 → 1 IATA, stops=2 → 2 IATAs. |
 | R-MONO-002 Descriptions from `get_place_details` | GAP | Conflicts with R-DAYS-011 — see §6. |
 | R-MONO-003 Per-day weather | COVERED | Via R-DAYS-010 Pydantic model coverage. |

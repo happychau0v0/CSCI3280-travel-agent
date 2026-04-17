@@ -243,6 +243,80 @@ def check_R_PLAN_004_must_call_search_flights_and_geocode(
     return RubricResult.pass_(rid)
 
 
+def check_R_PLAN_003_no_text_question(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-PLAN-003: plan role MUST NOT ask for missing info via reply text —
+    always use request_input. A prose question mark is OK only when
+    request_input also fires (the question accompanies a structured ask)."""
+    rid = "R-PLAN-003"
+    if context.get("call_role") != "plan":
+        return RubricResult.skip(rid, "not plan role")
+    prose = strip_json_block(response.get("reply", ""))
+    if not prose.rstrip().endswith("?"):
+        return RubricResult.pass_(rid)
+    calls = response.get("tool_calls_made", [])
+    if "request_input" in calls:
+        return RubricResult.pass_(
+            rid, "question accompanies a request_input call"
+        )
+    tail = prose[-80:].replace("\n", " ")
+    return RubricResult.fail(
+        rid,
+        f"prose ends with '?' but no request_input call: {tail!r}",
+    )
+
+
+def check_R_CHAT_008_one_sentence_reply(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-CHAT-008: chat reply is ONE short friendly sentence, no JSON."""
+    rid = "R-CHAT-008"
+    if context.get("call_role") != "chat":
+        return RubricResult.skip(rid, "not chat role")
+    reply = response.get("reply", "")
+    if "```json" in reply:
+        return RubricResult.fail(rid, "chat reply contains a JSON block")
+    prose = strip_json_block(reply)
+    if not prose:
+        return RubricResult.fail(rid, "chat reply is empty after stripping JSON")
+    sentence_count = len([s for s in re.split(r"[.!?]+\s", prose) if s.strip()])
+    if sentence_count > 2:
+        return RubricResult.fail(
+            rid, f"chat reply has {sentence_count} sentences; expected 1"
+        )
+    return RubricResult.pass_(rid, f"{sentence_count} sentence(s)")
+
+
+def check_R_DAYS_012_no_flight_or_hotels_re_emit(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-DAYS-012: days role MUST NOT re-emit flight or hotels."""
+    rid = "R-DAYS-012"
+    if context.get("call_role") != "days":
+        return RubricResult.skip(rid, "not days role")
+    itinerary = response.get("itinerary") or {}
+    leaked = [k for k in ("flight", "hotels") if k in itinerary]
+    if leaked:
+        return RubricResult.fail(rid, f"days response leaks keys: {leaked}")
+    return RubricResult.pass_(rid)
+
+
+def check_R_DETAIL_006_exactly_one_day(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-DETAIL-006: day_detail output MUST contain exactly one day object."""
+    rid = "R-DETAIL-006"
+    if context.get("call_role") != "day_detail":
+        return RubricResult.skip(rid, "not day_detail role")
+    days = (response.get("itinerary") or {}).get("days") or []
+    if len(days) != 1:
+        return RubricResult.fail(
+            rid, f"day_detail returned {len(days)} day(s); expected 1"
+        )
+    return RubricResult.pass_(rid)
+
+
 def check_R_HOTELS_003_must_call_search_places(
     response: dict, context: dict
 ) -> RubricResult:
@@ -274,9 +348,13 @@ RUBRICS: dict[str, Callable[[dict, dict], RubricResult]] = {
     "R-G-002": check_R_G_002_transport_preceded_by_directions,
     "R-G-003": check_R_G_003_weather_preceded_by_get_weather,
     "R-PLAN-002": check_R_PLAN_002_country_triggers_request_input,
+    "R-PLAN-003": check_R_PLAN_003_no_text_question,
     "R-PLAN-004": check_R_PLAN_004_must_call_search_flights_and_geocode,
     "R-CHAT-001": check_R_CHAT_001_no_data_fetch_tools,
+    "R-CHAT-008": check_R_CHAT_008_one_sentence_reply,
     "R-HOTELS-003": check_R_HOTELS_003_must_call_search_places,
+    "R-DAYS-012": check_R_DAYS_012_no_flight_or_hotels_re_emit,
+    "R-DETAIL-006": check_R_DETAIL_006_exactly_one_day,
 }
 
 

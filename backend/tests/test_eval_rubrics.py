@@ -377,6 +377,168 @@ class TestR_HOTELS_003:
         assert r[0].verdict == "SKIP"
 
 
+# ─── R-PLAN-003: no text questions (plan role) ──────────────────────────────
+
+
+class TestR_PLAN_003:
+    def test_pass_when_reply_is_declarative(self):
+        response = {
+            "reply": 'Tokyo trip locked in.\n```json\n{"itinerary": {"flight": {}}}\n```',
+            "tool_calls_made": ["search_flights", "geocode_city"],
+        }
+        r = run_rubrics(response, {"call_role": "plan"}, ["R-PLAN-003"])
+        assert r[0].verdict == "PASS"
+
+    def test_fail_when_prose_ends_in_question_without_request_input(self):
+        response = {
+            "reply": "Where in Japan would you like to visit?",
+            "tool_calls_made": [],
+        }
+        r = run_rubrics(response, {"call_role": "plan"}, ["R-PLAN-003"])
+        assert r[0].verdict == "FAIL"
+        assert "?" in r[0].reason
+
+    def test_pass_when_prose_ends_question_but_request_input_fired(self):
+        """Prose trailing on a request_input call is fine."""
+        response = {
+            "reply": "Which destination did you have in mind?",
+            "tool_calls_made": ["request_input"],
+        }
+        r = run_rubrics(response, {"call_role": "plan"}, ["R-PLAN-003"])
+        assert r[0].verdict == "PASS"
+
+    def test_skip_when_not_plan_role(self):
+        response = {
+            "reply": "Where do you want to go?",
+            "tool_calls_made": [],
+        }
+        r = run_rubrics(response, {"call_role": "hotels"}, ["R-PLAN-003"])
+        assert r[0].verdict == "SKIP"
+
+
+# ─── R-CHAT-008: one-sentence chat reply, no JSON ───────────────────────────
+
+
+class TestR_CHAT_008:
+    def test_pass_on_short_friendly_sentence(self):
+        r = run_rubrics(
+            {"reply": "Got it, swapping to Osaka."},
+            {"call_role": "chat"},
+            ["R-CHAT-008"],
+        )
+        assert r[0].verdict == "PASS"
+
+    def test_fail_when_chat_contains_json_block(self):
+        r = run_rubrics(
+            {
+                "reply": 'Here you go.\n```json\n{"itinerary": {"destination": "OSA"}}\n```',
+            },
+            {"call_role": "chat"},
+            ["R-CHAT-008"],
+        )
+        assert r[0].verdict == "FAIL"
+        assert "json" in r[0].reason.lower()
+
+    def test_fail_on_multi_sentence_paragraph(self):
+        text = (
+            "Tokyo is great. You'll love the ramen. "
+            "Let me know which airport works for you."
+        )
+        r = run_rubrics({"reply": text}, {"call_role": "chat"}, ["R-CHAT-008"])
+        assert r[0].verdict == "FAIL"
+
+    def test_skip_when_not_chat_role(self):
+        r = run_rubrics(
+            {"reply": "Three days in Tokyo confirmed at Senso-ji temple."},
+            {"call_role": "plan"},
+            ["R-CHAT-008"],
+        )
+        assert r[0].verdict == "SKIP"
+
+
+# ─── R-DAYS-012: days role must not re-emit flight/hotels ───────────────────
+
+
+class TestR_DAYS_012:
+    def test_pass_when_only_days_and_selected_hotel_emitted(self):
+        response = {
+            "itinerary": {
+                "selected_hotel": {"name": "Park Hyatt"},
+                "days": [{"day": 1, "activities": []}],
+            }
+        }
+        r = run_rubrics(response, {"call_role": "days"}, ["R-DAYS-012"])
+        assert r[0].verdict == "PASS"
+
+    def test_fail_when_flight_re_emitted(self):
+        response = {
+            "itinerary": {
+                "flight": {"options": []},
+                "days": [{"day": 1, "activities": []}],
+            }
+        }
+        r = run_rubrics(response, {"call_role": "days"}, ["R-DAYS-012"])
+        assert r[0].verdict == "FAIL"
+        assert "flight" in r[0].reason
+
+    def test_fail_when_hotels_re_emitted(self):
+        response = {
+            "itinerary": {
+                "hotels": [{"name": "X"}],
+                "days": [{"day": 1, "activities": []}],
+            }
+        }
+        r = run_rubrics(response, {"call_role": "days"}, ["R-DAYS-012"])
+        assert r[0].verdict == "FAIL"
+        assert "hotels" in r[0].reason
+
+    def test_skip_when_not_days_role(self):
+        response = {
+            "itinerary": {
+                "flight": {"options": [{"airline": "ANA"}]},
+                "days": [],
+            }
+        }
+        r = run_rubrics(response, {"call_role": "plan"}, ["R-DAYS-012"])
+        assert r[0].verdict == "SKIP"
+
+
+# ─── R-DETAIL-006: day_detail emits exactly one day ─────────────────────────
+
+
+class TestR_DETAIL_006:
+    def test_pass_on_exactly_one_day(self):
+        response = {
+            "itinerary": {"days": [{"day": 2, "activities": []}]}
+        }
+        r = run_rubrics(response, {"call_role": "day_detail"}, ["R-DETAIL-006"])
+        assert r[0].verdict == "PASS"
+
+    def test_fail_on_zero_days(self):
+        response = {"itinerary": {"days": []}}
+        r = run_rubrics(response, {"call_role": "day_detail"}, ["R-DETAIL-006"])
+        assert r[0].verdict == "FAIL"
+        assert "0" in r[0].reason
+
+    def test_fail_on_multiple_days(self):
+        response = {
+            "itinerary": {
+                "days": [
+                    {"day": 1, "activities": []},
+                    {"day": 2, "activities": []},
+                ]
+            }
+        }
+        r = run_rubrics(response, {"call_role": "day_detail"}, ["R-DETAIL-006"])
+        assert r[0].verdict == "FAIL"
+        assert "2" in r[0].reason
+
+    def test_skip_when_not_day_detail_role(self):
+        response = {"itinerary": {"days": []}}
+        r = run_rubrics(response, {"call_role": "days"}, ["R-DETAIL-006"])
+        assert r[0].verdict == "SKIP"
+
+
 # ─── runner contract ────────────────────────────────────────────────────────
 
 
