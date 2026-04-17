@@ -5,7 +5,7 @@
 > `docs/design.md`. Every requirement has a stable ID and a verification
 > pointer (or is flagged GAP) so we can audit coverage at a glance.
 >
-> Last updated: 2026-04-17 — §6 contradictions resolved; Tier A+C+F verification pass complete.
+> Last updated: 2026-04-17 — §6 contradictions resolved; Tiers A+C+F+B+D+E verification passes complete.
 
 ---
 
@@ -320,17 +320,21 @@ these choices.
 
 Legend: **COVERED** = a test / runtime check asserts the requirement.
 **PARTIAL** = partially covered (e.g., one role tested, others by parity but
-not explicitly). **GAP** = no existing verification.
+not explicitly). **GAP** = no existing verification. **RUBRIC READY** =
+eval-harness rubric written and unit-tested (see
+`backend/app/evals/rubrics.py`), but requires a real-LLM eval run to
+flip to COVERED — see `backend/app/evals/eval_runner.py` usage at the
+bottom of this section.
 
 | ID | Status | Verified by |
 |---|---|---|
 | R-G-001 No hallucination | GAP | No test asserts the LLM doesn't invent places. Enforceable only via an LLM-judge eval or fact-check against tool results. |
-| R-G-002 `get_directions` before transport | GAP | No test asserts `transport_to_next` only appears when a `get_directions` call was made. |
-| R-G-003 `get_weather` before weather claim | GAP | Similar — no pre-condition test. |
-| R-G-004 Spoken text outside JSON | GAP | No test asserts the reply contains non-JSON prose. |
-| R-G-005 No markdown in reply | GAP | No test asserts reply is markdown-free. |
-| R-G-006 No bullets/paragraphs in reply | GAP | — |
-| R-G-007 Don't narrate tool calls | GAP | — |
+| R-G-002 `get_directions` before transport | RUBRIC READY | `rubrics.py::check_R_G_002_transport_preceded_by_directions` + `test_eval_rubrics.py::TestR_G_002` (3 unit tests). Awaits live eval run. |
+| R-G-003 `get_weather` before weather claim | RUBRIC READY | `rubrics.py::check_R_G_003_weather_preceded_by_get_weather` + `test_eval_rubrics.py::TestR_G_003` (2 unit tests). Awaits live eval run. |
+| R-G-004 Spoken text outside JSON | RUBRIC READY | `rubrics.py::check_R_G_004_has_prose_outside_json` + `test_eval_rubrics.py::TestR_G_004` (2 unit tests). Awaits live eval run. |
+| R-G-005 No markdown in reply | RUBRIC READY | `rubrics.py::check_R_G_005_no_markdown` + `test_eval_rubrics.py::TestR_G_005` (5 unit tests). Awaits live eval run. |
+| R-G-006 No bullets/paragraphs in reply | RUBRIC READY | `rubrics.py::check_R_G_006_no_bullets` + `test_eval_rubrics.py::TestR_G_006` (3 unit tests). Awaits live eval run. |
+| R-G-007 Don't narrate tool calls | GAP | Needs LLM-judge rubric (planned in `rubrics.py`; not yet implemented since regex can't detect narration reliably). |
 | R-G-008 `navigate_menu` once, at end | PARTIAL | Runtime: `llm.py:556-557` emits `navigate` event; no test caps count or position. Playwright walkthrough step 3 observes the panel actually advances to FLIGHTS after START PLANNING (`CLAUDE.md:114-115`). |
 | R-G-009 Batch tool calls | COVERED | `test_llm_loop.py::test_tools_run_in_parallel_via_gather` (`:44`). |
 | R-G-010 Honor USER LOCATION | COVERED (by construction) | `llm.py` injects the block; `test_chat.py::test_format_preferences_renders_user_profile_block` checks injection. No test asserts the LLM doesn't re-ask. |
@@ -338,21 +342,21 @@ not explicitly). **GAP** = no existing verification.
 | R-G-012 Honor USER PROFILE | PARTIAL | Injection verified by `test_chat.py::test_format_preferences_renders_user_profile_block`; LLM behavior not asserted. |
 | R-G-013 Honor UI FORM STATE | PARTIAL | Injection in `llm.py:226-228`; LLM behavior not asserted. |
 | R-G-014 Prefer `request_input` | GAP | — |
-| R-G-015 Subtitle length ≈ 10-25 words | GAP | — |
+| R-G-015 Subtitle length ≈ 10-25 words | RUBRIC READY | `rubrics.py::check_R_G_015_subtitle_length_10_25_words` + `test_eval_rubrics.py::TestR_G_015` (4 unit tests). Awaits live eval run. |
 | R-G-016 User-authority parity (umbrella) | PARTIAL | Enforced by construction via the four sub-rules below. No single test asserts the umbrella principle. |
-| R-G-016a `submit_trip_form` pre-fills only | COVERED (by construction) | `App.jsx:1764-1768` — `onFormPrefilled` calls `setPendingFormPrefill(null)` + `menu.setPanel("HOME")`; does NOT call `handleSend`. **No regression test** — GAP on test. |
-| R-G-016b `pick_flight` / `pick_hotel` suggest only | COVERED (by construction) | `App.jsx:1247-1260` / `:1261-1272` — only `setSuggested{Flight,Hotel}Idx` + navigate; does NOT mutate `selected_flight` / `selected_hotel` or chain Call B/C. **No regression test** — GAP on test. |
-| R-G-016c `replace_activity` requires user confirm | COVERED (by construction) | `App.jsx:285` + `:903-904` + `:1273-1288` — replacement held in `pendingReplacement`; applied only on user accept. **No regression test** — GAP on test. |
+| R-G-016a `submit_trip_form` pre-fills only | COVERED | `frontend/src/__tests__/user-authority.test.js::R-G-016a` (2 tests) — static-analysis regression guards on `App.jsx:1764-1768` that `onFormPrefilled` does not call `handleSend`. |
+| R-G-016b `pick_flight` / `pick_hotel` suggest only | COVERED | `frontend/src/__tests__/user-authority.test.js::R-G-016b` (2 tests) — asserts the `pick_flight` / `pick_hotel` SSE branches only set `setSuggestedFlightIdx` / `setSuggestedHotelIdx` + navigate, never mutate `selected_flight` / `selected_hotel` or call `handleSend`. |
+| R-G-016c `replace_activity` requires user confirm | COVERED | `frontend/src/__tests__/user-authority.test.js::R-G-016c` (3 tests) — asserts `replace_activity` branch queues via `pendingChainedSendRef`, never mutates `currentItinerary.days` directly, and `pendingReplacement` flows through to the day panel. |
 | R-G-016d Chat cannot call data-fetch tools | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[chat]` asserts the 8-tool allow-list exactly; `search_flights`, `search_places`, `get_directions`, `get_weather`, `get_place_details` all absent. |
 | R-PLAN-001 Missing-date → `request_input` + STOP | COVERED (runtime) | `test_request_input_stops.py::test_request_input_in_batch_skips_concurrent_tools` asserts the loop breaks and concurrent `search_flights` / `navigate_menu` are dropped when `request_input` is in the batch. Behavioral half (LLM chooses `request_input`) is still GAP. |
-| R-PLAN-002 Country → `request_input` | GAP | — |
-| R-PLAN-003 No text questions | GAP | — |
+| R-PLAN-002 Country → `request_input` | RUBRIC READY | `rubrics.py::check_R_PLAN_002_country_triggers_request_input` + `test_eval_rubrics.py::TestR_PLAN_002` (3 unit tests). Awaits live eval run. |
+| R-PLAN-003 No text questions | GAP | Needs LLM-judge rubric (detect whether reply ends in a question mark in prose instead of going through `request_input`). |
 | R-PLAN-004 MUST call `search_flights` + `geocode_city` | GAP | No test asserts both fire. |
 | R-PLAN-005 MUST NOT call `search_places` / `get_weather` / `get_place_details` | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[plan]` asserts the exact allow-list. |
 | R-PLAN-006 IATA extraction | GAP | — |
-| R-PLAN-007 Round-trip: two `search_flights` calls | COVERED (golden) | `test_itinerary_schema.py::TestGoldenTokyoFull` validates `flight.options` has ≥3 options with prices/times; no explicit round-trip golden fixture. **Round-trip-specific assertions = GAP.** |
-| R-PLAN-008 Copy options verbatim | PARTIAL | `TestGoldenTokyoFull::test_flight_has_enough_options` (≥3) and `test_flight_options_have_prices` / `_have_times` cover fidelity indirectly. |
-| R-PLAN-009 `days` count = trip_days | PARTIAL | `TestGoldenTaipeiSparse::test_days_match_trip_length` asserts length == 2 for a 2-day trip. Only one fixture; not exhaustive. |
+| R-PLAN-007 Round-trip: two `search_flights` calls | COVERED | `test_itinerary_schema.py::TestRoundTripFlight` (5 tests) — asserts `flight.return_options` has ≥2 options, `flight.return_date` is set, outbound has ≥2 options. |
+| R-PLAN-008 Copy options verbatim | PARTIAL | `TestGoldenTokyoFull` + `TestRoundTripFlight` cover fidelity indirectly (≥3 options with prices/times). Strict verbatim-equality check (LLM didn't edit prices) needs a live-eval rubric. |
+| R-PLAN-009 `days` count = trip_days | COVERED | `TestGoldenTaipeiSparse::test_days_match_trip_length` (2-day) + `TestRoundTripFlight::test_day_count_matches_trip_length` (6-day). |
 | R-PLAN-010 Output shape | COVERED | `TestGoldenTokyoFull::test_pydantic_validates` + `_has_title_and_destination` + `_has_multiple_days` + `_phrasebook_present`. |
 | R-PLAN-011 `navigate_menu("FLIGHTS")` at end | PARTIAL | Playwright walkthrough step 3 (`CLAUDE.md:115`) — real browser observes panel change. No unit test. |
 | R-HOTELS-001 2-round cap | GAP | No test counts LLM rounds per role. |
@@ -366,9 +370,9 @@ not explicitly). **GAP** = no existing verification.
 | R-DAYS-002 `search_places` + `get_directions` each pair | PARTIAL | `TestGoldenTokyoFull::test_middle_days_have_enough_activities` (≥4 mid-day) and indirectly `_activity_times_monotonic`. `get_directions` call count not asserted. |
 | R-DAYS-003 Allow-list (post-D2: `search_places`, `get_directions`, `get_weather`, `navigate_menu`) | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[days]` + `test_days_allow_list_excludes_get_place_details`. |
 | R-DAYS-004 Time formula + monotonic | COVERED (shape-level) | Pydantic `Day._activity_times_monotonic` validator (`prompts.py`) rejects any day with out-of-order activity times — blocks ingest of non-monotonic LLM output at parse time. `TestGoldenTokyoFull::test_activity_times_monotonic` covers the behavioral half. Transit-duration arithmetic still GAP. |
-| R-DAYS-005 Day 1 actual arrival_time | GAP | No fixture pins a non-example arrival_time. |
-| R-DAYS-006 Day 1 structure | GAP | — |
-| R-DAYS-007 Last-day structure | GAP | — |
+| R-DAYS-005 Day 1 actual arrival_time | COVERED | `test_itinerary_schema.py::TestDay1ArrivalNonExampleTime::test_first_activity_time_matches_flight` — fixture has flight.arrival_time=14:50 (not the example 11:35); asserts days[0].activities[0].time=="14:50". |
+| R-DAYS-006 Day 1 structure | COVERED | `TestDay1ArrivalNonExampleTime` (5 tests) — asserts airport is first activity, duration 60, hotel check-in ≥ arrival+90 min. |
+| R-DAYS-007 Last-day structure | COVERED | `test_itinerary_schema.py::TestLastDayDeparture` (4 tests) — asserts check-out at 09:00, ≥1 real activity, departure airport last with duration 180. |
 | R-DAYS-008 Middle-day pattern | PARTIAL | `test_middle_days_have_enough_activities` (≥4). Meal count / pattern order not asserted. |
 | R-DAYS-009 Activity required fields | PARTIAL | Pydantic `Activity._place_fields_consistent` validator rejects any activity with `place_id` set but missing `lat`/`lng`. `photo_url` is not yet required — still GAP on that field. |
 | R-DAYS-010 Weather shape | COVERED | Pydantic `Weather` model validates shape (`:691-700`); `_coerce_temp` handles both number and `"22°C"` string. |
@@ -376,7 +380,7 @@ not explicitly). **GAP** = no existing verification.
 | R-DAYS-012 Output shape (no re-emit flight/hotels) | GAP | No test asserts absence. |
 | R-DAYS-013 Complete `days[]` on single replace | GAP | Frontend-handled per `test_day_planning_roles.py:193-196` comment; no backend test. |
 | R-DAYS-014 `navigate_menu("DAYS")` | PARTIAL | Playwright step 6 (`CLAUDE.md:128`). |
-| R-CHAT-001 No planning tools | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[chat]` asserts the exact 8-tool allow-list; no data-fetch tools. |
+| R-CHAT-001 No planning tools | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[chat]` (static allow-list) + `rubrics.py::check_R_CHAT_001_no_data_fetch_tools` + `test_eval_rubrics.py::TestR_CHAT_001` (3 unit tests; catches runtime behavior). |
 | R-CHAT-002 Airport disambiguation | GAP | — |
 | R-CHAT-003 Single-airport shortcut | GAP | — |
 | R-CHAT-004 Always round-trip | GAP | — |
@@ -385,24 +389,26 @@ not explicitly). **GAP** = no existing verification.
 | R-CHAT-007 Suggest, don't execute | PARTIAL | `design.md:260-261` documents; frontend state vars (`suggestedFlightIdx` etc.) would need UI tests. Playwright walkthrough covers via PICK button flow. |
 | R-CHAT-008 One-sentence reply | GAP | — |
 | R-REPLACE-001 Single `search_places` call | PARTIAL | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[replace]` asserts allow-list is exactly `{search_places}` — any other tool call is impossible at runtime. Call count (≤1 round) still not asserted. |
-| R-REPLACE-002 Copy fields verbatim | GAP | — |
-| R-REPLACE-003 Preserve `time` / `duration_min` | GAP | — |
+| R-REPLACE-002 Copy fields verbatim | PARTIAL | `test_itinerary_schema.py::TestReplaceActivityOutput::test_activity_has_required_fields` asserts the required fields are present. Strict verbatim-match-to-`search_places` check needs a live-eval rubric. |
+| R-REPLACE-003 Preserve `time` / `duration_min` | GAP | Needs rubric that compares replacement time/duration to the original activity — requires eval context to pass the original. |
 | R-REPLACE-004 No navigate_menu | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[replace]` asserts allow-list excludes `navigate_menu`. |
+| R-REPLACE-005 Replace output shape | COVERED | `test_itinerary_schema.py::TestReplaceActivityOutput` (4 tests) — asserts `itinerary.replace` block has day/old_name/activity with required fields, and no full `days` array is re-emitted. |
+| R-REPLACE-006 10-15 word description | COVERED | `TestReplaceActivityOutput::test_activity_description_10_to_15_words` (golden) + `rubrics.py::check_R_REPLACE_006_description_10_to_15_words` + `test_eval_rubrics.py::TestR_REPLACE_006` (3 unit tests). |
 | R-REPLACE-005 `replace` output shape | GAP | No golden fixture for replace output. |
 | R-REPLACE-006 10-15 word description | GAP | — |
 | R-THEMES-001 No tools | COVERED | `test_prompts_roles.py::test_day_themes_has_no_tools` + `test_day_planning_roles.py::test_day_themes_uses_empty_tool_list`. |
-| R-THEMES-002 Day count matches trip | GAP | — |
-| R-THEMES-003 Geographically distinct areas | GAP | — |
+| R-THEMES-002 Day count matches trip | COVERED | `test_itinerary_schema.py::TestDayThemesOutput::test_has_three_days` — 3-day fixture, asserts `len(days) == 3`. |
+| R-THEMES-003 Geographically distinct areas | COVERED | `TestDayThemesOutput::test_suggested_areas_are_geographically_distinct` — fails if any area name appears on more than one day. |
 | R-THEMES-004 Day 1 / last-day theming | GAP | — |
-| R-THEMES-005 `key_constraints` only on flight days | GAP | — |
-| R-THEMES-006 Specific neighborhood names | GAP | — |
+| R-THEMES-005 `key_constraints` only on flight days | COVERED | `TestDayThemesOutput::test_key_constraints_only_on_flight_days` — asserts day 1 has `arrival_time`, last day has `departure_time`, middle days have no `key_constraints`. |
+| R-THEMES-006 Specific neighborhood names | COVERED | `TestDayThemesOutput::test_every_day_has_theme_and_areas` (3-5 areas) + `::test_suggested_areas_not_generic` (no "downtown"/"city center"). |
 | R-DETAIL-001 2-round cap | GAP | — |
 | R-DETAIL-002 search_places per area, directions per pair | GAP | — |
 | R-DETAIL-003 Mode matches transport | GAP | — |
 | R-DETAIL-004 Allow-list | COVERED | `test_prompts_roles.py::test_day_detail_allowed_tools` + `test_prompts_roles.py::test_day_detail_does_not_allow_navigate_menu` + `test_day_planning_roles.py::test_day_detail_allowed_tools`. |
 | R-DETAIL-005 Day/time structure (inherits R-DAYS-*) | PARTIAL | Inherits R-DAYS-004 / R-DAYS-010 coverage. |
 | R-DETAIL-006 Exactly one day in output | GAP | — |
-| R-MONO-001 `stop_cities` for stops | GAP | — |
+| R-MONO-001 `stop_cities` for stops | COVERED | `test_itinerary_schema.py::TestMultiStopFlight` (4 tests) — asserts stops=0 → `stop_cities==[]`, stops=1 → 1 IATA, stops=2 → 2 IATAs. |
 | R-MONO-002 Descriptions from `get_place_details` | GAP | Conflicts with R-DAYS-011 — see §6. |
 | R-MONO-003 Per-day weather | COVERED | Via R-DAYS-010 Pydantic model coverage. |
 | R-MONO-004 Follow-up edits preserve days | GAP | — |
@@ -428,17 +434,39 @@ panel, plus overlay hotkeys and viewport overflow. It validates navigation
 
 ### Summary counts
 
-After Tier A + C + F pass on 2026-04-17:
+After Tier A+C+F pass (2026-04-17 morning) and Tier B+D+E pass (2026-04-17 afternoon):
 
-- **Total numbered requirements:** 69 (64 + R-G-016 umbrella + 4 sub-rules)
-- **COVERED (explicit assertion):** 16 — R-G-009, R-PLAN-001 (runtime), R-PLAN-005, R-PLAN-010, R-HOTELS-004, R-HOTELS-006, R-DAYS-003, R-DAYS-004, R-DAYS-010, R-CHAT-001, R-REPLACE-004, R-THEMES-001, R-DETAIL-004, R-G-016d, R-MONO-003 — plus all 3 cross-cutting runtime mechanisms (tool filter, fresh-context, request_input stop).
-- **PARTIAL:** ~18 — held by construction (R-G-016a/b/c frontend invariants), golden-fixture shape checks, or one-half-of-two-halves (R-DAYS-009 coord check but not photo_url).
-- **GAP:** ~35 — dominated by behavioral prompt-following rules (no-hallucination, no-markdown, no-narration, relative-date math, airport disambiguation). These need Tier B (golden fixtures) or Tier E (LLM-judge eval).
+- **Total numbered requirements:** 69
+- **COVERED (explicit assertion):** 29 — adds R-PLAN-007, R-PLAN-009, R-DAYS-005/006/007, R-THEMES-002/003/005/006, R-MONO-001, R-REPLACE-005/006, R-G-016a/b/c on top of the prior 16.
+- **RUBRIC READY (Tier E — awaits live LLM eval run):** 8 — R-G-002, R-G-003, R-G-004, R-G-005, R-G-006, R-G-015, R-PLAN-002, R-REPLACE-006 (also COVERED by fixture). Rubric logic unit-tested against canned PASS/FAIL responses; flips to COVERED after a live eval run achieves ≥90% pass rate across 3 runs.
+- **PARTIAL:** ~14 — mostly allow-list-half-asserted / construction-covered / one-fixture-shape-tested.
+- **GAP:** ~18 — the long tail. Largest clusters: R-G-001 no-hallucination (needs tool-result grounding check), R-CHAT-002…006 chat behavioral flows (need end-to-end chat eval), R-PLAN-003 text-question detection.
 
-**Remaining highest-leverage gaps** (in priority order):
+**How to close the remaining RUBRIC READY rows:**
+```bash
+cd backend && source .venv/bin/activate
+export OPENROUTER_API_KEY=...  # for chat() calls
+python -m app.evals.eval_runner \
+    --suite=app/evals/prompt_suite.yaml \
+    --model=x-ai/grok-4.20 \
+    --out=docs/bench-$(date +%F).md
+```
+Expected cost: ~$0.50-2 per run. After 3 runs at ≥90% pass per rubric,
+flip the row from RUBRIC READY to COVERED and cite the bench report.
 
-1. **Round-trip golden fixture** (Tier B) — LLM output with `flight.return_options` populated + assertion that `len(flight.return_options) ≥ 2` and `flight.return_date` is set. Closes R-PLAN-007.
-2. **Day-1 arrival & last-day departure fixtures** (Tier B) — one fixture each with non-example `arrival_time` / `departure_time`; assert `activities[0].name` ends with "Airport · Arrival" AND times line up with the flight schedule. Closes R-DAYS-005/006/007.
-3. **R-G-016a/b/c regression tests** (Tier D) — frontend component tests that `onFormPrefilled` doesn't call `handleSend`, `pick_flight` SSE leaves `selected_flight` untouched, `replace_activity` routes through `pendingReplacement`. The invariant is held by easily-broken bits of `App.jsx`.
-4. **`day_themes` output fixture** (Tier B) — covers R-THEMES-002/003/005/006 with a validator that asserts distinct areas, `len(days) == trip_days`, `key_constraints` only where arrival_time/departure_time present.
-5. **LLM-judge eval harness** (Tier E) — needed for R-G-001 (no hallucination: every place name must appear in a tool result), R-G-004/005/006/007 (narration / markdown / subtitle rules), R-CHAT-002/003/004/005/006 (chat behavioral rules). Biggest infra commitment.
+**Remaining highest-leverage gaps:**
+
+1. **R-G-001 no-hallucination tool-grounding check** — needs the
+   eval runner to capture per-tool result caches (currently stubbed in
+   `eval_runner.py::_run_one` at `tool_results: {}`), then a rubric
+   that verifies every place name in `itinerary.hotels` and
+   `itinerary.days[*].activities` appears in at least one
+   `search_places` result from the same turn.
+2. **R-CHAT-002…006 chat behavioral rubrics** — chat flows are
+   multi-turn (request_input → user reply → submit_trip_form). The
+   eval runner currently handles only single-turn prompts. Extending
+   to multi-turn is a second-pass eval enhancement.
+3. **R-G-007 no-tool-narration LLM-judge rubric** — regex can't
+   reliably detect "Let me search for flights now…" so this needs a
+   judge call. Pattern already scaffolded in `judge.py`; rubric body
+   not yet written.
