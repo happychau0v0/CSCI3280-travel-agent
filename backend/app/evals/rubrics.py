@@ -21,6 +21,7 @@ Rubric IDs mirror docs/llm-spec.md requirement IDs.
 """
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
 from typing import Callable
@@ -76,6 +77,16 @@ def strip_json_block(reply: str) -> str:
 
 def count_words(text: str) -> int:
     return len([w for w in re.split(r"\s+", text.strip()) if w])
+
+
+def haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Great-circle distance in km between two lat/lng points."""
+    r = 6371.0
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlam = math.radians(lng2 - lng1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(a))
 
 
 # ─── REGEX rubrics ──────────────────────────────────────────────────────────
@@ -363,6 +374,65 @@ def check_R_G_001_no_hallucinated_places(
     return RubricResult.pass_(rid, f"{len(emitted)} places, all grounded")
 
 
+def check_R_HOTELS_002_hotels_near_destination(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-HOTELS-002: hotel coordinates must be near the flight's destination
+    city (within 80 km of flight.to_lat/to_lng). Catches cases where the
+    LLM used an example destination (Tokyo) instead of the real one."""
+    rid = "R-HOTELS-002"
+    if context.get("call_role") != "hotels":
+        return RubricResult.skip(rid, "not hotels role")
+    lat = context.get("flight_to_lat")
+    lng = context.get("flight_to_lng")
+    if lat is None or lng is None:
+        return RubricResult.skip(rid, "flight_to_lat/lng missing from context")
+
+    hotels = (response.get("itinerary") or {}).get("hotels") or []
+    if not hotels:
+        return RubricResult.skip(rid, "no hotels to check")
+
+    misplaced = []
+    for h in hotels:
+        hlat, hlng = h.get("lat"), h.get("lng")
+        if hlat is None or hlng is None:
+            continue
+        dist = haversine_km(lat, lng, hlat, hlng)
+        if dist > 80.0:
+            misplaced.append(f"{h.get('name','?')} ({dist:.0f} km away)")
+    if misplaced:
+        return RubricResult.fail(rid, f"hotels too far from destination: {misplaced}")
+    return RubricResult.pass_(rid, f"{len(hotels)} hotels within 80 km")
+
+
+def check_R_REPLACE_002_activity_place_id_grounded(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-REPLACE-002: replacement activity's place_id must appear in at
+    least one search_places result from this turn."""
+    rid = "R-REPLACE-002"
+    tool_results = response.get("tool_results")
+    if tool_results is None:
+        return RubricResult.skip(rid, "no tool_results cache")
+    replace = (response.get("itinerary") or {}).get("replace")
+    if not replace:
+        return RubricResult.skip(rid, "not a replace response")
+    pid = (replace.get("activity") or {}).get("place_id")
+    if not pid:
+        return RubricResult.skip(rid, "replacement activity has no place_id")
+
+    tool_ids: set[str] = set()
+    for batch in tool_results.get("search_places") or []:
+        for p in (batch.get("places") or []):
+            if p.get("place_id"):
+                tool_ids.add(p["place_id"])
+    if pid not in tool_ids:
+        return RubricResult.fail(
+            rid, f"place_id {pid!r} not in any search_places result"
+        )
+    return RubricResult.pass_(rid)
+
+
 def check_R_HOTELS_003_must_call_search_places(
     response: dict, context: dict
 ) -> RubricResult:
@@ -399,7 +469,9 @@ RUBRICS: dict[str, Callable[[dict, dict], RubricResult]] = {
     "R-PLAN-004": check_R_PLAN_004_must_call_search_flights_and_geocode,
     "R-CHAT-001": check_R_CHAT_001_no_data_fetch_tools,
     "R-CHAT-008": check_R_CHAT_008_one_sentence_reply,
+    "R-HOTELS-002": check_R_HOTELS_002_hotels_near_destination,
     "R-HOTELS-003": check_R_HOTELS_003_must_call_search_places,
+    "R-REPLACE-002": check_R_REPLACE_002_activity_place_id_grounded,
     "R-DAYS-012": check_R_DAYS_012_no_flight_or_hotels_re_emit,
     "R-DETAIL-006": check_R_DETAIL_006_exactly_one_day,
 }

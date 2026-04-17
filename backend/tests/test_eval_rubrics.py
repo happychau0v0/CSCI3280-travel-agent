@@ -639,6 +639,122 @@ class TestR_G_001:
         assert r[0].verdict == "SKIP"
 
 
+# ─── R-HOTELS-002: hotels near flight.to coords ────────────────────────────
+
+
+class TestR_HOTELS_002:
+    def test_pass_when_all_hotels_near_flight_destination(self):
+        """Tokyo hotels within 50 km of NRT (35.76, 140.39 is NRT itself;
+        city-centre hotels are ~50-70 km away, so we allow 80 km)."""
+        response = {
+            "itinerary": {
+                "hotels": [
+                    {"name": "Park Hyatt", "lat": 35.6858, "lng": 139.6908},
+                    {"name": "Grand Hyatt", "lat": 35.6602, "lng": 139.7290},
+                ],
+            },
+            "tool_results": {},
+        }
+        context = {
+            "call_role": "hotels",
+            "flight_to_lat": 35.6895,
+            "flight_to_lng": 139.6917,
+        }
+        r = run_rubrics(response, context, ["R-HOTELS-002"])
+        assert r[0].verdict == "PASS"
+
+    def test_fail_when_hotel_in_wrong_city(self):
+        """Hotel coords point to Osaka instead of Tokyo — clear violation."""
+        response = {
+            "itinerary": {
+                "hotels": [
+                    {"name": "Park Hyatt Tokyo", "lat": 35.6858, "lng": 139.6908},
+                    {"name": "Osaka Mishap", "lat": 34.6937, "lng": 135.5023},
+                ],
+            },
+            "tool_results": {},
+        }
+        context = {
+            "call_role": "hotels",
+            "flight_to_lat": 35.6895,
+            "flight_to_lng": 139.6917,
+        }
+        r = run_rubrics(response, context, ["R-HOTELS-002"])
+        assert r[0].verdict == "FAIL"
+        assert "Osaka Mishap" in r[0].reason
+
+    def test_skip_when_no_flight_coords_in_context(self):
+        response = {
+            "itinerary": {"hotels": [{"name": "X", "lat": 0, "lng": 0}]},
+        }
+        r = run_rubrics(response, {"call_role": "hotels"}, ["R-HOTELS-002"])
+        assert r[0].verdict == "SKIP"
+
+    def test_skip_when_not_hotels_role(self):
+        response = {"itinerary": {"hotels": [{"name": "X", "lat": 0, "lng": 0}]}}
+        context = {
+            "call_role": "plan",
+            "flight_to_lat": 35.68,
+            "flight_to_lng": 139.69,
+        }
+        r = run_rubrics(response, context, ["R-HOTELS-002"])
+        assert r[0].verdict == "SKIP"
+
+
+# ─── R-REPLACE-002: replacement place_id grounded in search_places ─────────
+
+
+class TestR_REPLACE_002:
+    def test_pass_when_place_id_matches_tool_result(self):
+        response = {
+            "itinerary": {
+                "replace": {
+                    "day": 2,
+                    "activity": {"name": "Ichiran", "place_id": "chijq1"},
+                }
+            },
+            "tool_results": {
+                "search_places": [
+                    {"places": [
+                        {"name": "Ichiran", "place_id": "chijq1"},
+                        {"name": "Tonkatsu X", "place_id": "abc"},
+                    ]}
+                ]
+            },
+        }
+        r = run_rubrics(response, {}, ["R-REPLACE-002"])
+        assert r[0].verdict == "PASS"
+
+    def test_fail_when_place_id_fabricated(self):
+        response = {
+            "itinerary": {
+                "replace": {
+                    "day": 2,
+                    "activity": {"name": "Ichiran", "place_id": "fake_id"},
+                }
+            },
+            "tool_results": {
+                "search_places": [
+                    {"places": [{"name": "Ichiran", "place_id": "real_id"}]}
+                ]
+            },
+        }
+        r = run_rubrics(response, {}, ["R-REPLACE-002"])
+        assert r[0].verdict == "FAIL"
+
+    def test_skip_on_non_replace_response(self):
+        response = {"itinerary": {"days": []}, "tool_results": {}}
+        r = run_rubrics(response, {}, ["R-REPLACE-002"])
+        assert r[0].verdict == "SKIP"
+
+    def test_skip_without_tool_results(self):
+        response = {
+            "itinerary": {"replace": {"activity": {"place_id": "x"}}}
+        }
+        r = run_rubrics(response, {}, ["R-REPLACE-002"])
+        assert r[0].verdict == "SKIP"
+
+
 # ─── runner contract ────────────────────────────────────────────────────────
 
 

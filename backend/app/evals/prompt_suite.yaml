@@ -71,6 +71,8 @@
   context:
     user_location: Hong Kong
     today: "2026-04-17"
+    flight_to_lat: 35.6895
+    flight_to_lng: 139.6917
   rubrics:
     - R-G-001        # hotel names must appear in search_places results
     - R-G-002        # transport tool-first
@@ -78,6 +80,7 @@
     - R-G-004
     - R-G-005
     - R-G-015
+    - R-HOTELS-002   # hotel coords within 80 km of flight destination
     - R-HOTELS-003   # must call search_places when hotels returned
 
 # ─── Day-detail role — single-day planner (one day, no flight/hotels) ─────

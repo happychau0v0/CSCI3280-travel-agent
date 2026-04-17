@@ -360,7 +360,7 @@ bottom of this section.
 | R-PLAN-010 Output shape | COVERED | `TestGoldenTokyoFull::test_pydantic_validates` + `_has_title_and_destination` + `_has_multiple_days` + `_phrasebook_present`. |
 | R-PLAN-011 `navigate_menu("FLIGHTS")` at end | PARTIAL | Playwright walkthrough step 3 (`CLAUDE.md:115`) — real browser observes panel change. No unit test. |
 | R-HOTELS-001 2-round cap | GAP | No test counts LLM rounds per role. |
-| R-HOTELS-002 Destination = actual flight city | GAP | — |
+| R-HOTELS-002 Destination = actual flight city | RUBRIC READY | `rubrics.py::check_R_HOTELS_002_hotels_near_destination` + `test_eval_rubrics.py::TestR_HOTELS_002` (4 unit tests) — haversine-checks every hotel lat/lng is within 80 km of `context.flight_to_lat`/`flight_to_lng`. Awaits live eval run. |
 | R-HOTELS-003 MUST call `search_places` | RUBRIC READY | `rubrics.py::check_R_HOTELS_003_must_call_search_places` + `test_eval_rubrics.py::TestR_HOTELS_003` (4 unit tests). Awaits live eval run. |
 | R-HOTELS-004 Allow-list (post-D2: `search_places`, `get_weather`, `navigate_menu`) | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[hotels]` + `test_hotels_allow_list_excludes_get_place_details`. |
 | R-HOTELS-005 5-8 hotels (post-D3) | PARTIAL | `TestGoldenTokyoFull::test_has_enough_hotels` (≥3); upper bound 8 not asserted. GAP on neighborhood diversity. |
@@ -389,7 +389,7 @@ bottom of this section.
 | R-CHAT-007 Suggest, don't execute | PARTIAL | `design.md:260-261` documents; frontend state vars (`suggestedFlightIdx` etc.) would need UI tests. Playwright walkthrough covers via PICK button flow. |
 | R-CHAT-008 One-sentence reply | RUBRIC READY | `rubrics.py::check_R_CHAT_008_one_sentence_reply` + `test_eval_rubrics.py::TestR_CHAT_008` (4 unit tests) — rejects JSON blocks and >2-sentence replies. Awaits live eval run. |
 | R-REPLACE-001 Single `search_places` call | PARTIAL | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[replace]` asserts allow-list is exactly `{search_places}` — any other tool call is impossible at runtime. Call count (≤1 round) still not asserted. |
-| R-REPLACE-002 Copy fields verbatim | PARTIAL | `test_itinerary_schema.py::TestReplaceActivityOutput::test_activity_has_required_fields` asserts the required fields are present. Strict verbatim-match-to-`search_places` check needs a live-eval rubric. |
+| R-REPLACE-002 Copy fields verbatim | RUBRIC READY | `test_itinerary_schema.py::TestReplaceActivityOutput::test_activity_has_required_fields` covers shape. `rubrics.py::check_R_REPLACE_002_activity_place_id_grounded` + `test_eval_rubrics.py::TestR_REPLACE_002` (4 unit tests) verify the replacement `place_id` came from a `search_places` result that turn. Awaits live eval run. |
 | R-REPLACE-003 Preserve `time` / `duration_min` | GAP | Needs rubric that compares replacement time/duration to the original activity — requires eval context to pass the original. |
 | R-REPLACE-004 No navigate_menu | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[replace]` asserts allow-list excludes `navigate_menu`. |
 | R-REPLACE-005 Replace output shape | COVERED | `test_itinerary_schema.py::TestReplaceActivityOutput` (4 tests) — asserts `itinerary.replace` block has day/old_name/activity with required fields, and no full `days` array is re-emitted. |
