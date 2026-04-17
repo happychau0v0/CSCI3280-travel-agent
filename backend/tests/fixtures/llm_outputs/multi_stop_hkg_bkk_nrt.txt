@@ -1,0 +1,7 @@
+Multi-stop options via Bangkok found for a budget route to Tokyo.
+
+```json
+{"itinerary": {"title": "4 Days in Tokyo", "destination": "Tokyo, Japan", "origin": "Hong Kong", "local_transport_mode": "TRANSIT", "flight": {"from_city": "Hong Kong", "from_iata": "HKG", "to_city": "Tokyo", "to_iata": "NRT", "from_lat": 22.308, "from_lng": 113.9185, "to_lat": 35.7647, "to_lng": 140.3864, "date": "2026-05-15", "source": "fast-flights", "options": [{"type": "non-stop", "label": "Non-stop ANA", "price_low": 1850, "price_high": 2100, "duration_min": 235, "stops": 0, "airline": "ANA", "departure_time": "08:00", "arrival_time": "13:15", "recommended": true, "stop_cities": []}, {"type": "1-stop", "label": "1 stop via Bangkok", "price_low": 1200, "price_high": 1450, "duration_min": 620, "stops": 1, "airline": "Thai Airways", "departure_time": "22:00", "arrival_time": "14:20", "next_day_arrival": true, "stop_cities": ["BKK"]}, {"type": "2-stop", "label": "Budget via BKK and KIX", "price_low": 980, "price_high": 1200, "duration_min": 850, "stops": 2, "airline": "AirAsia", "departure_time": "06:30", "arrival_time": "20:40", "stop_cities": ["BKK", "KIX"]}]}, "days": [{"day": 1, "date": "2026-05-15"}, {"day": 2, "date": "2026-05-16"}, {"day": 3, "date": "2026-05-17"}, {"day": 4, "date": "2026-05-18"}]}}
+```
+
+Non-stop and 1-stop via Bangkok — pick based on time vs. cost.

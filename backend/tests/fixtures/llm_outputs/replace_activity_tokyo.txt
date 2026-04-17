@@ -1,0 +1,7 @@
+Swapped Senso-ji for Ichiran Ramen on day 2 to match your food focus.
+
+```json
+{"itinerary": {"replace": {"day": 2, "old_name": "Senso-ji Temple", "activity": {"time": "14:30", "name": "Ichiran Ramen Shibuya", "duration_min": 90, "address": "1-22-7 Jinnan, Shibuya City, Tokyo 150-0041", "place_id": "ChIJrTLr-GyLGGARY5C6o4b0tX0", "lat": 35.6615, "lng": 139.6989, "photo_url": "/photo/places/ChIJrTLr-GyLGGARY5C6o4b0tX0/photos/A1", "description": "Solo-booth tonkotsu ramen chain famous for concentration-focused eating experience."}}}}
+```
+
+Senso-ji swapped for Ichiran Ramen on day 2 at 14:30, same 90-minute window.

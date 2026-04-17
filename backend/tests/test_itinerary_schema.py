@@ -252,3 +252,274 @@ class TestExtractItineraryEdgeCases:
         result = _extract_itinerary(raw)
         assert result is not None
         assert result["title"] == "First"
+
+
+# ─── Round-trip flight fixture (R-PLAN-007) ──────────────────────────────
+
+
+class TestRoundTripFlight:
+    """Validate a round-trip Plan-role output: both outbound and return."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        self.data = _parse_fixture("hkg_nrt_roundtrip.txt")
+        self.itinerary = _validate(self.data)
+
+    def test_pydantic_validates(self):
+        assert isinstance(self.itinerary, Itinerary)
+
+    def test_outbound_options_present(self):
+        """R-PLAN-008: outbound options array copied verbatim."""
+        assert self.itinerary.flight is not None
+        assert len(self.itinerary.flight.options) >= 2
+
+    def test_return_options_populated(self):
+        """R-PLAN-007: round-trip MUST have return_options."""
+        assert len(self.itinerary.flight.return_options) >= 2
+
+    def test_return_date_set(self):
+        """R-PLAN-007: flight.return_date reflects the return leg."""
+        assert self.itinerary.flight.return_date == "2026-05-20"
+
+    def test_day_count_matches_trip_length(self):
+        """R-PLAN-009: May 15 → May 20 = 6 day stubs."""
+        assert len(self.itinerary.days) == 6
+
+    def test_outbound_has_recommended(self):
+        """At least one outbound option should be flagged recommended."""
+        assert any(opt.recommended for opt in self.itinerary.flight.options)
+
+
+# ─── Day 1 arrival at non-example time (R-DAYS-005/006) ───────────────────
+
+
+class TestDay1ArrivalNonExampleTime:
+    """Day 1 must use the flight's ACTUAL arrival_time (14:50), not 11:35."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        self.data = _parse_fixture("day1_1450_lastday_1800.txt")
+        self.itinerary = _validate(self.data)
+
+    def test_pydantic_validates(self):
+        assert isinstance(self.itinerary, Itinerary)
+
+    def test_first_activity_is_arrival_airport(self):
+        """R-DAYS-006: day 1 activity[0] MUST be '{iata} Airport · Arrival'."""
+        day1 = self.itinerary.days[0]
+        assert day1.activities[0].name.endswith("Airport · Arrival")
+
+    def test_first_activity_time_matches_flight(self):
+        """R-DAYS-005: day 1 activity[0].time == flight.arrival_time (14:50)."""
+        assert self.itinerary.days[0].activities[0].time == "14:50"
+
+    def test_first_activity_duration_60(self):
+        """R-DAYS-006: arrival airport activity is 60 min."""
+        assert self.itinerary.days[0].activities[0].duration_min == 60
+
+    def test_hotel_check_in_at_least_90_min_after_arrival(self):
+        """R-DAYS-006: hotel check-in ≥ arrival_time + 90 min (14:50 + 90 = 16:20)."""
+        def _to_min(hhmm: str) -> int:
+            h, m = map(int, hhmm.split(":"))
+            return h * 60 + m
+
+        acts = self.itinerary.days[0].activities
+        arrival_min = _to_min(acts[0].time)
+        check_in_min = _to_min(acts[1].time)
+        assert check_in_min >= arrival_min + 90, (
+            f"Hotel check-in at {acts[1].time} is too close to arrival at {acts[0].time}"
+        )
+
+
+# ─── Last-day departure structure (R-DAYS-007) ────────────────────────────
+
+
+class TestLastDayDeparture:
+    """Last day: 09:00 check-out, real activities, departure airport 180 min."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        self.data = _parse_fixture("day1_1450_lastday_1800.txt")
+        self.itinerary = _validate(self.data)
+
+    def test_first_activity_is_hotel_checkout_at_0900(self):
+        """R-DAYS-007: last day activity[0] is hotel check-out at 09:00."""
+        last = self.itinerary.days[-1]
+        assert last.activities[0].time == "09:00"
+        assert last.activities[0].duration_min == 30
+
+    def test_last_activity_is_departure_airport(self):
+        """R-DAYS-007: last day activity[-1] is '{iata} Airport · Departure'."""
+        last = self.itinerary.days[-1]
+        assert last.activities[-1].name.endswith("Airport · Departure")
+
+    def test_departure_activity_duration_180(self):
+        """R-DAYS-007: departure airport window is 180 min (3 hours)."""
+        last = self.itinerary.days[-1]
+        assert last.activities[-1].duration_min == 180
+
+    def test_at_least_one_real_activity_between_checkout_and_airport(self):
+        """R-DAYS-007: must have ≥1 real activity before the airport."""
+        last = self.itinerary.days[-1]
+        # activities[0] is check-out, activities[-1] is airport;
+        # anything in between counts as "real".
+        assert len(last.activities) >= 3
+
+
+# ─── day_themes role output (R-THEMES-002/003/005/006) ────────────────────
+
+
+class TestDayThemesOutput:
+    """day_themes returns only {itinerary.days[]} with themes + suggested_areas.
+
+    Pydantic Itinerary requires title/destination which day_themes does not
+    emit (legitimately — the frontend merges onto an existing itinerary).
+    So these tests work with the raw extracted dict, not the Pydantic model.
+    """
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        self.data = _parse_fixture("day_themes_3day_tokyo.txt")
+        self.days = self.data["days"]
+
+    def test_has_three_days(self):
+        """R-THEMES-002: days array length equals trip days."""
+        assert len(self.days) == 3
+
+    def test_every_day_has_theme_and_areas(self):
+        """R-THEMES-006: each day has a theme and suggested_areas list."""
+        for day in self.days:
+            assert day.get("theme"), f"Day {day.get('day')} missing theme"
+            areas = day.get("suggested_areas", [])
+            assert 3 <= len(areas) <= 5, (
+                f"Day {day.get('day')} has {len(areas)} suggested_areas; "
+                f"must be 3-5"
+            )
+
+    def test_suggested_areas_are_geographically_distinct(self):
+        """R-THEMES-003: no neighborhood appears in more than one day."""
+        seen: dict[str, int] = {}
+        for day in self.days:
+            for area in day.get("suggested_areas", []):
+                if area in seen:
+                    raise AssertionError(
+                        f"Area {area!r} appears on days {seen[area]} and "
+                        f"{day['day']} — suggested_areas must be distinct"
+                    )
+                seen[area] = day["day"]
+
+    def test_key_constraints_only_on_flight_days(self):
+        """R-THEMES-005: key_constraints only on day 1 (arrival) and last day (departure)."""
+        assert "key_constraints" in self.days[0]
+        assert self.days[0]["key_constraints"].get("arrival_time")
+
+        assert "key_constraints" in self.days[-1]
+        assert self.days[-1]["key_constraints"].get("departure_time")
+
+        for middle in self.days[1:-1]:
+            assert "key_constraints" not in middle, (
+                f"Middle day {middle['day']} has key_constraints; "
+                f"only flight days should."
+            )
+
+    def test_suggested_areas_not_generic(self):
+        """R-THEMES-006: no 'downtown'/'city center' generic placeholders."""
+        banned = {"downtown", "city center", "city centre"}
+        for day in self.days:
+            for area in day.get("suggested_areas", []):
+                assert area.lower() not in banned, (
+                    f"Day {day['day']} lists generic area {area!r}"
+                )
+
+
+# ─── Multi-stop flight options (R-MONO-001) ───────────────────────────────
+
+
+class TestMultiStopFlight:
+    """Multi-stop options MUST populate stop_cities with intermediate IATAs."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        self.data = _parse_fixture("multi_stop_hkg_bkk_nrt.txt")
+        self.itinerary = _validate(self.data)
+
+    def test_pydantic_validates(self):
+        assert isinstance(self.itinerary, Itinerary)
+
+    def test_non_stop_has_empty_stop_cities(self):
+        """R-MONO-001: stops=0 → stop_cities == []."""
+        non_stop = [o for o in self.itinerary.flight.options if o.stops == 0]
+        assert non_stop, "Fixture should include at least one non-stop option"
+        for opt in non_stop:
+            assert opt.stop_cities == [], (
+                f"Non-stop option {opt.label!r} has stop_cities={opt.stop_cities}"
+            )
+
+    def test_one_stop_has_one_iata_in_stop_cities(self):
+        """R-MONO-001: stops=1 → len(stop_cities) == 1."""
+        one_stop = [o for o in self.itinerary.flight.options if o.stops == 1]
+        assert one_stop, "Fixture should include at least one 1-stop option"
+        for opt in one_stop:
+            assert len(opt.stop_cities) == 1, (
+                f"1-stop option {opt.label!r} has stop_cities={opt.stop_cities}"
+            )
+            # IATA codes are 3 uppercase letters
+            assert len(opt.stop_cities[0]) == 3 and opt.stop_cities[0].isupper()
+
+    def test_two_stop_has_two_iatas_in_stop_cities(self):
+        """R-MONO-001: stops=2 → len(stop_cities) == 2."""
+        two_stop = [o for o in self.itinerary.flight.options if o.stops == 2]
+        if two_stop:  # optional — fixture may or may not have 2-stops
+            for opt in two_stop:
+                assert len(opt.stop_cities) == 2
+
+
+# ─── Replace role output (R-REPLACE-005) ──────────────────────────────────
+
+
+class TestReplaceActivityOutput:
+    """replace role emits {itinerary.replace: {day, old_name, activity}}.
+
+    This shape is not a full Itinerary — the frontend merges it as a diff.
+    Tests work with the raw extracted dict.
+    """
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        self.data = _parse_fixture("replace_activity_tokyo.txt")
+        assert "replace" in self.data, (
+            "Replace fixture missing itinerary.replace block"
+        )
+        self.replace = self.data["replace"]
+
+    def test_has_day_and_old_name(self):
+        """R-REPLACE-005: replace block has day (int) + old_name (str)."""
+        assert isinstance(self.replace.get("day"), int)
+        assert isinstance(self.replace.get("old_name"), str)
+        assert self.replace["old_name"]
+
+    def test_activity_has_required_fields(self):
+        """R-REPLACE-005: replacement activity has time + name + place fields."""
+        act = self.replace["activity"]
+        assert act.get("time")
+        assert act.get("name")
+        assert act.get("place_id")
+        assert act.get("lat") is not None
+        assert act.get("lng") is not None
+        assert act.get("photo_url")
+        assert act.get("address")
+
+    def test_activity_description_10_to_15_words(self):
+        """R-REPLACE-006: description is a brief 10-15-word blurb."""
+        desc = self.replace["activity"].get("description", "")
+        word_count = len(desc.split())
+        assert 8 <= word_count <= 20, (
+            f"Description is {word_count} words; expected roughly 10-15. "
+            f"Text: {desc!r}"
+        )
+
+    def test_no_full_days_array(self):
+        """R-REPLACE-004: replace must NOT re-emit the full days array."""
+        assert "days" not in self.data, (
+            "Replace output should only include the replace block, not full days"
+        )

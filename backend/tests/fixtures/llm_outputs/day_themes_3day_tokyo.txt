@@ -1,0 +1,7 @@
+Three distinct themes mapped across East, West, and Ginza Tokyo.
+
+```json
+{"itinerary": {"days": [{"day": 1, "date": "2026-05-15", "theme": "Arrival & East Tokyo", "suggested_areas": ["Asakusa", "Ueno", "Akihabara", "Yanaka"], "key_constraints": {"arrival_time": "11:35", "airport_iata": "NRT"}}, {"day": 2, "date": "2026-05-16", "theme": "West Tokyo Fashion & Culture", "suggested_areas": ["Shinjuku", "Harajuku", "Shibuya", "Omotesando"]}, {"day": 3, "date": "2026-05-17", "theme": "Departure Morning in Ginza", "suggested_areas": ["Ginza", "Tsukiji", "Marunouchi"], "key_constraints": {"departure_time": "18:00", "airport_iata": "NRT"}}]}}
+```
+
+Three days in Tokyo — East Side temples, West Side fashion, Ginza farewell.
