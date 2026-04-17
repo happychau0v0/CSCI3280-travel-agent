@@ -57,10 +57,7 @@ User ◄── SpeechSynthesis (TTS) ◄── Response ◄──────┘
 
 ## Key Conventions
 
-- **No hallucination:** Every place name, address, rating, and hour MUST come from a tool call
-- **Tool-first:** Call `search_places` before recommending any place; call `get_directions` before suggesting transport
-- **Structured output:** Itineraries are JSON that the frontend renders as cards; also provide a natural language summary for TTS
-- **Clarify ambiguity:** Ask users about trip duration, budget, interests when the request is vague
+- **LLM role & behavior spec:** see [`docs/llm-spec.md`](docs/llm-spec.md) — numbered requirements (R-G-*, R-PLAN-*, R-HOTELS-*, R-DAYS-*, R-CHAT-*, R-REPLACE-*, R-THEMES-*, R-DETAIL-*) with source citations and verification coverage. Update it when prompts, allow-lists, or per-stage contracts change.
 - **OpenRouter, not OpenAI direct:** Use `OPENROUTER_API_KEY` with OpenAI SDK's `base_url` override
 
 ## Design Doc Discipline
