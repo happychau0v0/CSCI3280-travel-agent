@@ -1,29 +1,24 @@
 # AI Travel Agent — Comprehensive Reference
 
 > **Audience:** Developers maintaining or extending the codebase.
-> **Scope:** User workflows, LLM response modes, tool contracts, business logic, SSE event stream,
-> TTS pipeline, hotkey system. This document captures rules baked into `llm.py`, `prompts.py`,
-> the frontend state machine, and the tool wrappers — things not derivable from reading one file alone.
+> **Scope:** Cross-cutting behaviour that isn't derivable from reading
+> any single source file — tool contracts, business-logic invariants,
+> the SSE event stream, the TTS fallback chain, the hotkey scope model,
+> the service-status overlay, data schemas, and static data files.
+>
+> **See also:**
+> - [`docs/user-flow.md`](user-flow.md) — happy-path + clarification
+>   flows with `callRole` wiring (previously §1 here).
+> - [`docs/llm-spec.md`](llm-spec.md) — numbered LLM behaviour
+>   requirements and per-role scoping (previously §2 here).
+> - [`docs/api.md`](api.md) — HTTP / SSE surface.
 
 ---
 
 ## Table of Contents
 
-1. [User Workflows](#1-user-workflows)
-   - 1.1 Happy Path (new trip)
-   - 1.2 Clarification Flow
-   - 1.3 Chat Mode (freeform)
-   - 1.4 Replan (edit existing itinerary)
-2. [LLM Response Modes](#2-llm-response-modes)
-   - Mode table
-   - Per-mode rules
-   - Context window strategy
-   - Model fallback routing
-3. [Tool Calling Reference](#3-tool-calling-reference)
-   - Data-fetching tools (6)
-   - UI tools (4)
-   - Utility tools (2)
-4. [Business Logic](#4-business-logic)
+1. [Tool Calling Reference](#3-tool-calling-reference)
+2. [Business Logic](#4-business-logic)
    - Itinerary construction rules
    - Flight search pipeline
    - JSON extraction pipeline
@@ -32,281 +27,29 @@
    - `request_input` hard-stop rule
    - Photo proxy
    - Route optimization (TSP)
-5. [SSE Event Stream Reference](#5-sse-event-stream-reference)
-6. [TTS Pipeline](#6-tts-pipeline)
-7. [Hotkey System](#7-hotkey-system)
+3. [SSE Event Stream Reference](#5-sse-event-stream-reference)
+4. [TTS Pipeline](#6-tts-pipeline)
+5. [Hotkey System](#7-hotkey-system)
    - Design philosophy
    - Scope model (tabs / list / detail)
    - Full hotkey reference
    - Adding new hotkeys
-8. [Service Status Overlay](#8-service-status-overlay)
-9. [Data Schemas](#9-data-schemas)
-10. [Static Data Files](#10-static-data-files)
-11. [Known Limitations & Gaps](#11-known-limitations--gaps)
+6. [Service Status Overlay](#8-service-status-overlay)
+7. [Data Schemas](#9-data-schemas)
+8. [Static Data Files](#10-static-data-files)
+9. [Known Limitations & Gaps](#11-known-limitations--gaps)
+
+> Section numbers 3–11 below are preserved from the original document
+> so anchor links from commits and other docs keep working.
 
 ---
 
-## 1. User Workflows
+## 1–2 removed
 
-### 1.1 Happy Path (new trip)
-
-The three-turn planning pipeline where each turn produces one panel of data.
-
-```
-User fills PanelHome form
-  → destination, origin, start_date, end_date, transport,
-    seat_class, party_size, interests
-
-User clicks START PLANNING
-  → App.handleSend(prompt, { callRole: "plan", reset: true })
-  → isLoading=true, AgentStatusBar shows "AGENT WORKING"
-  → POST /chat/stream opens SSE stream
-
-── TURN 1: PLAN ──────────────────────────────────────────
-Backend (callRole:"plan", SYSTEM_PROMPT_PLAN):
-  Round 1: geocode_city + search_flights + get_day_windows + get_phrasebook (parallel)
-  Round 2: LLM emits itinerary JSON block (flight + phrasebook) + navigate_menu("FLIGHTS")
-
-Frontend receives SSE events:
-  partial_itinerary  → preview flight options, auto-navigate to FLIGHTS panel
-  tool_start/end     → AgentStatusBar shows tool names + timings
-  navigate           → buffered in pendingNavigateRef
-  done               → merge flight + phrasebook into currentItinerary
-                        flush pendingNavigateRef → MenuShell switches to FLIGHTS
-
-User reviews FLIGHTS panel (outbound options, optionally return options)
-User clicks PICK on a flight option
-  → pushPickSnapshot() for undo
-  → App.handleSend("I'll take [flight]", { callRole: "hotels" })
-
-── TURN 2: HOTELS ────────────────────────────────────────
-Backend (callRole:"hotels", SYSTEM_PROMPT_HOTELS):
-  Round 1: search_places("hotels near [destination]") + get_weather (parallel)
-  Round 2: LLM emits itinerary JSON block (hotels array) + navigate_menu("HOTELS")
-
-Frontend:
-  done → merge hotels (additive, flight preserved), switch to HOTELS
-
-User reviews HOTELS panel (filter by price/rating, view photos, Leaflet map)
-User clicks PICK (optionally PICK & REPLAN if autoReplan=off)
-  → pushPickSnapshot() for undo
-  → App.handleSend("I'll stay at [hotel]", { callRole: "days" })
-     (if autoReplan=true, picking a hotel also calls callRole:"days" automatically)
-
-── TURN 3: DAYS ──────────────────────────────────────────
-Backend (callRole:"days", SYSTEM_PROMPT_DAYS):
-  Round 1: search_places per day + get_weather + get_directions (first+last transitions, parallel)
-  Round 2: LLM emits itinerary JSON block (days array) + navigate_menu("DAYS")
-
-Frontend:
-  done → merge days (flight + hotel preserved), switch to DAYS
-
-User reviews DAYS panel:
-  - Drag activities to reorder (hotel/airport anchors are immutable)
-  - Click REPLACE → App.handleSend("Replace [activity] with something else", { callRole: "days" })
-  - Click REMOVE → remove activity from local state (no LLM call)
-  - Click ☆ → add to favorites
-  - Click activity → DayMiniMap fetches live polyline from /api/directions (debounced 400ms)
-  - Edit time / name inline (click to edit)
-  - Add personal notes (user_note field, never sent to LLM)
-```
-
-**Undo/Redo:**
-- `pushPickSnapshot()` called before each PICK — saves {flight, hotels, selected_hotel, days} snapshot
-- Ctrl+Z / Cmd+Z → `handleUndoPick()` pops snapshot, restores state
-- Ctrl+Shift+Z / Cmd+Y → `handleRedoPick()` re-applies
-- Stack max depth: 20
-
----
-
-### 1.2 Clarification Flow
-
-Fires when the LLM determines it cannot proceed without more information from the user.
-
-```
-User submits form with destination="Australia" (country, not city)
-OR user submits without start_date / end_date
-
-Backend (callRole:"plan"):
-  Round 1: LLM calls request_input(field="destination",
-           prompt="Which city in Australia? (e.g., Sydney, Melbourne, Brisbane)")
-  → request_input hard-stops the loop (no other tools run)
-  → SSE event: { type:"request_input", data:{ field, prompt, options? } }
-
-Frontend:
-  onEvent("request_input"):
-    → switch to HOME panel (TRIP tab)
-    → focus the relevant field
-    → display prompt text near the field
-    → store pendingInputRequestRef = { field, prompt, callRole:"plan" }
-
-User types an answer (e.g., "Sydney") into the focused field
-  → handleSend("Sydney", { callRole: "plan" })   ← callRole preserved from ref
-  → backend runs SYSTEM_PROMPT_PLAN again, now destination is a city
-  → proceeds to search_flights normally
-```
-
-**Key rule:** The `callRole` is preserved across the clarification round. If `callRole:"plan"` was
-active when `request_input` fired, the next message also uses `callRole:"plan"` — not the full
-monolithic SYSTEM_PROMPT. Without this, the LLM would run all 3 turns in one go and jump to DAYS.
-
----
-
-### 1.3 Chat Mode (freeform)
-
-User opens the ChatPopover (T or Cmd+K) at any point and types a freeform request.
-
-```
-User presses T / Cmd+K → ChatPopover opens
-User types: "Change the currency to USD" or "Navigate to hotels"
-  → App.handleSend(text, { callRole: "chat" })
-
-Backend (callRole:"chat", SYSTEM_PROMPT_CHAT):
-  LLM uses UI-action tools to navigate and perform the same actions as the buttons:
-    navigate_menu    → switch to a panel
-    pick_flight      → select a flight option (same as clicking PICK in PanelFlights)
-    pick_hotel       → select a hotel (same as clicking PICK in PanelHotels)
-    replace_activity → replace or remove a day activity (same as clicking REPLACE)
-    request_input    → ask user for a missing field
-    toggle_setting   → change a setting (currency, theme, tts, etc.)
-    submit_trip_form → prefill the PLAN form and start planning
-
-Frontend:
-  SSE events for pick_flight / pick_hotel / replace_activity are handled identically
-  to the corresponding button clicks (same state updates and follow-on LLM calls).
-```
-
-**Design principle — chat has the same permissions as the UI:**
-A user typing "pick the Cathay Pacific flight" must produce the exact same result as
-clicking the PICK button on that row. Chat is not a limited text interface layered on top
-of the UI — it is an alternative input method with identical authority.
-
-- `pick_flight` → selects `selected_flight`, then frontend fires `callRole:"hotels"`
-- `pick_hotel` → selects `selected_hotel`, then frontend fires `callRole:"days"` (if autoReplan)
-- `replace_activity` → frontend fires `callRole:"days"` with a replacement instruction
-- `submit_trip_form` (already exists) → starts planning from scratch
-- `navigate_menu` (already exists) → moves user to any panel
-
-`pick_flight`, `pick_hotel`, and `replace_activity` are not yet implemented — see §10.
-
----
-
-### 1.4 Replan (edit existing itinerary)
-
-Triggered when the user picks a different hotel, or asks to change days after one already exists.
-
-```
-User changes hotel selection (autoReplan=true, the default):
-  → App picks hotel, immediately fires handleSend("Replanning days for [hotel]", { callRole: "days" })
-  → Backend runs SYSTEM_PROMPT_DAYS with new hotel context
-  → days merged (flight + hotel selection preserved)
-
-User asks via chat to replace an activity (current limitation — chat can't do this directly):
-  → Workaround: click REPLACE button on the activity row in PanelDays
-  → App.handleSend("Replace [activity] at [time] with a better option", { callRole: "days" })
-  → Backend runs SYSTEM_PROMPT_DAYS, emits new days array
-  → Frontend merges additively
-
-autoReplan toggle (top of HOTELS panel):
-  ON (default): picking a hotel immediately replans days
-  OFF: picking a hotel only updates selected_hotel, no day replan; user must click REPLAN button
-```
-
----
-
-## 2. LLM Response Modes
-
-### Mode Table
-
-| `callRole` | System Prompt | Allowed Tools | JSON Output | Navigates To | Context Sent |
-|-----------|--------------|---------------|-------------|-------------|--------------|
-| `"plan"` | `SYSTEM_PROMPT_PLAN` | search_flights, geocode_city, get_day_windows, get_phrasebook, request_input, navigate_menu | `flight` + `phrasebook` blocks | FLIGHTS | system + last user msg only |
-| `"hotels"` | `SYSTEM_PROMPT_HOTELS` | search_places, get_weather, navigate_menu | `hotels` array | HOTELS | system + last user msg only |
-| `"days"` | `SYSTEM_PROMPT_DAYS` | search_places, get_directions, get_weather, navigate_menu | `days` array | DAYS | system + last user msg only |
-| `"chat"` | `SYSTEM_PROMPT_CHAT` | request_input, submit_trip_form, navigate_menu, toggle_setting | None (text only) | — | Full conversation history |
-| `null` (legacy) | `SYSTEM_PROMPT` | All 12 tools | Full itinerary (all 3 turns) | Auto per turn | Full conversation history |
-
-### Per-Mode Rules
-
-**`"plan"` (SYSTEM_PROMPT_PLAN)**
-- Before calling `search_flights`, LLM MUST verify destination is a city (not country) and dates are provided. If either is missing or ambiguous, call `request_input` first and stop.
-- Call `geocode_city`, `search_flights`, `get_day_windows`, `get_phrasebook` in the SAME round (parallel).
-- Call `navigate_menu("FLIGHTS")` exactly ONCE, at the very end (last tool call before emitting JSON). Never mid-stream.
-- Output JSON must include `flight` object with `options` array (3–8 options). Copy options verbatim from `search_flights` result — no summarizing.
-- If round-trip: call `search_flights` twice (outbound + return); populate both `options` and `return_options`.
-- Forbidden: `search_places`, `get_weather`, `get_directions`, `get_place_details`.
-
-**`"hotels"` (SYSTEM_PROMPT_HOTELS)**
-- 2 rounds maximum.
-- Round 1: `search_places("hotels near [city]")` + `get_weather` in parallel.
-- Round 2: Emit JSON with exactly 5 hotels. Do NOT call `get_place_details` between rounds.
-- Each hotel: copy `photo_url` (first photo only) from `search_places` result. Do NOT embed a `photos` array.
-- Set `selected_hotel: null` in output (user has not picked yet).
-- Forbidden: `get_place_details`, `search_flights`, `get_directions`, `request_input`.
-
-**`"days"` (SYSTEM_PROMPT_DAYS)**
-- 2 rounds maximum.
-- Round 1: `search_places` queries per day + `get_weather` + `get_directions` (max 2 per day: first and last transitions only) — all in parallel.
-- Round 2: Emit JSON with `days` array. Do NOT call `get_place_details` (use descriptions from `search_places`).
-- Write activity descriptions from own knowledge (10–15 words). Do not copy full editorial summaries.
-- Day 1: first activity MUST be the arrival airport (from `get_day_windows` `arrival_airport` field), time = arrival + 90 min.
-- Last day: last activity MUST be the departure airport, timed 180 min before departure.
-- Middle days: ≥5 real activities, ≥2 meal stops, 09:00–21:00 window.
-- Weather required for every day.
-- Forbidden: `get_place_details`, `search_flights`, `request_input`.
-
-**`"chat"` (SYSTEM_PROMPT_CHAT)**
-- No data-fetching tools. Only controls UI state.
-- Responds with short conversational text; no JSON blocks.
-- Uses full conversation history (not fresh call).
-- See §1.3 for known gap re: intended full permissions.
-
-**`null` (SYSTEM_PROMPT — legacy monolithic)**
-- Full multi-turn logic: CONVERSATION mode (smalltalk, greetings) vs PLANNING mode (trip signals detected).
-- PLANNING mode runs all 3 turns sequentially in one call chain.
-- Not used in current UI-driven flow. Active only when `callRole` is omitted (e.g., early testing, bench eval).
-- `bench_eval=true` appends `BENCH_EVAL_ADDENDUM` which forces a single all-in-one response.
-
-### Context Window Strategy
-
-**Scoped calls** (`plan`, `hotels`, `days`):
-- Fresh call — only the relevant system prompt + the single triggering user message.
-- No conversation history. This prevents stale context from earlier turns contaminating the tool round.
-
-**`chat` and `null`:**
-- Full conversation history preserved (all prior messages).
-- Itinerary JSON is stripped from history before sending (replaced with `«itinerary»` placeholder) to save tokens.
-
-**Context pruning** (`_prune_tool_results` in `llm.py`):
-- As the tool-call loop accumulates rounds, older `role=tool` messages are truncated to `[tool result omitted]`.
-- Keeps the most recent N rounds intact: N=3 for reasoning models, N=2 for non-reasoning.
-- Round boundaries detected by `role=assistant` messages.
-
-### Model Fallback Routing
-
-```
-Primary:  xAI (grok-4.20-0309-non-reasoning, default)
-Fallback: Gemini (gemini-3.1-pro-preview)
-
-On round 0 only:
-  → xAI returns 500 (InternalServerError)  → provider outage
-  → xAI returns 403 / "region not available" / "not supported" / "geo" / "country"
-                                           → geo-restriction
-  → transparent retry with Gemini client
-  → emit SSE { type:"model_fallback", data:{ reason:"outage"|"region_restricted" } }
-
-On round 1+:
-  → re-raise (can't switch mid-stream without confusing state)
-
-Manual override:
-  → User selects Gemini in Settings → preferred_model is set
-  → llm.py routes to _get_fallback_client() regardless of primary status
-  → Gemini model names are incompatible with xAI client (different endpoint)
-```
-
-**`ROLE_DEFAULT_MODELS`:** Each role (`plan`, `hotels`, `days`, `chat`) has its own default model,
-currently all set to `grok-4.20-0309-non-reasoning`. Priority: explicit user choice > role default
-> global `LLM_MODEL` env var.
+Sections 1 (User Workflows) and 2 (LLM Response Modes) moved to
+[`docs/user-flow.md`](user-flow.md) and [`docs/llm-spec.md`](llm-spec.md)
+to avoid duplication. Numbered sections below are kept unchanged so
+existing links still resolve.
 
 ---
 

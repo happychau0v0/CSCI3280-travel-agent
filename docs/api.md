@@ -1,224 +1,235 @@
 # API Reference
 
-The backend exposes a small REST API at `http://localhost:8000`. All
+The backend exposes a REST + SSE API at `http://localhost:8000`. All
 endpoints accept and return JSON unless noted. CORS is wide open in
 development (`allow_origins=["*"]`).
 
----
+Router prefixes (see `backend/app/main.py`):
 
-## `GET /health`
+| Prefix | Module |
+|---|---|
+| `/chat` | `routers/chat.py` |
+| `/itinerary` | `routers/itinerary.py` |
+| `/photo` | `routers/photo.py` |
+| `/geo` | `routers/geo.py` |
+| `/speech` | `routers/speech.py` |
+| `/status` (no prefix, path is `/status`) | `routers/status.py` |
+| `/api/directions` | `routers/directions.py` |
+| `/visa` | `routers/visa.py` |
+| `/airports` | `routers/airports.py` |
+| `/export` | `routers/export.py` |
 
-Sanity check.
+Top-level (defined directly on `app` in `main.py`):
 
-```bash
-curl http://localhost:8000/health
-```
-
-```json
-{"status": "ok"}
-```
+- `GET /health` → `{"status": "ok"}` (liveness probe)
 
 ---
 
 ## `POST /chat`
 
-The main entry point. Runs the LLM with a tool-call loop and returns
-the assistant's reply plus any structured itinerary it produced.
+Runs the LLM tool-call loop and returns the final reply plus any
+structured itinerary the model produced. One-shot — blocks until the
+loop terminates. For progressive output use `/chat/stream` (below).
 
 ### Request
 
 ```json
 {
-  "message": "Plan a 2-day trip to Hong Kong with history and food.",
+  "message": "Plan a 3-day trip to Tokyo from Hong Kong.",
   "history": [
-    {"role": "user", "content": "Hi, can you help me plan a trip?"},
-    {"role": "assistant", "content": "Of course! Where would you like to go?"}
+    {"role": "user", "content": "..."},
+    {"role": "assistant", "content": "..."}
   ],
   "preferences": {
-    "interests": ["history", "ramen"],
+    "interests": ["food", "temples"],
     "dislikes": ["crowds"],
     "dietary": "vegetarian",
     "budget": "$$",
     "travel_style": "relaxed"
-  }
+  },
+  "call_role": "plan",
+  "user_location": {"city": "Hong Kong", "country": "HK", "lat": 22.3, "lng": 114.2},
+  "trip_dates": {"start": "2026-05-15", "end": "2026-05-17"},
+  "local_form": {"destination": "NRT", "origin": "HKG", "party_size": 2}
 }
 ```
 
-`history` and `preferences` are optional. The frontend sends `history`
-on every request because the backend is stateless. `preferences` come
-from the `ProfilePanel` localStorage — if non-empty, they're injected
-into the system prompt as a USER PROFILE block.
+`history`, `preferences`, `user_location`, `trip_dates`, and
+`local_form` are optional. `call_role` selects one of the scoped
+system prompts (`plan` / `hotels` / `days` / `chat` / `day_themes` /
+`day_detail`); omit for the full `SYSTEM_PROMPT`.
 
 ### Response
 
 ```json
 {
-  "reply": "Here's your 2-day Hong Kong itinerary...\n\n```json\n{...}\n```\n\nA warm summary for TTS.",
-  "itinerary": {
-    "title": "2 Days in Hong Kong",
-    "destination": "Hong Kong",
-    "days": [
-      {
-        "day": 1,
-        "date": "2026-04-15",
-        "theme": "Historic Hong Kong",
-        "weather": {"condition": "Partly cloudy", "temp_c": 22, "icon": "partly-cloudy"},
-        "activities": [
-          {
-            "time": "10:00",
-            "name": "Man Mo Temple",
-            "address": "124-130 Hollywood Rd, Sheung Wan",
-            "duration_min": 60,
-            "description": "Atmospheric historic temple...",
-            "place_id": "ChIJ...",
-            "photo_url": "/photo/places/ChIJ.../photos/Ae...",
-            "lat": 22.2841,
-            "lng": 114.1503,
-            "transport_to_next": {
-              "mode": "WALK",
-              "duration": "8 min",
-              "distance": "0.6 km",
-              "polyline": "encoded_polyline_string"
-            }
-          }
-        ]
-      }
-    ]
-  },
-  "tool_calls_made": ["get_weather", "search_places", "get_directions"]
+  "reply": "I have 3 flight options for you... ```json\n{...}\n```",
+  "itinerary": { "destination": "Tokyo", "flight": { "options": [...] }, "days": [...] },
+  "tool_calls_made": ["search_flights", "geocode_city", "get_day_windows"]
 }
 ```
 
-`itinerary` is null if the model didn't produce a structured itinerary
-(e.g. for a quick info question like "what's the weather in Tokyo?").
+`itinerary` is `null` if the model did not emit a fenced ```json
+block.
 
 ### Errors
 
 | Status | Meaning |
 |---|---|
-| `503` | `OPENROUTER_API_KEY` missing — add it to `.env` and restart |
-| `500` | LLM call failed — see backend logs for the underlying exception |
+| `503` | `XAI_API_KEY` missing (no Gemini fallback available either) |
+| `500` | LLM call failed — see backend logs |
 
-```bash
-curl -s -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "What should I do in Hong Kong tomorrow?"}'
-```
+---
+
+## `POST /chat/stream`
+
+Server-Sent Events version of `/chat`. Same request body. The stream
+emits four event types as the tool-call loop runs:
+
+| Event | Payload | When |
+|---|---|---|
+| `tool_start` | `{name, args}` | About to dispatch a tool |
+| `tool_end` | `{name, ok, error?}` | Tool returned / raised |
+| `partial_itinerary` | `{itinerary}` | Model emitted an interim JSON block (e.g. flight options before the full itinerary lands) |
+| `done` | same shape as `POST /chat` response | Loop exhausted or final text produced |
+
+Clients consume this for the live "AGENT WORKING" subtitle ticker
+and to render flight options ~7 s before the full response (see
+`docs/perf/streaming-benchmark.md`).
 
 ---
 
 ## `POST /itinerary`
 
-Save a structured itinerary in memory and return its short ID. The
-store is in-memory only — restarting the server clears it.
+Save an itinerary in-memory and return a short ID. The store is
+process-local — a restart clears it.
 
-### Request
-
-```json
-{
-  "itinerary": {
-    "title": "Test Trip",
-    "destination": "Test City",
-    "days": []
-  }
-}
-```
-
-### Response
-
-```json
-{"id": "a1b2c3d4"}
-```
-
----
+**Request:** `{"itinerary": {...}}`  **Response:** `{"id": "a1b2c3d4"}`
 
 ## `GET /itinerary/{id}`
 
-Retrieve a previously-saved itinerary.
-
-```bash
-curl http://localhost:8000/itinerary/a1b2c3d4
-```
-
-Returns the full itinerary object that was saved, or 404 if the ID
-doesn't exist.
-
----
+Retrieve a previously-saved itinerary, or `404` if the ID is unknown.
 
 ## `POST /itinerary/optimize`
 
-Reorder a list of activities for shortest total travel distance using
-nearest-neighbor + 2-opt (see `backend/app/optimize.py`). Each activity
-must have `lat` and `lng`.
+Reorder activities for shortest total travel distance using
+haversine + nearest-neighbor + 2-opt (see `backend/app/optimize.py`).
+Each activity must have `lat` and `lng`.
 
-### Request
+**Request**
 
 ```json
 {
   "activities": [
-    {"name": "Central", "lat": 22.2819, "lng": 114.1577, "extra": {"time": "09:00"}},
-    {"name": "Shek O", "lat": 22.2298, "lng": 114.2519, "extra": {"time": "12:00"}},
-    {"name": "Wan Chai", "lat": 22.2783, "lng": 114.1747, "extra": {"time": "14:00"}}
+    {"name": "Central", "lat": 22.28, "lng": 114.16, "extra": {"time": "09:00"}},
+    {"name": "Shek O",  "lat": 22.23, "lng": 114.25, "extra": {"time": "12:00"}}
   ]
 }
 ```
 
-The `extra` dict is a free-form passthrough — anything you put in it
-comes back in the response unchanged. Use it to attach `time`,
-`address`, `photo_url`, `description`, etc. so you don't have to look
-up activities by name after the call.
-
-### Response
+**Response**
 
 ```json
 {
-  "ordered": [
-    {"name": "Central", "lat": 22.2819, "lng": 114.1577, "time": "09:00"},
-    {"name": "Wan Chai", "lat": 22.2783, "lng": 114.1747, "time": "14:00"},
-    {"name": "Shek O", "lat": 22.2298, "lng": 114.2519, "time": "12:00"}
-  ],
+  "ordered": [...],
   "distance_km_before": 32.4,
   "distance_km_after": 19.8,
   "savings_pct": 38.9
 }
 ```
 
-### Errors
-
-| Status | Meaning |
-|---|---|
-| `400` | Fewer than 2 activities supplied |
+Returns `400` if fewer than 2 activities are supplied.
 
 ---
 
 ## `GET /photo/{photo_name:path}`
 
-Streams a Google Places photo through the backend so the API key never
-reaches the browser. `photo_name` is a Places API resource path like
-`places/ChIJ.../photos/Ae...` (it can contain slashes — the `:path`
-converter accepts them).
+Streams a Google Places photo through the backend so the API key
+never reaches the browser. `photo_name` is a Places resource path
+like `places/ChIJ.../photos/Ae...`.
 
-```bash
-curl -o ramen.jpg \
-  "http://localhost:8000/photo/places/ChIJabc/photos/AeXyz?max_width=800"
+Query: `max_width` (int, default `800`, Google supports up to 4800).
+
+Response: `200` with `Content-Type: image/jpeg` and
+`Cache-Control: public, max-age=86400`, or `503` / `502` / forwarded
+Google status on failure.
+
+---
+
+## `GET /geo/reverse`
+
+Reverse-geocode a `lat,lng` pair into `{city, country, country_code}`
+via Google Geocoding API. Query: `lat=...&lng=...`. Used by the
+browser geolocation flow so the LLM can prefill an origin city.
+
+---
+
+## `POST /api/directions`
+
+Thin proxy around the `get_directions` tool for one-off frontend
+requests outside the LLM loop (e.g. re-routing a day after a manual
+reorder). Body: `{origin, destination, mode}`. Returns
+`{duration, distance, polyline, steps}`.
+
+---
+
+## `POST /speech/tts`
+
+Generate speech audio from text using Google Cloud TTS Neural2.
+Response is `audio/mpeg` bytes if TTS is configured, `503` if no
+service-account credentials, or `204` if the text is empty after
+sanitisation. The frontend falls back to the browser
+`SpeechSynthesis` API on `503` / `204`.
+
+---
+
+## `GET /status`
+
+Service-status dashboard endpoint. Returns the health of every
+upstream provider we depend on:
+
+```json
+{
+  "llm_primary":   {"ok": true,  "model": "grok-4.20-0309-non-reasoning"},
+  "llm_fallback":  {"ok": true,  "model": "gemini-3.1-pro-preview"},
+  "google_maps":   {"ok": true,  "places": true, "routes": true, "weather": true},
+  "flights":       {"ok": true,  "provider": "fast-flights"},
+  "tts":           {"ok": false, "reason": "GOOGLE_TTS_CREDENTIALS not set"}
+}
 ```
 
-### Query parameters
+Rendered by the `ServiceStatusOverlay` (press `C` in the UI).
 
-| Name | Type | Default | Description |
-|---|---|---|---|
-| `max_width` | int | `800` | Max width in pixels (Google supports up to 4800) |
+---
 
-### Response
+## `GET /visa/check`
 
-`200 OK` with `Content-Type: image/jpeg` (or whatever Google returns)
-and a `Cache-Control: public, max-age=86400` header. The image bytes
-are streamed.
+Look up visa / entry-policy requirements from the static dataset in
+`backend/app/data/visa_hk.json` (curated for HK SAR passport
+holders; extendable via `visa_mock.json`). Query:
+`destination=<iso-3-or-country-name>`. Returns
+`{required, visa_on_arrival, eta, duration_days, notes}` or `null`
+if the destination is not in the dataset.
 
-### Errors
+---
 
-| Status | Meaning |
-|---|---|
-| `503` | `GOOGLE_MAPS_API_KEY` missing |
-| `502` | Upstream Google fetch failed |
-| `4xx` | Whatever code Google returned upstream (forwarded as-is) |
+## `GET /airports/search`
+
+Search the bundled airport database (`backend/app/data/airports.json`)
+by name, city, country, or IATA code. Query:
+`query=Tokyo&limit=5`. Returns up to `limit` matching airports with
+IATA code + city + country; used by the `AirportCombobox` UI and
+the LLM `search_airports` tool.
+
+---
+
+## `POST /export/pdf`
+
+Render a printable PDF of the current itinerary using weasyprint
+against the Jinja2 template in `backend/app/templates/itinerary.html`.
+Body: `{itinerary, visa?}`. Response: `application/pdf` bytes with a
+`Content-Disposition: attachment; filename=itinerary-<dest>.pdf`
+header.
+
+See `frontend/src/utils/exportKml.js` for the companion KML exporter
+(runs entirely in the browser — no backend round-trip needed).
