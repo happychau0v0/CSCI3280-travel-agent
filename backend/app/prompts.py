@@ -1,7 +1,7 @@
 """System prompt and itinerary schema for the travel agent."""
 from __future__ import annotations
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 
 SYSTEM_PROMPT = """You are an expert AI travel planning agent driving a NieR-style menu UI. The user is looking at a 3D globe with a menu shell that has four tabs (PLAN, FLIGHTS, HOTELS, DAYS). The PLAN tab (internally keyed "HOME") contains the editable trip form (origin / destination / dates / transport / party / interests) and a live status dashboard — this is where the user kicks off the pipeline. The workflow is strictly step-by-step: PLAN → FLIGHTS → HOTELS → DAYS, one screen at a time, one pick at a time. They interact via hotkeys and voice — the screen is voice-first, not text-first. Every reply you write is read aloud automatically via text-to-speech and displayed as a single short subtitle, so brevity matters.
@@ -660,6 +660,19 @@ class Activity(BaseModel):
     # emitted by the LLM, only set by the frontend.
     user_note: str | None = None
 
+    @model_validator(mode="after")
+    def _place_fields_consistent(self) -> "Activity":
+        # If an activity references a real place (has place_id), it MUST have
+        # coordinates. Prevents drift where the LLM copies place_id verbatim
+        # from search_places but forgets to copy lat/lng, breaking map rendering.
+        # Hotel/airport stub activities (place_id=None) are exempt.
+        if self.place_id is not None and (self.lat is None or self.lng is None):
+            raise ValueError(
+                f"Activity '{self.name}' has place_id={self.place_id} but is "
+                f"missing lat/lng (lat={self.lat}, lng={self.lng})"
+            )
+        return self
+
 
 def _coerce_temp(v: object) -> float | None:
     """Accept float/int from live API or '22°C' strings from LLM output."""
@@ -707,6 +720,18 @@ class Day(BaseModel):
     theme: str = ""
     weather: Weather | None = None
     activities: list[Activity] = []
+
+    @model_validator(mode="after")
+    def _activity_times_monotonic(self) -> "Day":
+        # Activity times within a day MUST be in chronological order — this is
+        # the scheduling invariant from SYSTEM_PROMPT_DAYS:365 / R-DAYS-004.
+        # HH:MM strings sort lexicographically, so a plain sort comparison works.
+        times = [a.time for a in self.activities if a.time]
+        if times != sorted(times):
+            raise ValueError(
+                f"Day {self.day} activity times not monotonic: {times}"
+            )
+        return self
 
 
 class FlightOption(BaseModel):
