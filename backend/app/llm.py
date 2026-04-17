@@ -354,6 +354,13 @@ async def _run_loop(
         [t for t in TOOL_DEFINITIONS if t["function"]["name"] in allowed]
         if allowed is not None else list(TOOL_DEFINITIONS)
     )
+    # Providers reject `tool_choice="auto"` when `tools=[]` (400 Bad Request
+    # on xAI / Gemini OpenAI-compat endpoints). For no-tool roles like
+    # day_themes we must omit both fields entirely.
+    _tool_kwargs: dict = (
+        {"tools": tools_for_role, "tool_choice": "auto"}
+        if tools_for_role else {}
+    )
 
     # Scoped calls (plan/hotels/days) must NOT see prior conversation history —
     # each is a fresh, single-purpose call. Only the system prompt + the one
@@ -398,9 +405,8 @@ async def _run_loop(
                 stream = await client.chat.completions.create(
                     model=active_model,
                     messages=full_messages,
-                    tools=tools_for_role,
-                    tool_choice="auto",
                     stream=True,
+                    **_tool_kwargs,
                 )
                 content_chunks: list[str] = []
                 # tc_accum keys are logical slot indices.
@@ -480,8 +486,7 @@ async def _run_loop(
                 response = await client.chat.completions.create(
                     model=active_model,
                     messages=full_messages,
-                    tools=tools_for_role,
-                    tool_choice="auto",
+                    **_tool_kwargs,
                 )
                 msg = response.choices[0].message
         except (openai.APIStatusError, openai.APIConnectionError) as exc:

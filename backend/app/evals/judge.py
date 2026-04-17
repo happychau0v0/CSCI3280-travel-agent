@@ -1,11 +1,14 @@
 """LLM-as-judge wrapper for rubrics that can't be checked with regex.
 
 Used by LLM-JUDGE-category rubrics in rubrics.py. Calls a small/cheap
-model (Haiku 4.5 or Gemini Flash by default) with a strict-judge prompt,
-parses the one-line JSON verdict.
+Gemini Flash model by default (different provider from the xAI primary,
+so we're not self-grading), parses the one-line JSON verdict.
 
 Not invoked in unit tests — each call costs ~$0.001-0.01 and adds ~1-2s
 latency. Reserve for scheduled eval runs only.
+
+Override with EVAL_JUDGE_MODEL / EVAL_JUDGE_BASE_URL / EVAL_JUDGE_API_KEY
+if you want to point at OpenRouter, Anthropic, or a different Gemini model.
 """
 from __future__ import annotations
 
@@ -16,11 +19,13 @@ import re
 
 from openai import AsyncOpenAI
 
+from app.config import GEMINI_API_KEY, GEMINI_BASE_URL
+
 logger = logging.getLogger(__name__)
 
 
-JUDGE_MODEL = os.getenv("EVAL_JUDGE_MODEL", "anthropic/claude-haiku-4-5")
-JUDGE_BASE_URL = os.getenv("EVAL_JUDGE_BASE_URL", "https://openrouter.ai/api/v1")
+JUDGE_MODEL = os.getenv("EVAL_JUDGE_MODEL", "gemini-2.5-flash")
+JUDGE_BASE_URL = os.getenv("EVAL_JUDGE_BASE_URL", GEMINI_BASE_URL)
 
 JUDGE_SYSTEM_PROMPT = """You are a strict evaluator grading an LLM response
 against a single rubric rule.
@@ -61,9 +66,14 @@ async def judge(
     {"verdict": "SKIP", "reason": "<error>"}. The eval runner treats
     SKIP as inconclusive and flags it in the report.
     """
-    api_key = api_key or os.getenv("OPENROUTER_API_KEY") or os.getenv("EVAL_JUDGE_API_KEY")
+    api_key = (
+        api_key
+        or os.getenv("EVAL_JUDGE_API_KEY")
+        or (GEMINI_API_KEY if JUDGE_BASE_URL == GEMINI_BASE_URL else None)
+        or os.getenv("OPENROUTER_API_KEY")
+    )
     if not api_key:
-        return {"verdict": "SKIP", "reason": "no OPENROUTER_API_KEY for judge"}
+        return {"verdict": "SKIP", "reason": "no judge API key configured"}
 
     client = AsyncOpenAI(base_url=JUDGE_BASE_URL, api_key=api_key)
     try:

@@ -60,7 +60,9 @@ _HISTORY = [
 
 @pytest.mark.asyncio
 async def test_day_themes_uses_empty_tool_list():
-    """day_themes must pass tools=[] to the LLM (no tools allowed)."""
+    """day_themes has an empty allow-list → `tools` and `tool_choice`
+    must be OMITTED entirely. Providers (xAI / Gemini OpenAI-compat)
+    reject `tool_choice="auto"` with an empty tools array as 400."""
     captured: list[dict] = []
     fake_client = _make_fake_client(captured)
 
@@ -72,8 +74,11 @@ async def test_day_themes_uses_empty_tool_list():
         )
 
     assert captured, "LLM create was never called"
-    assert captured[0]["tools"] == [], (
-        f"Expected tools=[], got {captured[0]['tools']}"
+    assert "tools" not in captured[0], (
+        f"Expected tools field omitted; got {captured[0].get('tools')!r}"
+    )
+    assert "tool_choice" not in captured[0], (
+        f"Expected tool_choice omitted; got {captured[0].get('tool_choice')!r}"
     )
 
 

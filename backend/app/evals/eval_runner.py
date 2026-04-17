@@ -6,15 +6,23 @@ docs/bench-models-*.md files).
 
 Usage:
     cd backend && source .venv/bin/activate
-    python -m app.evals.eval_runner --suite=app/evals/prompt_suite.yaml \
-        --model=x-ai/grok-4.20 --out=docs/bench-$(date +%F).md
+    python -m app.evals.eval_runner --suite=app/evals/prompt_suite.yaml \\
+        --model=grok-4.20-0309-non-reasoning \\
+        --out=../docs/bench-$(date +%F).md
 
-Requires:
-    OPENROUTER_API_KEY in env (for chat() calls)
-    XAI_API_KEY if running against xAI direct
+Requires (all loaded from backend/.env via app.config):
+    XAI_API_KEY     — primary Grok calls on api.x.ai
+    GEMINI_API_KEY  — fallback path + default LLM-judge model
+    GOOGLE_MAPS_API_KEY — for search_places / get_directions /
+                          get_weather / geocode_city tool calls
 
-Cost: roughly $0.50-2 per full suite run against Grok-4.20, depending
-on rubric LLM-judge count.
+Override models with:
+    --model=<name>            main LLM (xAI if no 'gemini' prefix;
+                              else Gemini via FALLBACK_LLM_MODEL path)
+    EVAL_JUDGE_MODEL=<name>   LLM-judge model (default: gemini-2.5-flash)
+
+Cost: ~$0.50-2 per full suite run against Grok-4.20, depending on
+rubric LLM-judge count.
 """
 from __future__ import annotations
 

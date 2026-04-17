@@ -101,6 +101,13 @@ async def test_role_uses_correct_tool_allow_list(role, expected):
         )
 
     assert captured, f"LLM create was never called for role={role}"
+    # Empty allow-list → `tools` and `tool_choice` are omitted entirely
+    # (providers reject tool_choice="auto" with tools=[]).
+    if not expected:
+        assert "tools" not in captured[0], (
+            f"Role {role!r} has empty allow-list but tools field was sent"
+        )
+        return
     tool_names = {t["function"]["name"] for t in captured[0]["tools"]}
     assert tool_names == expected, (
         f"Role {role!r} exposed tools {sorted(tool_names)}; "
