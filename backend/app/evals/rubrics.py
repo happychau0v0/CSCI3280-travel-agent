@@ -225,6 +225,41 @@ def check_R_CHAT_001_no_data_fetch_tools(
     return RubricResult.pass_(rid)
 
 
+def check_R_PLAN_004_must_call_search_flights_and_geocode(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-PLAN-004: if response has flight options, both search_flights AND
+    geocode_city MUST be in tool_calls_made."""
+    rid = "R-PLAN-004"
+    itinerary = response.get("itinerary") or {}
+    flight = itinerary.get("flight") or {}
+    options = flight.get("options") if isinstance(flight, dict) else None
+    if not options:
+        return RubricResult.skip(rid, "no flight options to verify")
+    calls = response.get("tool_calls_made", [])
+    missing = [t for t in ("search_flights", "geocode_city") if t not in calls]
+    if missing:
+        return RubricResult.fail(rid, f"missing required calls: {missing}")
+    return RubricResult.pass_(rid)
+
+
+def check_R_HOTELS_003_must_call_search_places(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-HOTELS-003: hotels role — if response returns hotels,
+    search_places MUST have fired."""
+    rid = "R-HOTELS-003"
+    if context.get("call_role") != "hotels":
+        return RubricResult.skip(rid, "not hotels role")
+    itinerary = response.get("itinerary") or {}
+    hotels = itinerary.get("hotels") or []
+    if not hotels:
+        return RubricResult.skip(rid, "no hotels in response")
+    if "search_places" not in response.get("tool_calls_made", []):
+        return RubricResult.fail(rid, "hotels returned but no search_places call")
+    return RubricResult.pass_(rid)
+
+
 # ─── registry ───────────────────────────────────────────────────────────────
 
 
@@ -239,7 +274,9 @@ RUBRICS: dict[str, Callable[[dict, dict], RubricResult]] = {
     "R-G-002": check_R_G_002_transport_preceded_by_directions,
     "R-G-003": check_R_G_003_weather_preceded_by_get_weather,
     "R-PLAN-002": check_R_PLAN_002_country_triggers_request_input,
+    "R-PLAN-004": check_R_PLAN_004_must_call_search_flights_and_geocode,
     "R-CHAT-001": check_R_CHAT_001_no_data_fetch_tools,
+    "R-HOTELS-003": check_R_HOTELS_003_must_call_search_places,
 }
 
 

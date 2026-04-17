@@ -292,6 +292,91 @@ class TestR_CHAT_001:
         assert r[0].verdict == "SKIP"
 
 
+# ─── R-PLAN-004: MUST call search_flights + geocode_city ───────────────────
+
+
+class TestR_PLAN_004:
+    def test_pass_when_both_calls_fired(self):
+        response = {
+            "itinerary": {"flight": {"options": [{"airline": "ANA"}]}},
+            "tool_calls_made": ["search_flights", "geocode_city", "navigate_menu"],
+        }
+        r = run_rubrics(response, {"call_role": "plan"}, ["R-PLAN-004"])
+        assert r[0].verdict == "PASS"
+
+    def test_fail_when_geocode_missing(self):
+        response = {
+            "itinerary": {"flight": {"options": [{"airline": "ANA"}]}},
+            "tool_calls_made": ["search_flights", "navigate_menu"],
+        }
+        r = run_rubrics(response, {"call_role": "plan"}, ["R-PLAN-004"])
+        assert r[0].verdict == "FAIL"
+        assert "geocode_city" in r[0].reason
+
+    def test_fail_when_search_flights_missing(self):
+        response = {
+            "itinerary": {"flight": {"options": [{"airline": "ANA"}]}},
+            "tool_calls_made": ["geocode_city", "navigate_menu"],
+        }
+        r = run_rubrics(response, {"call_role": "plan"}, ["R-PLAN-004"])
+        assert r[0].verdict == "FAIL"
+        assert "search_flights" in r[0].reason
+
+    def test_skip_when_no_flight_options(self):
+        response = {
+            "itinerary": {"flight": None},
+            "tool_calls_made": ["request_input"],
+        }
+        r = run_rubrics(response, {"call_role": "plan"}, ["R-PLAN-004"])
+        assert r[0].verdict == "SKIP"
+
+    def test_skip_when_flight_present_but_options_empty(self):
+        response = {
+            "itinerary": {"flight": {"options": []}},
+            "tool_calls_made": [],
+        }
+        r = run_rubrics(response, {"call_role": "plan"}, ["R-PLAN-004"])
+        assert r[0].verdict == "SKIP"
+
+
+# ─── R-HOTELS-003: MUST call search_places when hotels returned ─────────────
+
+
+class TestR_HOTELS_003:
+    def test_pass_when_search_places_fired(self):
+        response = {
+            "itinerary": {"hotels": [{"name": "Park Hyatt"}, {"name": "Grand Hyatt"}]},
+            "tool_calls_made": ["search_places", "get_weather", "navigate_menu"],
+        }
+        r = run_rubrics(response, {"call_role": "hotels"}, ["R-HOTELS-003"])
+        assert r[0].verdict == "PASS"
+
+    def test_fail_when_hotels_returned_without_search(self):
+        response = {
+            "itinerary": {"hotels": [{"name": "Park Hyatt"}]},
+            "tool_calls_made": ["get_weather", "navigate_menu"],
+        }
+        r = run_rubrics(response, {"call_role": "hotels"}, ["R-HOTELS-003"])
+        assert r[0].verdict == "FAIL"
+        assert "search_places" in r[0].reason
+
+    def test_skip_when_not_hotels_role(self):
+        response = {
+            "itinerary": {"hotels": [{"name": "X"}]},
+            "tool_calls_made": [],
+        }
+        r = run_rubrics(response, {"call_role": "plan"}, ["R-HOTELS-003"])
+        assert r[0].verdict == "SKIP"
+
+    def test_skip_when_no_hotels_in_response(self):
+        response = {
+            "itinerary": {"hotels": []},
+            "tool_calls_made": [],
+        }
+        r = run_rubrics(response, {"call_role": "hotels"}, ["R-HOTELS-003"])
+        assert r[0].verdict == "SKIP"
+
+
 # ─── runner contract ────────────────────────────────────────────────────────
 
 

@@ -21,10 +21,11 @@
     user_location: Hong Kong
     today: "2026-04-17"
   rubrics:
-    - R-G-004   # prose outside json
-    - R-G-005   # no markdown
-    - R-G-006   # no bullets
-    - R-G-015   # subtitle length
+    - R-G-004     # prose outside json
+    - R-G-005     # no markdown
+    - R-G-006     # no bullets
+    - R-G-015     # subtitle length
+    - R-PLAN-004  # must call search_flights + geocode_city
 
 # ─── Plan role — country destination should clarify ────────────────────────
 
@@ -71,11 +72,12 @@
     user_location: Hong Kong
     today: "2026-04-17"
   rubrics:
-    - R-G-002   # transport tool-first
-    - R-G-003   # weather tool-first
+    - R-G-002        # transport tool-first
+    - R-G-003        # weather tool-first
     - R-G-004
     - R-G-005
     - R-G-015
+    - R-HOTELS-003   # must call search_places when hotels returned
 
 # ─── Chat role — must not call data-fetch tools ────────────────────────────
 

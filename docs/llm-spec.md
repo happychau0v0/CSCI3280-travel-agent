@@ -351,7 +351,7 @@ bottom of this section.
 | R-PLAN-001 Missing-date → `request_input` + STOP | COVERED (runtime) | `test_request_input_stops.py::test_request_input_in_batch_skips_concurrent_tools` asserts the loop breaks and concurrent `search_flights` / `navigate_menu` are dropped when `request_input` is in the batch. Behavioral half (LLM chooses `request_input`) is still GAP. |
 | R-PLAN-002 Country → `request_input` | RUBRIC READY | `rubrics.py::check_R_PLAN_002_country_triggers_request_input` + `test_eval_rubrics.py::TestR_PLAN_002` (3 unit tests). Awaits live eval run. |
 | R-PLAN-003 No text questions | GAP | Needs LLM-judge rubric (detect whether reply ends in a question mark in prose instead of going through `request_input`). |
-| R-PLAN-004 MUST call `search_flights` + `geocode_city` | GAP | No test asserts both fire. |
+| R-PLAN-004 MUST call `search_flights` + `geocode_city` | RUBRIC READY | `rubrics.py::check_R_PLAN_004_must_call_search_flights_and_geocode` + `test_eval_rubrics.py::TestR_PLAN_004` (5 unit tests). Awaits live eval run. |
 | R-PLAN-005 MUST NOT call `search_places` / `get_weather` / `get_place_details` | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[plan]` asserts the exact allow-list. |
 | R-PLAN-006 IATA extraction | GAP | — |
 | R-PLAN-007 Round-trip: two `search_flights` calls | COVERED | `test_itinerary_schema.py::TestRoundTripFlight` (5 tests) — asserts `flight.return_options` has ≥2 options, `flight.return_date` is set, outbound has ≥2 options. |
@@ -361,7 +361,7 @@ bottom of this section.
 | R-PLAN-011 `navigate_menu("FLIGHTS")` at end | PARTIAL | Playwright walkthrough step 3 (`CLAUDE.md:115`) — real browser observes panel change. No unit test. |
 | R-HOTELS-001 2-round cap | GAP | No test counts LLM rounds per role. |
 | R-HOTELS-002 Destination = actual flight city | GAP | — |
-| R-HOTELS-003 MUST call `search_places` | GAP | — |
+| R-HOTELS-003 MUST call `search_places` | RUBRIC READY | `rubrics.py::check_R_HOTELS_003_must_call_search_places` + `test_eval_rubrics.py::TestR_HOTELS_003` (4 unit tests). Awaits live eval run. |
 | R-HOTELS-004 Allow-list (post-D2: `search_places`, `get_weather`, `navigate_menu`) | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[hotels]` + `test_hotels_allow_list_excludes_get_place_details`. |
 | R-HOTELS-005 5-8 hotels (post-D3) | PARTIAL | `TestGoldenTokyoFull::test_has_enough_hotels` (≥3); upper bound 8 not asserted. GAP on neighborhood diversity. |
 | R-HOTELS-006 Output shape | COVERED | `TestGoldenTokyoFull::test_hotels_have_required_fields`. |
