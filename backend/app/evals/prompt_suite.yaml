@@ -170,3 +170,67 @@
   rubrics:
     - R-CHAT-001
     - R-CHAT-008
+
+# ─── Chat role — multi-airport disambiguation (Tokyo → NRT/HND) ────────────
+
+- id: chat-plan-tokyo-multi-airport
+  call_role: chat
+  user_message: |
+    Plan a 4-day trip to Tokyo starting 2026-05-15 ending 2026-05-18.
+    Transport: plane.
+  context:
+    user_location: Hong Kong
+    today: "2026-04-17"
+    expects_airport_disambiguation: true
+  rubrics:
+    - R-CHAT-001
+    - R-CHAT-002   # search_airports + request_input with ≥2 Name (IATA) options
+    - R-CHAT-008
+
+# ─── Chat role — single-airport shortcut (Singapore → SIN) ────────────────
+
+- id: chat-plan-singapore-single-airport
+  call_role: chat
+  user_message: |
+    Plan a 5-day trip to Singapore starting 2026-06-01 ending 2026-06-05.
+    Transport: plane.
+  context:
+    user_location: Hong Kong
+    today: "2026-04-17"
+    expects_single_airport: true
+  rubrics:
+    - R-CHAT-003   # skip search_airports, go straight to submit_trip_form
+    - R-CHAT-005   # all four required fields present
+    - R-CHAT-008
+
+# ─── Chat role — missing end date triggers prompt ─────────────────────────
+
+- id: chat-plan-missing-end-date
+  call_role: chat
+  user_message: |
+    Plan a trip to Singapore starting 2026-06-01. Transport: plane.
+  context:
+    user_location: Hong Kong
+    today: "2026-04-17"
+    expects_end_date_prompt: true
+  rubrics:
+    - R-CHAT-004   # request_input('end_date') before submit_trip_form
+    - R-CHAT-008
+
+# ─── Chat role — relative date computation ────────────────────────────────
+
+# 2026-04-17 is a Friday, so "this Sunday" = 2026-04-19.
+# A 6-day inclusive trip runs 2026-04-19 → 2026-04-24 (5 full days between).
+- id: chat-relative-dates-6-day-this-sunday
+  call_role: chat
+  user_message: |
+    Plan a 6 day trip to Singapore starting this Sunday. Transport: plane.
+  context:
+    user_location: Hong Kong
+    today: "2026-04-17"
+    expected_start_date: "2026-04-19"
+    expected_end_date: "2026-04-24"
+  rubrics:
+    - R-CHAT-005
+    - R-CHAT-006
+    - R-CHAT-008

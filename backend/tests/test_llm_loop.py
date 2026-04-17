@@ -138,6 +138,55 @@ async def test_tool_results_captured_and_returned():
     assert tr["get_directions"][0]["duration"] == "15 mins"
 
 
+# ─── tool_calls_detail exposes per-call args ─────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_tool_calls_detail_captures_args():
+    """Rubrics that check tool arguments (e.g. R-CHAT-005) need args, not
+    just tool names. _run_loop should return tool_calls_detail — a list
+    of {name, args} dicts in call order."""
+
+    async def noop(**kwargs):
+        return {"ok": True}
+
+    round0 = _completion(_msg(
+        content="",
+        tool_calls=[
+            _tc("c1", "search_airports", {"query": "Tokyo"}),
+            _tc("c2", "submit_trip_form", {
+                "destination": "NRT",
+                "start_date": "2026-05-15",
+                "end_date": "2026-05-17",
+                "transport": "plane",
+            }),
+        ],
+    ))
+    round1 = _completion(_msg(content="done", tool_calls=None))
+
+    fake_client = SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=SimpleNamespace(
+                create=AsyncMock(side_effect=[round0, round1])
+            )
+        )
+    )
+
+    with patch.object(llm, "_get_client", return_value=fake_client), \
+         patch.object(llm, "TOOL_DISPATCH",
+                      {"search_airports": noop, "submit_trip_form": noop}):
+        result = await llm._run_loop([{"role": "user", "content": "plan"}])
+
+    assert "tool_calls_detail" in result
+    detail = result["tool_calls_detail"]
+    assert len(detail) == 2
+    assert detail[0]["name"] == "search_airports"
+    assert detail[0]["args"] == {"query": "Tokyo"}
+    assert detail[1]["name"] == "submit_trip_form"
+    assert detail[1]["args"]["destination"] == "NRT"
+    assert detail[1]["args"]["end_date"] == "2026-05-17"
+
+
 # ─── MAX_TOOL_ROUNDS guard ────────────────────────────────────────────────
 
 

@@ -381,11 +381,11 @@ bottom of this section.
 | R-DAYS-013 Complete `days[]` on single replace | GAP | Frontend-handled per `test_day_planning_roles.py:193-196` comment; no backend test. |
 | R-DAYS-014 `navigate_menu("DAYS")` | PARTIAL | Playwright step 6 (`CLAUDE.md:128`). |
 | R-CHAT-001 No planning tools | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[chat]` (static allow-list) + `rubrics.py::check_R_CHAT_001_no_data_fetch_tools` + `test_eval_rubrics.py::TestR_CHAT_001` (3 unit tests; catches runtime behavior). |
-| R-CHAT-002 Airport disambiguation | GAP | — |
-| R-CHAT-003 Single-airport shortcut | GAP | — |
-| R-CHAT-004 Always round-trip | GAP | — |
-| R-CHAT-005 4 fields for `submit_trip_form` | GAP | — |
-| R-CHAT-006 Relative date computation | GAP | — |
+| R-CHAT-002 Airport disambiguation | RUBRIC READY | `rubrics.py::check_R_CHAT_002_airport_disambiguation` + `test_eval_rubrics.py::TestR_CHAT_002` (4 unit tests) — fires only when `expects_airport_disambiguation=true` in fixture context; asserts both `search_airports` and `request_input` fired and the latter's options contain ≥2 `Name (IATA)` labels. Awaits live eval run. |
+| R-CHAT-003 Single-airport shortcut | RUBRIC READY | `rubrics.py::check_R_CHAT_003_single_airport_shortcut` + `test_eval_rubrics.py::TestR_CHAT_003` (3 unit tests) — fails if `search_airports` is called or `submit_trip_form` is skipped when `expects_single_airport=true`. Awaits live eval run. |
+| R-CHAT-004 Always round-trip | RUBRIC READY | `rubrics.py::check_R_CHAT_004_round_trip_requires_end_date` + `test_eval_rubrics.py::TestR_CHAT_004` (4 unit tests) — scans `tool_calls_detail` for `request_input(field='end_date')` before any `submit_trip_form`. Awaits live eval run. |
+| R-CHAT-005 4 fields for `submit_trip_form` | RUBRIC READY | `rubrics.py::check_R_CHAT_005_submit_trip_form_four_fields` + `test_eval_rubrics.py::TestR_CHAT_005` (4 unit tests) — checks destination is `^[A-Z]{3}$` IATA and start/end are `YYYY-MM-DD`. Awaits live eval run. |
+| R-CHAT-006 Relative date computation | RUBRIC READY | `rubrics.py::check_R_CHAT_006_relative_date_computation` + `test_eval_rubrics.py::TestR_CHAT_006` (3 unit tests) — compares `submit_trip_form` start/end args against `context.expected_start_date`/`expected_end_date` fixtures. Awaits live eval run. |
 | R-CHAT-007 Suggest, don't execute | PARTIAL | `design.md:260-261` documents; frontend state vars (`suggestedFlightIdx` etc.) would need UI tests. Playwright walkthrough covers via PICK button flow. |
 | R-CHAT-008 One-sentence reply | RUBRIC READY | `rubrics.py::check_R_CHAT_008_one_sentence_reply` + `test_eval_rubrics.py::TestR_CHAT_008` (4 unit tests) — rejects JSON blocks and >2-sentence replies. Awaits live eval run. |
 | R-REPLACE-001 Single `search_places` call | PARTIAL | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[replace]` asserts allow-list is exactly `{search_places}` — any other tool call is impossible at runtime. Call count (≤1 round) still not asserted. |

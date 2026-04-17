@@ -77,6 +77,7 @@ async def _run_one(item: dict, model: str | None) -> dict:
         "reply": result.get("reply", ""),
         "itinerary": result.get("itinerary"),
         "tool_calls_made": result.get("tool_calls_made", []),
+        "tool_calls_detail": result.get("tool_calls_detail", []),
         "tool_results": result.get("tool_results", {}),
         "error": None,
     }

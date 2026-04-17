@@ -755,6 +755,281 @@ class TestR_REPLACE_002:
         assert r[0].verdict == "SKIP"
 
 
+# ─── R-CHAT-002: multi-airport disambiguation ──────────────────────────────
+
+
+class TestR_CHAT_002:
+    def test_pass_when_search_airports_and_request_input_fire(self):
+        response = {
+            "tool_calls_made": ["search_airports", "request_input"],
+            "tool_calls_detail": [
+                {"name": "search_airports", "args": {"query": "Tokyo"}},
+                {"name": "request_input", "args": {
+                    "field": "destination",
+                    "prompt": "Which Tokyo airport?",
+                    "options": [
+                        "Narita International (NRT)",
+                        "Haneda International (HND)",
+                    ],
+                }},
+            ],
+        }
+        r = run_rubrics(
+            response,
+            {"call_role": "chat", "expects_airport_disambiguation": True},
+            ["R-CHAT-002"],
+        )
+        assert r[0].verdict == "PASS"
+
+    def test_fail_when_search_airports_missing(self):
+        response = {
+            "tool_calls_made": ["request_input"],
+            "tool_calls_detail": [
+                {"name": "request_input", "args": {"options": ["NRT", "HND"]}}
+            ],
+        }
+        r = run_rubrics(
+            response,
+            {"call_role": "chat", "expects_airport_disambiguation": True},
+            ["R-CHAT-002"],
+        )
+        assert r[0].verdict == "FAIL"
+        assert "search_airports" in r[0].reason
+
+    def test_fail_when_options_lack_iata(self):
+        response = {
+            "tool_calls_made": ["search_airports", "request_input"],
+            "tool_calls_detail": [
+                {"name": "search_airports", "args": {"query": "Tokyo"}},
+                {"name": "request_input", "args": {
+                    "field": "destination",
+                    "options": ["Tokyo airport", "Second airport"],
+                }},
+            ],
+        }
+        r = run_rubrics(
+            response,
+            {"call_role": "chat", "expects_airport_disambiguation": True},
+            ["R-CHAT-002"],
+        )
+        assert r[0].verdict == "FAIL"
+        assert "IATA" in r[0].reason or "(" in r[0].reason
+
+    def test_skip_when_context_does_not_expect_disambiguation(self):
+        response = {"tool_calls_made": ["submit_trip_form"]}
+        r = run_rubrics(response, {"call_role": "chat"}, ["R-CHAT-002"])
+        assert r[0].verdict == "SKIP"
+
+
+# ─── R-CHAT-003: single-airport city → direct submit_trip_form ────────────
+
+
+class TestR_CHAT_003:
+    def test_pass_when_single_airport_city_submits_directly(self):
+        response = {
+            "tool_calls_made": ["submit_trip_form"],
+            "tool_calls_detail": [
+                {"name": "submit_trip_form", "args": {"destination": "SIN"}},
+            ],
+        }
+        r = run_rubrics(
+            response,
+            {"call_role": "chat", "expects_single_airport": True},
+            ["R-CHAT-003"],
+        )
+        assert r[0].verdict == "PASS"
+
+    def test_fail_when_search_airports_called_for_single_airport_city(self):
+        response = {
+            "tool_calls_made": ["search_airports", "submit_trip_form"],
+            "tool_calls_detail": [
+                {"name": "search_airports", "args": {"query": "Singapore"}},
+                {"name": "submit_trip_form", "args": {"destination": "SIN"}},
+            ],
+        }
+        r = run_rubrics(
+            response,
+            {"call_role": "chat", "expects_single_airport": True},
+            ["R-CHAT-003"],
+        )
+        assert r[0].verdict == "FAIL"
+
+    def test_skip_when_not_expecting_single_airport(self):
+        response = {"tool_calls_made": ["submit_trip_form"]}
+        r = run_rubrics(response, {"call_role": "chat"}, ["R-CHAT-003"])
+        assert r[0].verdict == "SKIP"
+
+
+# ─── R-CHAT-004: always round-trip — request end_date if missing ─────────
+
+
+class TestR_CHAT_004:
+    def test_pass_when_request_input_end_date_before_submit(self):
+        response = {
+            "tool_calls_made": ["request_input", "submit_trip_form"],
+            "tool_calls_detail": [
+                {"name": "request_input", "args": {"field": "end_date"}},
+                {"name": "submit_trip_form", "args": {
+                    "destination": "NRT",
+                    "start_date": "2026-05-15",
+                    "end_date": "2026-05-17",
+                    "transport": "plane",
+                }},
+            ],
+        }
+        r = run_rubrics(
+            response,
+            {"call_role": "chat", "expects_end_date_prompt": True},
+            ["R-CHAT-004"],
+        )
+        assert r[0].verdict == "PASS"
+
+    def test_pass_when_only_request_input_end_date(self):
+        """LLM may stop after request_input, waiting for user to provide it."""
+        response = {
+            "tool_calls_made": ["request_input"],
+            "tool_calls_detail": [
+                {"name": "request_input", "args": {"field": "end_date"}},
+            ],
+        }
+        r = run_rubrics(
+            response,
+            {"call_role": "chat", "expects_end_date_prompt": True},
+            ["R-CHAT-004"],
+        )
+        assert r[0].verdict == "PASS"
+
+    def test_fail_when_submit_fires_without_end_date_prompt(self):
+        response = {
+            "tool_calls_made": ["submit_trip_form"],
+            "tool_calls_detail": [
+                {"name": "submit_trip_form", "args": {
+                    "destination": "NRT",
+                    "start_date": "2026-05-15",
+                    "transport": "plane",
+                }},
+            ],
+        }
+        r = run_rubrics(
+            response,
+            {"call_role": "chat", "expects_end_date_prompt": True},
+            ["R-CHAT-004"],
+        )
+        assert r[0].verdict == "FAIL"
+
+    def test_skip_when_not_expecting_end_date_prompt(self):
+        response = {"tool_calls_made": ["submit_trip_form"]}
+        r = run_rubrics(response, {"call_role": "chat"}, ["R-CHAT-004"])
+        assert r[0].verdict == "SKIP"
+
+
+# ─── R-CHAT-005: submit_trip_form has all four required fields ────────────
+
+
+class TestR_CHAT_005:
+    def test_pass_on_complete_submit(self):
+        response = {
+            "tool_calls_detail": [
+                {"name": "submit_trip_form", "args": {
+                    "destination": "NRT",
+                    "start_date": "2026-05-15",
+                    "end_date": "2026-05-17",
+                    "transport": "plane",
+                }}
+            ],
+        }
+        r = run_rubrics(response, {"call_role": "chat"}, ["R-CHAT-005"])
+        assert r[0].verdict == "PASS"
+
+    def test_fail_when_missing_end_date(self):
+        response = {
+            "tool_calls_detail": [
+                {"name": "submit_trip_form", "args": {
+                    "destination": "NRT",
+                    "start_date": "2026-05-15",
+                    "transport": "plane",
+                }}
+            ],
+        }
+        r = run_rubrics(response, {"call_role": "chat"}, ["R-CHAT-005"])
+        assert r[0].verdict == "FAIL"
+        assert "end_date" in r[0].reason
+
+    def test_fail_when_destination_is_not_iata(self):
+        response = {
+            "tool_calls_detail": [
+                {"name": "submit_trip_form", "args": {
+                    "destination": "Tokyo",
+                    "start_date": "2026-05-15",
+                    "end_date": "2026-05-17",
+                    "transport": "plane",
+                }}
+            ],
+        }
+        r = run_rubrics(response, {"call_role": "chat"}, ["R-CHAT-005"])
+        assert r[0].verdict == "FAIL"
+        assert "IATA" in r[0].reason or "3-letter" in r[0].reason
+
+    def test_skip_when_no_submit_call(self):
+        response = {
+            "tool_calls_detail": [
+                {"name": "request_input", "args": {"field": "end_date"}}
+            ],
+        }
+        r = run_rubrics(response, {"call_role": "chat"}, ["R-CHAT-005"])
+        assert r[0].verdict == "SKIP"
+
+
+# ─── R-CHAT-006: relative dates computed from TODAY ───────────────────────
+
+
+class TestR_CHAT_006:
+    def test_pass_when_dates_match_expected(self):
+        response = {
+            "tool_calls_detail": [
+                {"name": "submit_trip_form", "args": {
+                    "destination": "NRT",
+                    "start_date": "2026-04-19",
+                    "end_date": "2026-04-24",
+                    "transport": "plane",
+                }}
+            ],
+        }
+        context = {
+            "call_role": "chat",
+            "today": "2026-04-17",
+            "expected_start_date": "2026-04-19",
+            "expected_end_date": "2026-04-24",
+        }
+        r = run_rubrics(response, context, ["R-CHAT-006"])
+        assert r[0].verdict == "PASS"
+
+    def test_fail_when_dates_drift(self):
+        response = {
+            "tool_calls_detail": [
+                {"name": "submit_trip_form", "args": {
+                    "destination": "NRT",
+                    "start_date": "2026-04-20",  # off by 1 day
+                    "end_date": "2026-04-24",
+                    "transport": "plane",
+                }}
+            ],
+        }
+        context = {
+            "call_role": "chat",
+            "today": "2026-04-17",
+            "expected_start_date": "2026-04-19",
+            "expected_end_date": "2026-04-24",
+        }
+        r = run_rubrics(response, context, ["R-CHAT-006"])
+        assert r[0].verdict == "FAIL"
+
+    def test_skip_when_expected_dates_missing(self):
+        response = {"tool_calls_detail": []}
+        r = run_rubrics(response, {"call_role": "chat"}, ["R-CHAT-006"])
+        assert r[0].verdict == "SKIP"
+
+
 # ─── runner contract ────────────────────────────────────────────────────────
 
 

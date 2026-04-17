@@ -360,6 +360,10 @@ async def _run_loop(
     # (e.g. every place name the LLM emits must appear in a search_places
     # result from the same turn — see R-G-001 in docs/llm-spec.md).
     tool_results_by_name: dict[str, list[dict]] = {}
+    # Per-call detail cache: list of {name, args} in call order. Used by
+    # rubrics that need to inspect arguments, not just whether a tool fired
+    # (e.g. R-CHAT-005 checks submit_trip_form has all four required fields).
+    tool_calls_detail: list[dict] = []
     last_text = ""
 
     for round_idx in range(MAX_TOOL_ROUNDS):
@@ -541,6 +545,7 @@ async def _run_loop(
                 fn_args = {}
 
             tool_calls_made.append(fn_name)
+            tool_calls_detail.append({"name": fn_name, "args": fn_args})
             t0 = asyncio.get_event_loop().time()
             logger.info("Tool call: %s(%s)", fn_name, fn_args)
 
@@ -663,6 +668,7 @@ async def _run_loop(
         "reply": last_text,
         "itinerary": itinerary,
         "tool_calls_made": tool_calls_made,
+        "tool_calls_detail": tool_calls_detail,
         "tool_results": tool_results_by_name,
     }
 

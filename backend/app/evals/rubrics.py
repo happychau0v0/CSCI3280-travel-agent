@@ -433,6 +433,154 @@ def check_R_REPLACE_002_activity_place_id_grounded(
     return RubricResult.pass_(rid)
 
 
+def _find_detail_call(response: dict, name: str) -> dict | None:
+    """Return the first {name, args} entry in tool_calls_detail matching
+    `name`, or None."""
+    for call in response.get("tool_calls_detail") or []:
+        if call.get("name") == name:
+            return call
+    return None
+
+
+_IATA_RE = re.compile(r"^[A-Z]{3}$")
+_LABEL_IATA_RE = re.compile(r"\(([A-Z]{3})\)")
+
+
+def check_R_CHAT_002_airport_disambiguation(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-CHAT-002: multi-airport cities (Tokyo, London, NY) — LLM must call
+    search_airports AND request_input with 2+ 'Name (IATA)' options."""
+    rid = "R-CHAT-002"
+    if not context.get("expects_airport_disambiguation"):
+        return RubricResult.skip(rid, "context does not expect disambiguation")
+    if context.get("call_role") != "chat":
+        return RubricResult.skip(rid, "not chat role")
+    calls = response.get("tool_calls_made", [])
+    missing = [t for t in ("search_airports", "request_input") if t not in calls]
+    if missing:
+        return RubricResult.fail(rid, f"missing required calls: {missing}")
+    req = _find_detail_call(response, "request_input")
+    options = (req or {}).get("args", {}).get("options") or []
+    if len(options) < 2:
+        return RubricResult.fail(
+            rid, f"request_input options had {len(options)} items; need ≥2"
+        )
+    with_iata = [o for o in options if _LABEL_IATA_RE.search(str(o))]
+    if len(with_iata) < 2:
+        return RubricResult.fail(
+            rid,
+            f"options lack 'Name (IATA)' format — only {len(with_iata)} of "
+            f"{len(options)} contain a parenthesised IATA code",
+        )
+    return RubricResult.pass_(rid)
+
+
+def check_R_CHAT_003_single_airport_shortcut(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-CHAT-003: single-airport cities (SIN, HKG, BKK) skip
+    search_airports and submit_trip_form directly."""
+    rid = "R-CHAT-003"
+    if not context.get("expects_single_airport"):
+        return RubricResult.skip(rid, "context does not expect single-airport flow")
+    if context.get("call_role") != "chat":
+        return RubricResult.skip(rid, "not chat role")
+    calls = response.get("tool_calls_made", [])
+    if "search_airports" in calls:
+        return RubricResult.fail(
+            rid, "search_airports fired for a single-airport city; should skip it"
+        )
+    if "submit_trip_form" not in calls:
+        return RubricResult.fail(rid, "submit_trip_form did not fire")
+    return RubricResult.pass_(rid)
+
+
+def check_R_CHAT_004_round_trip_requires_end_date(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-CHAT-004: if end_date is missing, request_input('end_date', …)
+    MUST fire before submit_trip_form (or instead of it, to wait for user)."""
+    rid = "R-CHAT-004"
+    if not context.get("expects_end_date_prompt"):
+        return RubricResult.skip(rid, "context does not expect end_date prompt")
+    if context.get("call_role") != "chat":
+        return RubricResult.skip(rid, "not chat role")
+    detail = response.get("tool_calls_detail") or []
+    end_prompt_idx: int | None = None
+    submit_idx: int | None = None
+    for i, call in enumerate(detail):
+        if (
+            call.get("name") == "request_input"
+            and call.get("args", {}).get("field") == "end_date"
+        ):
+            end_prompt_idx = i if end_prompt_idx is None else end_prompt_idx
+        if call.get("name") == "submit_trip_form":
+            submit_idx = i if submit_idx is None else submit_idx
+    if end_prompt_idx is None:
+        return RubricResult.fail(
+            rid, "no request_input(field='end_date') call before submit_trip_form"
+        )
+    if submit_idx is not None and end_prompt_idx > submit_idx:
+        return RubricResult.fail(
+            rid, "request_input('end_date') fired AFTER submit_trip_form"
+        )
+    return RubricResult.pass_(rid)
+
+
+def check_R_CHAT_005_submit_trip_form_four_fields(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-CHAT-005: submit_trip_form requires destination (IATA), start_date
+    (YYYY-MM-DD), end_date (YYYY-MM-DD), transport — all four present."""
+    rid = "R-CHAT-005"
+    call = _find_detail_call(response, "submit_trip_form")
+    if not call:
+        return RubricResult.skip(rid, "no submit_trip_form call to verify")
+    args = call.get("args") or {}
+    required = ("destination", "start_date", "end_date", "transport")
+    missing = [f for f in required if not args.get(f)]
+    if missing:
+        return RubricResult.fail(rid, f"submit_trip_form missing fields: {missing}")
+    if not _IATA_RE.match(str(args.get("destination", ""))):
+        return RubricResult.fail(
+            rid,
+            f"destination {args.get('destination')!r} is not a 3-letter IATA code",
+        )
+    for field in ("start_date", "end_date"):
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(args[field])):
+            return RubricResult.fail(
+                rid, f"{field}={args[field]!r} not in YYYY-MM-DD format"
+            )
+    return RubricResult.pass_(rid)
+
+
+def check_R_CHAT_006_relative_date_computation(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-CHAT-006: relative dates ('this Sunday', '6 day trip') must be
+    correctly resolved against TODAY. The context supplies
+    expected_start_date / expected_end_date — we compare the submit args."""
+    rid = "R-CHAT-006"
+    expected_start = context.get("expected_start_date")
+    expected_end = context.get("expected_end_date")
+    if not (expected_start and expected_end):
+        return RubricResult.skip(rid, "no expected dates in context")
+    call = _find_detail_call(response, "submit_trip_form")
+    if not call:
+        return RubricResult.skip(rid, "submit_trip_form did not fire")
+    args = call.get("args") or {}
+    actual_start = args.get("start_date")
+    actual_end = args.get("end_date")
+    if actual_start != expected_start or actual_end != expected_end:
+        return RubricResult.fail(
+            rid,
+            f"got start={actual_start}/end={actual_end}; "
+            f"expected start={expected_start}/end={expected_end}",
+        )
+    return RubricResult.pass_(rid)
+
+
 def check_R_HOTELS_003_must_call_search_places(
     response: dict, context: dict
 ) -> RubricResult:
@@ -468,6 +616,11 @@ RUBRICS: dict[str, Callable[[dict, dict], RubricResult]] = {
     "R-PLAN-003": check_R_PLAN_003_no_text_question,
     "R-PLAN-004": check_R_PLAN_004_must_call_search_flights_and_geocode,
     "R-CHAT-001": check_R_CHAT_001_no_data_fetch_tools,
+    "R-CHAT-002": check_R_CHAT_002_airport_disambiguation,
+    "R-CHAT-003": check_R_CHAT_003_single_airport_shortcut,
+    "R-CHAT-004": check_R_CHAT_004_round_trip_requires_end_date,
+    "R-CHAT-005": check_R_CHAT_005_submit_trip_form_four_fields,
+    "R-CHAT-006": check_R_CHAT_006_relative_date_computation,
     "R-CHAT-008": check_R_CHAT_008_one_sentence_reply,
     "R-HOTELS-002": check_R_HOTELS_002_hotels_near_destination,
     "R-HOTELS-003": check_R_HOTELS_003_must_call_search_places,
