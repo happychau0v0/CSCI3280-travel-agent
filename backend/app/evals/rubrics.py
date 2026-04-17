@@ -21,10 +21,14 @@ Rubric IDs mirror docs/llm-spec.md requirement IDs.
 """
 from __future__ import annotations
 
+import inspect
+import json
 import math
 import re
 from dataclasses import dataclass
 from typing import Callable
+
+from app.evals.judge import judge
 
 
 @dataclass
@@ -581,6 +585,74 @@ def check_R_CHAT_006_relative_date_computation(
     return RubricResult.pass_(rid)
 
 
+# ─── LLM-JUDGE rubrics ──────────────────────────────────────────────────────
+
+
+_R_G_007_RULE = (
+    "The reply MUST NOT narrate intermediate tool calls or work-in-progress. "
+    "Examples of FAIL (narration): 'Let me search for flights now…', "
+    "'Now I'll look for hotels…', 'First, I'll call the weather API.', "
+    "'I found flights, now searching hotels…'. "
+    "Examples of PASS (no narration): direct statements about the trip "
+    "('Three days in Tokyo confirmed.'), greetings, clarifying questions "
+    "('Which Tokyo airport works best?'), or short result summaries. "
+    "The user wants a silent build, then a short summary — never running "
+    "commentary about the process."
+)
+
+
+async def check_R_G_007_no_tool_narration(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-G-007: LLM-judge checks that the reply does not narrate tool calls."""
+    rid = "R-G-007"
+    prose = strip_json_block(response.get("reply", ""))
+    if not prose:
+        return RubricResult.skip(rid, "no prose to judge")
+    verdict = await judge(_R_G_007_RULE, prose)
+    return RubricResult(rid, verdict.get("verdict", "SKIP"), verdict.get("reason", ""))
+
+
+_R_THEMES_004_RULE = (
+    "Day 1's theme MUST reflect the limited afternoon time when an "
+    "arrival_time is given in key_constraints (e.g. 'airport + light "
+    "check-in + nearby walk'). The last day's theme MUST fit activities "
+    "that end before the departure_time (e.g. 'quick local bites before "
+    "flight' rather than 'full day trek'). FAIL when theme contradicts "
+    "the timing constraint (e.g. 'full-day excursion' with 17:00 "
+    "departure)."
+)
+
+
+async def check_R_THEMES_004_day_timing(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-THEMES-004: LLM-judge checks that day 1 / last-day themes
+    account for arrival / departure timing constraints."""
+    rid = "R-THEMES-004"
+    days = (response.get("itinerary") or {}).get("days") or []
+    flight_days = [
+        d for d in days
+        if (d.get("key_constraints") or {}).get("arrival_time")
+        or (d.get("key_constraints") or {}).get("departure_time")
+    ]
+    if not flight_days:
+        return RubricResult.skip(rid, "no flight key_constraints to judge")
+    context_blob = json.dumps(
+        [
+            {
+                "day": d.get("day"),
+                "theme": d.get("theme"),
+                "key_constraints": d.get("key_constraints"),
+            }
+            for d in flight_days
+        ],
+        default=str,
+    )
+    verdict = await judge(_R_THEMES_004_RULE, context_blob)
+    return RubricResult(rid, verdict.get("verdict", "SKIP"), verdict.get("reason", ""))
+
+
 def check_R_HOTELS_003_must_call_search_places(
     response: dict, context: dict
 ) -> RubricResult:
@@ -622,6 +694,8 @@ RUBRICS: dict[str, Callable[[dict, dict], RubricResult]] = {
     "R-CHAT-005": check_R_CHAT_005_submit_trip_form_four_fields,
     "R-CHAT-006": check_R_CHAT_006_relative_date_computation,
     "R-CHAT-008": check_R_CHAT_008_one_sentence_reply,
+    "R-G-007": check_R_G_007_no_tool_narration,
+    "R-THEMES-004": check_R_THEMES_004_day_timing,
     "R-HOTELS-002": check_R_HOTELS_002_hotels_near_destination,
     "R-HOTELS-003": check_R_HOTELS_003_must_call_search_places,
     "R-REPLACE-002": check_R_REPLACE_002_activity_place_id_grounded,
@@ -635,9 +709,10 @@ def run_rubrics(
     context: dict,
     rubric_ids: list[str] | None = None,
 ) -> list[RubricResult]:
-    """Run a set of rubrics against one response.
+    """Run a set of SYNC rubrics against one response.
 
-    If rubric_ids is None, runs every registered rubric (useful for triage).
+    If rubric_ids is None, runs every registered sync rubric (async ones
+    are skipped with a clear reason so offline callers aren't surprised).
     Unknown IDs produce a SKIP result with a warning reason.
     """
     ids = rubric_ids if rubric_ids is not None else list(RUBRICS.keys())
@@ -647,8 +722,38 @@ def run_rubrics(
         if fn is None:
             results.append(RubricResult.skip(rid, f"no rubric function registered for {rid}"))
             continue
+        if inspect.iscoroutinefunction(fn):
+            results.append(RubricResult.skip(
+                rid, "async rubric — use arun_rubrics to evaluate"
+            ))
+            continue
         try:
             results.append(fn(response, context))
         except Exception as exc:  # noqa: BLE001 — top-level guard so one bad rubric doesn't tank the run
+            results.append(RubricResult.fail(rid, f"rubric raised: {exc}"))
+    return results
+
+
+async def arun_rubrics(
+    response: dict,
+    context: dict,
+    rubric_ids: list[str] | None = None,
+) -> list[RubricResult]:
+    """Async variant that awaits coroutine rubrics (LLM-judge) and runs
+    sync ones in-line. Use this when rubric_ids may include async
+    rubrics (R-G-007, R-THEMES-004, …)."""
+    ids = rubric_ids if rubric_ids is not None else list(RUBRICS.keys())
+    results: list[RubricResult] = []
+    for rid in ids:
+        fn = RUBRICS.get(rid)
+        if fn is None:
+            results.append(RubricResult.skip(rid, f"no rubric function registered for {rid}"))
+            continue
+        try:
+            ret = fn(response, context)
+            if inspect.iscoroutine(ret):
+                ret = await ret
+            results.append(ret)
+        except Exception as exc:  # noqa: BLE001
             results.append(RubricResult.fail(rid, f"rubric raised: {exc}"))
     return results

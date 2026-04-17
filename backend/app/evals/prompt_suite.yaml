@@ -24,6 +24,7 @@
     - R-G-004     # prose outside json
     - R-G-005     # no markdown
     - R-G-006     # no bullets
+    - R-G-007     # LLM-judge: no tool-call narration
     - R-G-015     # subtitle length
     - R-PLAN-004  # must call search_flights + geocode_city
 
@@ -119,6 +120,21 @@
     - R-G-002
     - R-G-003
     - R-G-004
+    - R-G-007      # LLM-judge: no tool-call narration
+
+# ─── Themes role — day 1 / last-day timing awareness ──────────────────────
+
+- id: themes-tokyo-flight-aware
+  call_role: day_themes
+  user_message: |
+    Assign themes to this 4-day Tokyo trip (2026-05-15 to 2026-05-18).
+    Day 1 arrival_time: 14:50. Day 4 departure_time: 17:00.
+    Transport: TRANSIT. Party: 2. Interests: food, history, shopping.
+  context:
+    user_location: Hong Kong
+    today: "2026-04-17"
+  rubrics:
+    - R-THEMES-004   # LLM-judge: day 1 / last-day themes fit flight timing
 
 # ─── Plan role — text-question discipline ──────────────────────────────────
 

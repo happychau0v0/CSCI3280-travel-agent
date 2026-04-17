@@ -334,7 +334,7 @@ bottom of this section.
 | R-G-004 Spoken text outside JSON | RUBRIC READY | `rubrics.py::check_R_G_004_has_prose_outside_json` + `test_eval_rubrics.py::TestR_G_004` (2 unit tests). Awaits live eval run. |
 | R-G-005 No markdown in reply | RUBRIC READY | `rubrics.py::check_R_G_005_no_markdown` + `test_eval_rubrics.py::TestR_G_005` (5 unit tests). Awaits live eval run. |
 | R-G-006 No bullets/paragraphs in reply | RUBRIC READY | `rubrics.py::check_R_G_006_no_bullets` + `test_eval_rubrics.py::TestR_G_006` (3 unit tests). Awaits live eval run. |
-| R-G-007 Don't narrate tool calls | GAP | Needs LLM-judge rubric (planned in `rubrics.py`; not yet implemented since regex can't detect narration reliably). |
+| R-G-007 Don't narrate tool calls | RUBRIC READY | `rubrics.py::check_R_G_007_no_tool_narration` (async LLM-judge via `judge.py`) + `test_eval_rubrics.py::TestR_G_007` (4 unit tests using mocked judge). Runs through `arun_rubrics` — eval_runner switched to the async path so judge calls actually fire during live runs. Awaits live eval run. |
 | R-G-008 `navigate_menu` once, at end | PARTIAL | Runtime: `llm.py:556-557` emits `navigate` event; no test caps count or position. Playwright walkthrough step 3 observes the panel actually advances to FLIGHTS after START PLANNING (`CLAUDE.md:114-115`). |
 | R-G-009 Batch tool calls | COVERED | `test_llm_loop.py::test_tools_run_in_parallel_via_gather` (`:44`). |
 | R-G-010 Honor USER LOCATION | COVERED (by construction) | `llm.py` injects the block; `test_chat.py::test_format_preferences_renders_user_profile_block` checks injection. No test asserts the LLM doesn't re-ask. |
@@ -399,7 +399,7 @@ bottom of this section.
 | R-THEMES-001 No tools | COVERED | `test_prompts_roles.py::test_day_themes_has_no_tools` + `test_day_planning_roles.py::test_day_themes_uses_empty_tool_list`. |
 | R-THEMES-002 Day count matches trip | COVERED | `test_itinerary_schema.py::TestDayThemesOutput::test_has_three_days` — 3-day fixture, asserts `len(days) == 3`. |
 | R-THEMES-003 Geographically distinct areas | COVERED | `TestDayThemesOutput::test_suggested_areas_are_geographically_distinct` — fails if any area name appears on more than one day. |
-| R-THEMES-004 Day 1 / last-day theming | GAP | — |
+| R-THEMES-004 Day 1 / last-day theming | RUBRIC READY | `rubrics.py::check_R_THEMES_004_day_timing` (async LLM-judge via `judge.py`) + `test_eval_rubrics.py::TestR_THEMES_004` (2 unit tests). Only days with `key_constraints.arrival_time`/`departure_time` are judged; middle days skip. Awaits live eval run. |
 | R-THEMES-005 `key_constraints` only on flight days | COVERED | `TestDayThemesOutput::test_key_constraints_only_on_flight_days` — asserts day 1 has `arrival_time`, last day has `departure_time`, middle days have no `key_constraints`. |
 | R-THEMES-006 Specific neighborhood names | COVERED | `TestDayThemesOutput::test_every_day_has_theme_and_areas` (3-5 areas) + `::test_suggested_areas_not_generic` (no "downtown"/"city center"). |
 | R-DETAIL-001 2-round cap | GAP | — |

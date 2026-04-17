@@ -7,8 +7,13 @@ rubric would mask real behavior regressions.
 """
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
 from app.evals.rubrics import (
     RubricResult,
+    arun_rubrics,
     count_words,
     run_rubrics,
     strip_json_block,
@@ -1028,6 +1033,120 @@ class TestR_CHAT_006:
         response = {"tool_calls_detail": []}
         r = run_rubrics(response, {"call_role": "chat"}, ["R-CHAT-006"])
         assert r[0].verdict == "SKIP"
+
+
+# ─── R-G-007: no tool-call narration (LLM-judge) ───────────────────────────
+
+
+class TestR_G_007:
+    @pytest.mark.asyncio
+    async def test_pass_when_judge_returns_pass(self):
+        response = {"reply": "Three days in Tokyo confirmed at Senso-ji temple."}
+        with patch(
+            "app.evals.rubrics.judge",
+            AsyncMock(return_value={"verdict": "PASS", "reason": "direct"}),
+        ):
+            results = await arun_rubrics(response, {}, ["R-G-007"])
+        assert results[0].verdict == "PASS"
+
+    @pytest.mark.asyncio
+    async def test_fail_when_judge_returns_fail(self):
+        response = {"reply": "Let me search for flights now, then look for hotels."}
+        with patch(
+            "app.evals.rubrics.judge",
+            AsyncMock(return_value={"verdict": "FAIL", "reason": "narrates"}),
+        ):
+            results = await arun_rubrics(response, {}, ["R-G-007"])
+        assert results[0].verdict == "FAIL"
+
+    @pytest.mark.asyncio
+    async def test_skip_when_no_prose(self):
+        response = {"reply": ""}
+        with patch(
+            "app.evals.rubrics.judge", AsyncMock()
+        ) as mock_judge:
+            results = await arun_rubrics(response, {}, ["R-G-007"])
+        assert results[0].verdict == "SKIP"
+        mock_judge.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_skip_when_judge_unavailable(self):
+        response = {"reply": "Three days confirmed."}
+        with patch(
+            "app.evals.rubrics.judge",
+            AsyncMock(return_value={"verdict": "SKIP", "reason": "no key"}),
+        ):
+            results = await arun_rubrics(response, {}, ["R-G-007"])
+        assert results[0].verdict == "SKIP"
+
+
+# ─── R-THEMES-004: day 1 / last-day themes account for flight timing ───────
+
+
+class TestR_THEMES_004:
+    @pytest.mark.asyncio
+    async def test_pass_when_judge_says_themes_fit_timing(self):
+        response = {
+            "itinerary": {
+                "days": [
+                    {
+                        "day": 1,
+                        "theme": "Airport arrival afternoon easy walk",
+                        "key_constraints": {"arrival_time": "14:50"},
+                    },
+                    {"day": 2, "theme": "Full Shibuya"},
+                    {
+                        "day": 3,
+                        "theme": "Relaxed shopping before 18:00 flight",
+                        "key_constraints": {"departure_time": "18:00"},
+                    },
+                ]
+            }
+        }
+        with patch(
+            "app.evals.rubrics.judge",
+            AsyncMock(return_value={"verdict": "PASS", "reason": "timing accounted"}),
+        ):
+            results = await arun_rubrics(response, {}, ["R-THEMES-004"])
+        assert results[0].verdict == "PASS"
+
+    @pytest.mark.asyncio
+    async def test_skip_when_no_key_constraints(self):
+        """No flight event means no constraint — skip."""
+        response = {
+            "itinerary": {
+                "days": [
+                    {"day": 1, "theme": "Sightseeing"},
+                    {"day": 2, "theme": "Food"},
+                ]
+            }
+        }
+        with patch("app.evals.rubrics.judge", AsyncMock()) as mock_judge:
+            results = await arun_rubrics(response, {}, ["R-THEMES-004"])
+        assert results[0].verdict == "SKIP"
+        mock_judge.assert_not_called()
+
+
+# ─── arun_rubrics runs both sync + async ───────────────────────────────────
+
+
+class TestArunRubrics:
+    @pytest.mark.asyncio
+    async def test_awaits_async_and_passes_sync_through(self):
+        response = {
+            "reply": "Three days confirmed.",
+            "itinerary": {},
+        }
+        with patch(
+            "app.evals.rubrics.judge",
+            AsyncMock(return_value={"verdict": "PASS", "reason": "ok"}),
+        ):
+            results = await arun_rubrics(
+                response, {}, ["R-G-004", "R-G-007"]
+            )
+        verdicts = {r.rubric_id: r.verdict for r in results}
+        assert verdicts["R-G-004"] == "PASS"
+        assert verdicts["R-G-007"] == "PASS"
 
 
 # ─── runner contract ────────────────────────────────────────────────────────

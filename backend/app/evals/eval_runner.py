@@ -83,9 +83,9 @@ async def _run_one(item: dict, model: str | None) -> dict:
     }
 
 
-def _render_report(results: list[dict], model: str) -> str:
+async def _render_report(results: list[dict], model: str) -> str:
     """Write the markdown report body; caller adds headers."""
-    from app.evals.rubrics import run_rubrics  # noqa: PLC0415
+    from app.evals.rubrics import arun_rubrics  # noqa: PLC0415
 
     rows: list[str] = []
     counts: Counter = Counter()
@@ -93,7 +93,7 @@ def _render_report(results: list[dict], model: str) -> str:
     for run in results:
         context = {**(run.get("context") or {}), "call_role": run.get("call_role")}
         rubric_ids = run.get("rubrics") or []
-        rubric_results = run_rubrics(run, context, rubric_ids)
+        rubric_results = await arun_rubrics(run, context, rubric_ids)
         for r in rubric_results:
             counts[r.verdict] += 1
             if r.verdict == "FAIL":
@@ -154,10 +154,11 @@ async def main(argv: list[str]) -> int:
         print(f"  - {item['id']}")
         result = await _run_one(item, args.model)
         result["call_role"] = item.get("call_role")
+        result["context"] = item.get("context") or {}
         result["rubrics"] = item.get("rubrics", [])
         results.append(result)
 
-    report = _render_report(results, args.model or "default")
+    report = await _render_report(results, args.model or "default")
 
     out_path = Path(args.out) if args.out else Path(
         f"docs/bench-{date.today().isoformat()}.md"
