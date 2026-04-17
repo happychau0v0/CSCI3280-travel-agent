@@ -353,13 +353,6 @@ export default function SettingsOverlay({
         }
       },
     },
-    {
-      kind: "action",
-      key: "about",
-      label: "ABOUT",
-      value: "v0.85",
-      onActivate: () => {},
-    },
   ];
 
   const selectedIdx = Math.min(activeIdx, rows.length - 1);
