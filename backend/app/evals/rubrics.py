@@ -585,6 +585,192 @@ def check_R_CHAT_006_relative_date_computation(
     return RubricResult.pass_(rid)
 
 
+# ─── Long-tail shape rubrics ────────────────────────────────────────────────
+
+
+def check_R_PLAN_006_iata_extraction(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-PLAN-006: search_flights origin/destination args must be 3-letter
+    IATA codes, not full airport labels or city names."""
+    rid = "R-PLAN-006"
+    sf_calls = [
+        c for c in (response.get("tool_calls_detail") or [])
+        if c.get("name") == "search_flights"
+    ]
+    if not sf_calls:
+        return RubricResult.skip(rid, "no search_flights call to verify")
+    violators: list[str] = []
+    for call in sf_calls:
+        args = call.get("args") or {}
+        for field in ("origin", "destination"):
+            val = str(args.get(field, ""))
+            if not _IATA_RE.match(val):
+                violators.append(f"{field}={val!r}")
+    if violators:
+        return RubricResult.fail(
+            rid, f"search_flights args not IATA: {violators}"
+        )
+    return RubricResult.pass_(rid, f"{len(sf_calls)} call(s), all IATA")
+
+
+_MEAL_RE = re.compile(
+    r"\b(breakfast|brunch|lunch|dinner|ramen|sushi|cafe|"
+    r"coffee|tea\s*house|restaurant|market|bakery|bar|izakaya|bistro|"
+    r"eatery|diner|food\s*court)\b",
+    re.IGNORECASE,
+)
+
+
+def check_R_DAYS_008_middle_day_meals(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-DAYS-008: every middle day must include at least 1 meal activity
+    (breakfast/lunch/dinner/ramen/market/etc.)."""
+    rid = "R-DAYS-008"
+    if context.get("call_role") != "days":
+        return RubricResult.skip(rid, "not days role")
+    days = (response.get("itinerary") or {}).get("days") or []
+    if len(days) < 3:
+        return RubricResult.skip(rid, "no middle days in a short trip")
+    mismatches: list[int] = []
+    for d in days[1:-1]:
+        activities = d.get("activities") or []
+        has_meal = any(
+            _MEAL_RE.search(a.get("name", "")) for a in activities
+        )
+        if not has_meal:
+            mismatches.append(d.get("day", "?"))
+    if mismatches:
+        return RubricResult.fail(
+            rid, f"middle day(s) without meals: {mismatches}"
+        )
+    return RubricResult.pass_(rid, f"{len(days) - 2} middle day(s) all have meals")
+
+
+def check_R_DAYS_011_activity_description_word_count(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-DAYS-011: each real (place_id-grounded) activity has a self-written
+    description of roughly 10-15 words (tolerance 8-20)."""
+    rid = "R-DAYS-011"
+    days = (response.get("itinerary") or {}).get("days") or []
+    grounded = [
+        a for d in days for a in (d.get("activities") or [])
+        if a.get("place_id")
+    ]
+    if not grounded:
+        return RubricResult.skip(rid, "no grounded activities")
+    violators: list[str] = []
+    for a in grounded:
+        desc = a.get("description") or ""
+        n = count_words(desc)
+        if n < 8 or n > 20:
+            violators.append(f"{a.get('name','?')} ({n} words)")
+    if violators:
+        return RubricResult.fail(
+            rid,
+            f"description(s) out of 8-20 word band: {violators[:3]}"
+            + (f" (+{len(violators) - 3} more)" if len(violators) > 3 else ""),
+        )
+    return RubricResult.pass_(rid, f"{len(grounded)} descriptions within band")
+
+
+def check_R_DETAIL_002_search_and_directions_counts(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-DETAIL-002: day_detail must call search_places once per suggested
+    area and get_directions for every consecutive pair of activities."""
+    rid = "R-DETAIL-002"
+    if context.get("call_role") != "day_detail":
+        return RubricResult.skip(rid, "not day_detail role")
+    areas = context.get("suggested_areas_count")
+    if areas is None:
+        return RubricResult.skip(rid, "suggested_areas_count missing from context")
+    calls = response.get("tool_calls_made") or []
+    sp_count = calls.count("search_places")
+    gd_count = calls.count("get_directions")
+    days = (response.get("itinerary") or {}).get("days") or []
+    pair_count = sum(
+        max(len(d.get("activities") or []) - 1, 0) for d in days
+    )
+    problems: list[str] = []
+    if sp_count < areas:
+        problems.append(
+            f"search_places count ({sp_count}) < suggested_areas ({areas})"
+        )
+    if pair_count and gd_count < pair_count:
+        problems.append(
+            f"get_directions count ({gd_count}) < activity pairs ({pair_count})"
+        )
+    if problems:
+        return RubricResult.fail(rid, "; ".join(problems))
+    return RubricResult.pass_(rid)
+
+
+_TRANSPORT_MODE_MAP = {
+    "transit": "TRANSIT",
+    "driving": "DRIVE",
+    "walking": "WALK",
+    "mixed": "TRANSIT",
+}
+
+
+def check_R_DETAIL_003_directions_mode_matches_transport(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-DETAIL-003: get_directions mode must match transport mode:
+    transit→TRANSIT, driving→DRIVE, walking→WALK, mixed→TRANSIT.
+    Never omit mode."""
+    rid = "R-DETAIL-003"
+    transport = context.get("local_transport_mode")
+    if not transport:
+        return RubricResult.skip(rid, "no local_transport_mode in context")
+    expected = _TRANSPORT_MODE_MAP.get(str(transport).lower())
+    if not expected:
+        return RubricResult.skip(rid, f"unknown transport mode {transport!r}")
+    gd_calls = [
+        c for c in (response.get("tool_calls_detail") or [])
+        if c.get("name") == "get_directions"
+    ]
+    if not gd_calls:
+        return RubricResult.skip(rid, "no get_directions calls")
+    offenders: list[str] = []
+    for call in gd_calls:
+        mode = (call.get("args") or {}).get("mode")
+        if mode is None:
+            offenders.append("missing mode")
+        elif mode != expected:
+            offenders.append(f"{mode!r} (expected {expected!r})")
+    if offenders:
+        return RubricResult.fail(
+            rid,
+            f"get_directions mode mismatch for transport={transport!r} "
+            f"(expected {expected!r}): {offenders[:3]}",
+        )
+    return RubricResult.pass_(rid, f"{len(gd_calls)} calls, mode={expected}")
+
+
+def check_R_REPLACE_003_preserve_time_and_duration(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-REPLACE-003: replacement keeps original time; duration_min may
+    change only if the activity is fundamentally different in type."""
+    rid = "R-REPLACE-003"
+    orig = context.get("original_activity")
+    if not orig:
+        return RubricResult.skip(rid, "no original_activity in context")
+    replace = (response.get("itinerary") or {}).get("replace") or {}
+    new_activity = replace.get("activity") or {}
+    orig_time = orig.get("time")
+    new_time = new_activity.get("time")
+    if new_time != orig_time:
+        return RubricResult.fail(
+            rid, f"time changed: was {orig_time!r}, now {new_time!r}"
+        )
+    return RubricResult.pass_(rid)
+
+
 # ─── LLM-JUDGE rubrics ──────────────────────────────────────────────────────
 
 
@@ -687,6 +873,12 @@ RUBRICS: dict[str, Callable[[dict, dict], RubricResult]] = {
     "R-PLAN-002": check_R_PLAN_002_country_triggers_request_input,
     "R-PLAN-003": check_R_PLAN_003_no_text_question,
     "R-PLAN-004": check_R_PLAN_004_must_call_search_flights_and_geocode,
+    "R-PLAN-006": check_R_PLAN_006_iata_extraction,
+    "R-DAYS-008": check_R_DAYS_008_middle_day_meals,
+    "R-DAYS-011": check_R_DAYS_011_activity_description_word_count,
+    "R-DETAIL-002": check_R_DETAIL_002_search_and_directions_counts,
+    "R-DETAIL-003": check_R_DETAIL_003_directions_mode_matches_transport,
+    "R-REPLACE-003": check_R_REPLACE_003_preserve_time_and_duration,
     "R-CHAT-001": check_R_CHAT_001_no_data_fetch_tools,
     "R-CHAT-002": check_R_CHAT_002_airport_disambiguation,
     "R-CHAT-003": check_R_CHAT_003_single_airport_shortcut,

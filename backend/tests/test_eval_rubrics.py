@@ -1035,6 +1035,352 @@ class TestR_CHAT_006:
         assert r[0].verdict == "SKIP"
 
 
+# ─── R-PLAN-006: IATA extraction in search_flights args ───────────────────
+
+
+class TestR_PLAN_006:
+    def test_pass_on_three_letter_iata_codes(self):
+        response = {
+            "tool_calls_detail": [
+                {"name": "search_flights", "args": {
+                    "origin": "HKG", "destination": "NRT",
+                    "date": "2026-05-15",
+                }}
+            ]
+        }
+        r = run_rubrics(response, {"call_role": "plan"}, ["R-PLAN-006"])
+        assert r[0].verdict == "PASS"
+
+    def test_fail_when_origin_is_full_label(self):
+        response = {
+            "tool_calls_detail": [
+                {"name": "search_flights", "args": {
+                    "origin": "Hong Kong International (HKG)",
+                    "destination": "NRT",
+                }}
+            ]
+        }
+        r = run_rubrics(response, {"call_role": "plan"}, ["R-PLAN-006"])
+        assert r[0].verdict == "FAIL"
+        assert "origin" in r[0].reason
+
+    def test_fail_when_destination_is_city_name(self):
+        response = {
+            "tool_calls_detail": [
+                {"name": "search_flights", "args": {
+                    "origin": "HKG", "destination": "Tokyo",
+                }}
+            ]
+        }
+        r = run_rubrics(response, {"call_role": "plan"}, ["R-PLAN-006"])
+        assert r[0].verdict == "FAIL"
+
+    def test_skip_when_no_search_flights_call(self):
+        response = {"tool_calls_detail": [
+            {"name": "request_input", "args": {}}
+        ]}
+        r = run_rubrics(response, {"call_role": "plan"}, ["R-PLAN-006"])
+        assert r[0].verdict == "SKIP"
+
+
+# ─── R-DAYS-008: middle-day meals pattern ─────────────────────────────────
+
+
+class TestR_DAYS_008:
+    def test_pass_when_middle_days_have_meals(self):
+        response = {
+            "itinerary": {
+                "days": [
+                    {"day": 1, "activities": [
+                        {"name": "NRT Airport · Arrival"},
+                        {"name": "Hotel · Check-in"},
+                    ]},
+                    {"day": 2, "activities": [
+                        {"name": "Tsukiji Outer Market breakfast"},
+                        {"name": "Senso-ji"},
+                        {"name": "Ichiran Ramen lunch"},
+                        {"name": "Harajuku"},
+                    ]},
+                    {"day": 3, "activities": [
+                        {"name": "Hotel · Check-out"},
+                        {"name": "Airport departure"},
+                    ]},
+                ]
+            }
+        }
+        r = run_rubrics(response, {"call_role": "days"}, ["R-DAYS-008"])
+        assert r[0].verdict == "PASS"
+
+    def test_fail_when_middle_day_has_no_meal(self):
+        response = {
+            "itinerary": {
+                "days": [
+                    {"day": 1, "activities": [{"name": "Airport"}]},
+                    {"day": 2, "activities": [
+                        {"name": "Senso-ji"},
+                        {"name": "Meiji Shrine"},
+                        {"name": "Harajuku walk"},
+                    ]},
+                    {"day": 3, "activities": [{"name": "Airport"}]},
+                ]
+            }
+        }
+        r = run_rubrics(response, {"call_role": "days"}, ["R-DAYS-008"])
+        assert r[0].verdict == "FAIL"
+
+    def test_skip_on_2_day_trip_no_middle_days(self):
+        response = {
+            "itinerary": {
+                "days": [
+                    {"day": 1, "activities": []},
+                    {"day": 2, "activities": []},
+                ]
+            }
+        }
+        r = run_rubrics(response, {"call_role": "days"}, ["R-DAYS-008"])
+        assert r[0].verdict == "SKIP"
+
+    def test_skip_when_not_days_role(self):
+        response = {"itinerary": {"days": []}}
+        r = run_rubrics(response, {"call_role": "plan"}, ["R-DAYS-008"])
+        assert r[0].verdict == "SKIP"
+
+
+# ─── R-DAYS-011: activity descriptions 10-15 words (self-written) ─────────
+
+
+class TestR_DAYS_011:
+    def test_pass_on_typical_description(self):
+        response = {
+            "itinerary": {
+                "days": [{"activities": [
+                    {
+                        "place_id": "abc",
+                        "description": (
+                            "Iconic crimson gate temple with ancient "
+                            "architecture and bustling Nakamise souvenir street."
+                        ),
+                    }
+                ]}]
+            }
+        }
+        r = run_rubrics(response, {"call_role": "days"}, ["R-DAYS-011"])
+        assert r[0].verdict == "PASS"
+
+    def test_fail_when_description_too_short(self):
+        response = {
+            "itinerary": {
+                "days": [{"activities": [
+                    {"place_id": "abc", "description": "Famous temple."}
+                ]}]
+            }
+        }
+        r = run_rubrics(response, {"call_role": "days"}, ["R-DAYS-011"])
+        assert r[0].verdict == "FAIL"
+
+    def test_fail_when_description_too_long(self):
+        text = " ".join(["word"] * 40)
+        response = {
+            "itinerary": {
+                "days": [{"activities": [
+                    {"place_id": "abc", "description": text},
+                ]}]
+            }
+        }
+        r = run_rubrics(response, {"call_role": "days"}, ["R-DAYS-011"])
+        assert r[0].verdict == "FAIL"
+
+    def test_skip_for_airport_and_hotel_stubs(self):
+        """Stub activities (no place_id) don't need a description."""
+        response = {
+            "itinerary": {
+                "days": [{"activities": [
+                    {"place_id": None, "description": "x"},
+                    {"place_id": None},
+                ]}]
+            }
+        }
+        r = run_rubrics(response, {"call_role": "days"}, ["R-DAYS-011"])
+        assert r[0].verdict == "SKIP"
+
+
+# ─── R-DETAIL-002: search_places per area + directions per pair ───────────
+
+
+class TestR_DETAIL_002:
+    def test_pass_when_counts_match(self):
+        response = {
+            "itinerary": {
+                "days": [{
+                    "activities": [
+                        {"name": "A", "place_id": "1"},
+                        {"name": "B", "place_id": "2"},
+                        {"name": "C", "place_id": "3"},
+                    ]
+                }]
+            },
+            "tool_calls_made": [
+                "search_places", "search_places", "search_places",
+                "get_directions", "get_directions",
+            ],
+        }
+        context = {
+            "call_role": "day_detail",
+            "suggested_areas_count": 3,  # 3 areas → 3 search_places calls
+        }
+        r = run_rubrics(response, context, ["R-DETAIL-002"])
+        assert r[0].verdict == "PASS"
+
+    def test_fail_when_directions_call_count_too_low(self):
+        response = {
+            "itinerary": {
+                "days": [{
+                    "activities": [
+                        {"name": "A", "place_id": "1"},
+                        {"name": "B", "place_id": "2"},
+                        {"name": "C", "place_id": "3"},
+                        {"name": "D", "place_id": "4"},
+                    ]
+                }]
+            },
+            "tool_calls_made": [
+                "search_places", "search_places", "search_places",
+                "get_directions",
+            ],
+        }
+        context = {"call_role": "day_detail", "suggested_areas_count": 3}
+        r = run_rubrics(response, context, ["R-DETAIL-002"])
+        assert r[0].verdict == "FAIL"
+        assert "directions" in r[0].reason.lower()
+
+    def test_skip_when_not_day_detail_role(self):
+        response = {}
+        r = run_rubrics(
+            response,
+            {"call_role": "days", "suggested_areas_count": 2},
+            ["R-DETAIL-002"],
+        )
+        assert r[0].verdict == "SKIP"
+
+
+# ─── R-DETAIL-003: get_directions mode matches transport ─────────────────
+
+
+class TestR_DETAIL_003:
+    def test_pass_when_all_modes_match(self):
+        response = {
+            "tool_calls_detail": [
+                {"name": "get_directions", "args": {
+                    "origin": "A", "destination": "B", "mode": "TRANSIT",
+                }},
+                {"name": "get_directions", "args": {
+                    "origin": "B", "destination": "C", "mode": "TRANSIT",
+                }},
+            ]
+        }
+        context = {"call_role": "day_detail", "local_transport_mode": "transit"}
+        r = run_rubrics(response, context, ["R-DETAIL-003"])
+        assert r[0].verdict == "PASS"
+
+    def test_fail_when_mode_mismatch(self):
+        response = {
+            "tool_calls_detail": [
+                {"name": "get_directions", "args": {
+                    "origin": "A", "destination": "B", "mode": "WALK",
+                }},
+            ]
+        }
+        context = {"call_role": "day_detail", "local_transport_mode": "transit"}
+        r = run_rubrics(response, context, ["R-DETAIL-003"])
+        assert r[0].verdict == "FAIL"
+        assert "WALK" in r[0].reason and "TRANSIT" in r[0].reason
+
+    def test_fail_when_mode_missing(self):
+        response = {
+            "tool_calls_detail": [
+                {"name": "get_directions", "args": {
+                    "origin": "A", "destination": "B",
+                }},
+            ]
+        }
+        context = {"call_role": "day_detail", "local_transport_mode": "driving"}
+        r = run_rubrics(response, context, ["R-DETAIL-003"])
+        assert r[0].verdict == "FAIL"
+        assert "mode" in r[0].reason.lower()
+
+    def test_skip_when_no_transport_mode_in_context(self):
+        response = {"tool_calls_detail": []}
+        r = run_rubrics(response, {"call_role": "day_detail"}, ["R-DETAIL-003"])
+        assert r[0].verdict == "SKIP"
+
+
+# ─── R-REPLACE-003: preserve time / duration_min ──────────────────────────
+
+
+class TestR_REPLACE_003:
+    def test_pass_when_time_and_duration_preserved(self):
+        response = {
+            "itinerary": {
+                "replace": {
+                    "activity": {
+                        "name": "Ichiran",
+                        "time": "12:30",
+                        "duration_min": 60,
+                    }
+                }
+            }
+        }
+        context = {
+            "original_activity": {"time": "12:30", "duration_min": 60},
+        }
+        r = run_rubrics(response, context, ["R-REPLACE-003"])
+        assert r[0].verdict == "PASS"
+
+    def test_fail_when_time_changed(self):
+        response = {
+            "itinerary": {
+                "replace": {
+                    "activity": {
+                        "name": "Ichiran",
+                        "time": "13:00",
+                        "duration_min": 60,
+                    }
+                }
+            }
+        }
+        context = {
+            "original_activity": {"time": "12:30", "duration_min": 60},
+        }
+        r = run_rubrics(response, context, ["R-REPLACE-003"])
+        assert r[0].verdict == "FAIL"
+        assert "12:30" in r[0].reason
+
+    def test_pass_when_duration_changed_but_time_same(self):
+        """Duration may change if the activity is fundamentally different,
+        but time must stay the same."""
+        response = {
+            "itinerary": {
+                "replace": {
+                    "activity": {
+                        "name": "Ichiran",
+                        "time": "12:30",
+                        "duration_min": 90,
+                    }
+                }
+            }
+        }
+        context = {
+            "original_activity": {"time": "12:30", "duration_min": 60},
+        }
+        r = run_rubrics(response, context, ["R-REPLACE-003"])
+        assert r[0].verdict == "PASS"
+
+    def test_skip_without_original_activity_in_context(self):
+        response = {"itinerary": {"replace": {"activity": {"time": "10:00"}}}}
+        r = run_rubrics(response, {}, ["R-REPLACE-003"])
+        assert r[0].verdict == "SKIP"
+
+
 # ─── R-G-007: no tool-call narration (LLM-judge) ───────────────────────────
 
 

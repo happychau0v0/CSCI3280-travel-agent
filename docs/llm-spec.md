@@ -353,7 +353,7 @@ bottom of this section.
 | R-PLAN-003 No text questions | RUBRIC READY | `rubrics.py::check_R_PLAN_003_no_text_question` + `test_eval_rubrics.py::TestR_PLAN_003` (4 unit tests) — fails when prose ends with '?' and no `request_input` was called. Awaits live eval run. |
 | R-PLAN-004 MUST call `search_flights` + `geocode_city` | RUBRIC READY | `rubrics.py::check_R_PLAN_004_must_call_search_flights_and_geocode` + `test_eval_rubrics.py::TestR_PLAN_004` (5 unit tests). Awaits live eval run. |
 | R-PLAN-005 MUST NOT call `search_places` / `get_weather` / `get_place_details` | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[plan]` asserts the exact allow-list. |
-| R-PLAN-006 IATA extraction | GAP | — |
+| R-PLAN-006 IATA extraction | RUBRIC READY | `rubrics.py::check_R_PLAN_006_iata_extraction` + `test_eval_rubrics.py::TestR_PLAN_006` (4 unit tests) — regex-checks every `search_flights` call's origin/destination args match `^[A-Z]{3}$`. Awaits live eval run. |
 | R-PLAN-007 Round-trip: two `search_flights` calls | COVERED | `test_itinerary_schema.py::TestRoundTripFlight` (5 tests) — asserts `flight.return_options` has ≥2 options, `flight.return_date` is set, outbound has ≥2 options. |
 | R-PLAN-008 Copy options verbatim | PARTIAL | `TestGoldenTokyoFull` + `TestRoundTripFlight` cover fidelity indirectly (≥3 options with prices/times). Strict verbatim-equality check (LLM didn't edit prices) needs a live-eval rubric. |
 | R-PLAN-009 `days` count = trip_days | COVERED | `TestGoldenTaipeiSparse::test_days_match_trip_length` (2-day) + `TestRoundTripFlight::test_day_count_matches_trip_length` (6-day). |
@@ -373,10 +373,10 @@ bottom of this section.
 | R-DAYS-005 Day 1 actual arrival_time | COVERED | `test_itinerary_schema.py::TestDay1ArrivalNonExampleTime::test_first_activity_time_matches_flight` — fixture has flight.arrival_time=14:50 (not the example 11:35); asserts days[0].activities[0].time=="14:50". |
 | R-DAYS-006 Day 1 structure | COVERED | `TestDay1ArrivalNonExampleTime` (5 tests) — asserts airport is first activity, duration 60, hotel check-in ≥ arrival+90 min. |
 | R-DAYS-007 Last-day structure | COVERED | `test_itinerary_schema.py::TestLastDayDeparture` (4 tests) — asserts check-out at 09:00, ≥1 real activity, departure airport last with duration 180. |
-| R-DAYS-008 Middle-day pattern | PARTIAL | `test_middle_days_have_enough_activities` (≥4). Meal count / pattern order not asserted. |
+| R-DAYS-008 Middle-day pattern | RUBRIC READY | `rubrics.py::check_R_DAYS_008_middle_day_meals` + `test_eval_rubrics.py::TestR_DAYS_008` (4 unit tests) — detects meal activities via keyword regex on activity names; fails when any middle day lacks ≥1 meal. Existing `test_middle_days_have_enough_activities` (≥4 activities) still provides shape-level coverage. Awaits live eval run. |
 | R-DAYS-009 Activity required fields | PARTIAL | Pydantic `Activity._place_fields_consistent` validator rejects any activity with `place_id` set but missing `lat`/`lng`. `photo_url` is not yet required — still GAP on that field. |
 | R-DAYS-010 Weather shape | COVERED | Pydantic `Weather` model validates shape (`:691-700`); `_coerce_temp` handles both number and `"22°C"` string. |
-| R-DAYS-011 Self-written description | GAP | — |
+| R-DAYS-011 Self-written description | RUBRIC READY | `rubrics.py::check_R_DAYS_011_activity_description_word_count` + `test_eval_rubrics.py::TestR_DAYS_011` (4 unit tests) — verifies every `place_id`-grounded activity's description falls within 8-20 words (target 10-15). Awaits live eval run. |
 | R-DAYS-012 Output shape (no re-emit flight/hotels) | RUBRIC READY | `rubrics.py::check_R_DAYS_012_no_flight_or_hotels_re_emit` + `test_eval_rubrics.py::TestR_DAYS_012` (4 unit tests). Awaits live eval run. |
 | R-DAYS-013 Complete `days[]` on single replace | GAP | Frontend-handled per `test_day_planning_roles.py:193-196` comment; no backend test. |
 | R-DAYS-014 `navigate_menu("DAYS")` | PARTIAL | Playwright step 6 (`CLAUDE.md:128`). |
@@ -390,7 +390,7 @@ bottom of this section.
 | R-CHAT-008 One-sentence reply | RUBRIC READY | `rubrics.py::check_R_CHAT_008_one_sentence_reply` + `test_eval_rubrics.py::TestR_CHAT_008` (4 unit tests) — rejects JSON blocks and >2-sentence replies. Awaits live eval run. |
 | R-REPLACE-001 Single `search_places` call | PARTIAL | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[replace]` asserts allow-list is exactly `{search_places}` — any other tool call is impossible at runtime. Call count (≤1 round) still not asserted. |
 | R-REPLACE-002 Copy fields verbatim | RUBRIC READY | `test_itinerary_schema.py::TestReplaceActivityOutput::test_activity_has_required_fields` covers shape. `rubrics.py::check_R_REPLACE_002_activity_place_id_grounded` + `test_eval_rubrics.py::TestR_REPLACE_002` (4 unit tests) verify the replacement `place_id` came from a `search_places` result that turn. Awaits live eval run. |
-| R-REPLACE-003 Preserve `time` / `duration_min` | GAP | Needs rubric that compares replacement time/duration to the original activity — requires eval context to pass the original. |
+| R-REPLACE-003 Preserve `time` / `duration_min` | RUBRIC READY | `rubrics.py::check_R_REPLACE_003_preserve_time_and_duration` + `test_eval_rubrics.py::TestR_REPLACE_003` (4 unit tests) — fixture supplies `context.original_activity={time,duration_min}`; the rubric fails when the replacement changes `time`. Duration changes are allowed (activity type may differ). Awaits live eval run. |
 | R-REPLACE-004 No navigate_menu | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[replace]` asserts allow-list excludes `navigate_menu`. |
 | R-REPLACE-005 Replace output shape | COVERED | `test_itinerary_schema.py::TestReplaceActivityOutput` (4 tests) — asserts `itinerary.replace` block has day/old_name/activity with required fields, and no full `days` array is re-emitted. |
 | R-REPLACE-006 10-15 word description | COVERED | `TestReplaceActivityOutput::test_activity_description_10_to_15_words` (golden) + `rubrics.py::check_R_REPLACE_006_description_10_to_15_words` + `test_eval_rubrics.py::TestR_REPLACE_006` (3 unit tests). |
@@ -403,8 +403,8 @@ bottom of this section.
 | R-THEMES-005 `key_constraints` only on flight days | COVERED | `TestDayThemesOutput::test_key_constraints_only_on_flight_days` — asserts day 1 has `arrival_time`, last day has `departure_time`, middle days have no `key_constraints`. |
 | R-THEMES-006 Specific neighborhood names | COVERED | `TestDayThemesOutput::test_every_day_has_theme_and_areas` (3-5 areas) + `::test_suggested_areas_not_generic` (no "downtown"/"city center"). |
 | R-DETAIL-001 2-round cap | GAP | — |
-| R-DETAIL-002 search_places per area, directions per pair | GAP | — |
-| R-DETAIL-003 Mode matches transport | GAP | — |
+| R-DETAIL-002 search_places per area, directions per pair | RUBRIC READY | `rubrics.py::check_R_DETAIL_002_search_and_directions_counts` + `test_eval_rubrics.py::TestR_DETAIL_002` (3 unit tests) — fails when `search_places` count < `suggested_areas_count` (from context) or `get_directions` count < activity pairs emitted. Awaits live eval run. |
+| R-DETAIL-003 Mode matches transport | RUBRIC READY | `rubrics.py::check_R_DETAIL_003_directions_mode_matches_transport` + `test_eval_rubrics.py::TestR_DETAIL_003` (4 unit tests) — checks every `get_directions.mode` arg equals the TRANSPORT_MODE_MAP entry for `context.local_transport_mode` (`transit→TRANSIT`, `driving→DRIVE`, etc.). Missing `mode` also fails. Awaits live eval run. |
 | R-DETAIL-004 Allow-list | COVERED | `test_prompts_roles.py::test_day_detail_allowed_tools` + `test_prompts_roles.py::test_day_detail_does_not_allow_navigate_menu` + `test_day_planning_roles.py::test_day_detail_allowed_tools`. |
 | R-DETAIL-005 Day/time structure (inherits R-DAYS-*) | PARTIAL | Inherits R-DAYS-004 / R-DAYS-010 coverage. |
 | R-DETAIL-006 Exactly one day in output | RUBRIC READY | `rubrics.py::check_R_DETAIL_006_exactly_one_day` + `test_eval_rubrics.py::TestR_DETAIL_006` (4 unit tests). Awaits live eval run. |

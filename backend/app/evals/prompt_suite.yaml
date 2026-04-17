@@ -27,6 +27,7 @@
     - R-G-007     # LLM-judge: no tool-call narration
     - R-G-015     # subtitle length
     - R-PLAN-004  # must call search_flights + geocode_city
+    - R-PLAN-006  # search_flights args are IATA-only
 
 # ─── Plan role — country destination should clarify ────────────────────────
 
@@ -96,7 +97,11 @@
   context:
     user_location: Hong Kong
     today: "2026-04-17"
+    suggested_areas_count: 3
+    local_transport_mode: transit
   rubrics:
+    - R-DETAIL-002   # search_places per area + directions per pair
+    - R-DETAIL-003   # get_directions mode=TRANSIT
     - R-DETAIL-006   # exactly one day in output
     - R-G-004
     - R-G-005
@@ -115,6 +120,8 @@
     user_location: Hong Kong
     today: "2026-04-17"
   rubrics:
+    - R-DAYS-008   # middle days include meals
+    - R-DAYS-011   # activity descriptions 10-15 words
     - R-DAYS-012   # no re-emit of flight or hotels
     - R-G-001      # every place name must appear in search_places results
     - R-G-002
