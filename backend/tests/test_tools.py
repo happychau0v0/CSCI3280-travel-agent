@@ -17,7 +17,8 @@ from app.tools import (
     weather,
 )
 from app.tools.errors import ToolUnavailableError
-from app.llm import _build_tools_list, _prune_tool_results
+from app.llm import _prune_tool_results
+from app.tools import TOOL_DEFINITIONS
 
 
 @pytest.fixture(autouse=True)
@@ -1103,8 +1104,7 @@ def test_tools_list_only_contains_function_types():
     xAI deprecated web_search_preview (now returns 422); it was removed so
     the tools list only contains standard function-call tool definitions.
     """
-    tools = _build_tools_list()
-    for t in tools:
+    for t in TOOL_DEFINITIONS:
         assert t.get("type") == "function", (
             f"Non-function tool found in list: {t}"
         )

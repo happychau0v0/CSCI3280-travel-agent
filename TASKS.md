@@ -16,7 +16,6 @@ All three modules (ASR, LLM, TTS) work together end-to-end. Verified by 25 backe
 - [x] `tools/places.py` — `search_places(query, location?, radius_km?)` and `get_place_details(place_id)` via Google Places API (New)
 - [x] `tools/directions.py` — `get_directions(origin, destination, mode)` via Google Routes API
 - [x] `tools/weather.py` — `get_weather(city, date?)` via Google Weather API (geocode → weather lookup)
-- [x] `tools/search.py` — `web_search(query)` stub (SerpAPI/Tavily intentionally deferred)
 - [x] Register all tools as OpenAI function definitions for the LLM tool-call loop
 
 ### Frontend Chat UI

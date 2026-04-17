@@ -116,13 +116,6 @@ def check_ack(r):
     return "✅", "ack"
 
 
-def check_web_search(r):
-    # Stub: just confirms it returns a list and doesn't raise.
-    if not isinstance(r, list):
-        return "❌", f"expected list, got {type(r).__name__}"
-    return "✅", f"{len(r)} results (stub)"
-
-
 # ─── cases ────────────────────────────────────────────────────────────────
 
 FUTURE_DATE = (datetime.now(timezone.utc) + timedelta(days=30)).date().isoformat()
@@ -153,7 +146,6 @@ def build_cases(place_id_holder):
         ("toggle_setting", {"setting": "theme", "value": "light"}, check_ack),
         ("submit_trip_form", {"destination": "Tokyo"}, check_ack),
         ("request_input", {"field": "destination", "prompt": "Where?"}, check_ack),
-        ("web_search", {"query": "tokyo travel"}, check_web_search),
     ]
 
 
@@ -212,7 +204,6 @@ async def main() -> int:
         ("toggle_setting", {"setting": "theme", "value": "light"}, check_ack),
         ("submit_trip_form", {"destination": "Tokyo"}, check_ack),
         ("request_input", {"field": "destination", "prompt": "Where?"}, check_ack),
-        ("web_search", {"query": "tokyo travel"}, check_web_search),
     ]
 
     results = await asyncio.gather(*(run_one(*c) for c in cases))

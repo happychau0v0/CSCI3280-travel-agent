@@ -50,7 +50,6 @@ from app.config import (
     GEMINI_API_KEY,
     GEMINI_BASE_URL,
     LLM_MODEL,
-    PRUNE_KEEP_ROUNDS,
     XAI_API_KEY,
     XAI_BASE_URL,
     check_key,
@@ -60,14 +59,6 @@ from app.tools import TOOL_DEFINITIONS, TOOL_DISPATCH, ToolUnavailableError
 
 logger = logging.getLogger(__name__)
 
-
-def _build_tools_list(model: str = LLM_MODEL) -> list[dict]:
-    """Return TOOL_DEFINITIONS for the given model.
-
-    xAI deprecated web_search_preview in their tools API (now returns 422);
-    all providers including xAI only accept type=function tools via this endpoint.
-    """
-    return list(TOOL_DEFINITIONS)
 
 # A typical multi-day itinerary takes 3-6 tool calls (one weather lookup,
 # 2-4 place searches, a handful of directions). 10 rounds gives plenty of

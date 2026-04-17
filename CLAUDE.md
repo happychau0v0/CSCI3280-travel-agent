@@ -47,8 +47,7 @@ User ──► Web Speech API (STT) ──► POST /chat ──► LLM (OpenRout
                                               ├── search_places (Google Places New)
                                               ├── get_place_details (Google Places New)
                                               ├── get_directions (Google Routes API)
-                                              ├── get_weather (Google Weather API)
-                                              └── web_search (stub for now)
+                                              └── get_weather (Google Weather API)
                                                     │
                                               Structured JSON itinerary
                                                     │
