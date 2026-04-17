@@ -45,3 +45,6 @@ backend/logs/
 backend/tests/fixtures/llm_outputs/dump_*.txt
 .playwright-mcp/
 .worktrees/
+
+# Claude Code working directory (per-user AI assistant state)
+.claude/

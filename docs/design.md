@@ -7,8 +7,7 @@
 ## Purpose
 
 This document defines the intended interaction model, user flow, and LLM
-scoping strategy for the AI Travel Agent. It supersedes the chat-centric
-description in `docs/architecture.md`.
+scoping strategy for the AI Travel Agent.
 
 The core principle: **buttons are the primary interface; chat is a UI
 control agent.** A user should be able to plan a complete trip — flights,

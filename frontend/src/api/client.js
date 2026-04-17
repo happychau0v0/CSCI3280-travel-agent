@@ -179,8 +179,8 @@ export async function streamChat({
       }
 
       // Timestamp each event for per-event benchmark analysis. The
-      // window.__sseEvents buffer is read by scripts/benchmark-round8.mjs
-      // to produce per-tool duration rows. Guarded by DEV flag.
+      // window.__sseEvents buffer is kept in DEV for offline inspection
+      // (produced per-tool duration rows for one-off streaming benchmarks).
       if (typeof window !== "undefined" && import.meta.env.DEV) {
         if (!window.__sseEvents) window.__sseEvents = [];
         window.__sseEvents.push({

@@ -4,9 +4,9 @@ When MOCK_TOOLS=1 is set, these stubs replace the real TOOL_DISPATCH
 entries. They return realistic fixture data without calling any external
 APIs — no Google Maps key, no fast-flights, no OpenRouter needed.
 
-This lets the Playwright integration test (verify-integration.mjs) exercise
-the REAL SSE pipeline, JSON extraction, and state transitions while keeping
-the test deterministic and free.
+This lets Playwright integration tests exercise the REAL SSE pipeline,
+JSON extraction, and state transitions while keeping the test deterministic
+and free.
 """
 from __future__ import annotations
 
