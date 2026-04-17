@@ -148,11 +148,11 @@ Find hotels near the city centre.
 | Tool | Required? |
 |------|-----------|
 | `search_places` (hotels query) | **MUST** call |
-| `get_place_details` | SHOULD call for top 3–5 results |
+| `get_place_details` | **MUST NOT** call — `search_places` already returns description/hours/photos |
 | `get_weather` | MAY call (forecast strip) |
 | `search_flights` | **MUST NOT** call |
 | `get_directions` | **MUST NOT** call |
-| `navigate_menu` | **MUST NOT** call |
+| `navigate_menu` | MUST call once at end with `"HOTELS"` |
 | `request_input` | **MUST NOT** call |
 
 **Expected output shape:**
@@ -199,12 +199,12 @@ search_places call.
 | Tool | Required? |
 |------|-----------|
 | `search_places` (activities) | **MUST** call per day/category |
-| `get_place_details` | **MUST** call per chosen activity |
+| `get_place_details` | **MUST NOT** call — `search_places` already returns description/hours/photos; activity description is self-written |
 | `get_directions` | **MUST** call between consecutive activities |
 | `get_weather` | MAY call per day |
 | `search_flights` | **MUST NOT** call |
 | `search_places` (hotels query) | **MUST NOT** call |
-| `navigate_menu` | **MUST NOT** call |
+| `navigate_menu` | MUST call once at end with `"DAYS"` |
 | `request_input` | **MUST NOT** call |
 
 **Expected output shape:** Full itinerary with `days[].activities[]` populated;

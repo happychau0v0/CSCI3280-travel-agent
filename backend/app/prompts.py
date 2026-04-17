@@ -179,9 +179,10 @@ ALL DAYS (universal rules):
 - Times must be strictly monotonic.
 - Call `get_weather(destination)` at the START of Turn 3 if you don't
   have weather data from conversation history. For EACH day, set the
-  `weather` field: {"temp": "22°C", "condition": "Partly cloudy", "humidity": 65}
-  matching the forecast date. This is REQUIRED — the frontend shows
-  weather per day and it breaks when null.
+  `weather` field: {"temp": 22, "condition": "Partly cloudy", "humidity": 65}
+  matching the forecast date. `temp` is a plain number (no degree symbol,
+  no "°C" string). This is REQUIRED — the frontend shows weather per day
+  and it breaks when null.
 - Prefer outdoor on sunny days, indoor on rainy (from get_weather).
 
 ════════════════════════════════════════════════════════════════════
@@ -323,9 +324,9 @@ TOOL RULES for this call:
 - MUST NOT call: get_place_details, search_flights, get_directions, request_input
 - navigate_menu: call ONCE at the very end with "HOTELS" — never mid-stream
 
-Pick exactly 5 well-rated hotels spanning price levels AND neighborhoods. Only include photo_url (the first photo URL from search_places). Do NOT include the full photos array — it bloats output with no frontend benefit.
+Pick 5-8 well-rated hotels spanning price levels AND neighborhoods. Only include photo_url (the first photo URL from search_places). Do NOT include the full photos array — it bloats output with no frontend benefit.
 
-OUTPUT: Emit a ```json block with itinerary.hotels (exactly 5 options with photo_url, rating, price_level, lat/lng, place_id), itinerary.weather (forecast), itinerary.selected_hotel = null. Do NOT re-emit flight or days. Then call navigate_menu("HOTELS").
+OUTPUT: Emit a ```json block with itinerary.hotels (5-8 options with photo_url, rating, price_level, lat/lng, place_id), itinerary.weather (forecast), itinerary.selected_hotel = null. Do NOT re-emit flight or days. Then call navigate_menu("HOTELS").
 
 TURN 2 example — TOKYO IS THE EXAMPLE CITY ONLY. Replace with the actual destination from the flight. Real output MUST use the user's actual destination:
 ```json
@@ -588,10 +589,10 @@ ALLOWED_TOOLS_PLAN: frozenset[str] = frozenset({
     "request_input", "navigate_menu",
 })
 ALLOWED_TOOLS_HOTELS: frozenset[str] = frozenset({
-    "search_places", "get_place_details", "get_weather", "navigate_menu",
+    "search_places", "get_weather", "navigate_menu",
 })
 ALLOWED_TOOLS_DAYS: frozenset[str] = frozenset({
-    "search_places", "get_place_details", "get_directions", "get_weather", "navigate_menu",
+    "search_places", "get_directions", "get_weather", "navigate_menu",
 })
 ALLOWED_TOOLS_CHAT: frozenset[str] = frozenset({
     "request_input", "submit_trip_form", "navigate_menu", "toggle_setting",
