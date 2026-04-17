@@ -72,6 +72,7 @@
     user_location: Hong Kong
     today: "2026-04-17"
   rubrics:
+    - R-G-001        # hotel names must appear in search_places results
     - R-G-002        # transport tool-first
     - R-G-003        # weather tool-first
     - R-G-004
@@ -111,6 +112,7 @@
     today: "2026-04-17"
   rubrics:
     - R-DAYS-012   # no re-emit of flight or hotels
+    - R-G-001      # every place name must appear in search_places results
     - R-G-002
     - R-G-003
     - R-G-004

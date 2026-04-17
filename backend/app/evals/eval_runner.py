@@ -77,7 +77,7 @@ async def _run_one(item: dict, model: str | None) -> dict:
         "reply": result.get("reply", ""),
         "itinerary": result.get("itinerary"),
         "tool_calls_made": result.get("tool_calls_made", []),
-        "tool_results": {},  # TODO: wire through chat() to capture per-tool results
+        "tool_results": result.get("tool_results", {}),
         "error": None,
     }
 

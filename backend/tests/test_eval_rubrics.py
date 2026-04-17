@@ -539,6 +539,106 @@ class TestR_DETAIL_006:
         assert r[0].verdict == "SKIP"
 
 
+# ─── R-G-001: no hallucinated places (tool-grounding) ──────────────────────
+
+
+class TestR_G_001:
+    def test_pass_when_every_name_appears_in_tool_results(self):
+        response = {
+            "itinerary": {
+                "hotels": [
+                    {"name": "Park Hyatt Tokyo"},
+                    {"name": "Grand Hyatt Tokyo"},
+                ],
+                "days": [
+                    {
+                        "activities": [
+                            {"name": "Senso-ji", "place_id": "abc"},
+                            {"name": "Meiji Shrine", "place_id": "def"},
+                        ]
+                    }
+                ],
+            },
+            "tool_results": {
+                "search_places": [
+                    {"places": [
+                        {"name": "Park Hyatt Tokyo"},
+                        {"name": "Grand Hyatt Tokyo"},
+                    ]},
+                    {"places": [
+                        {"name": "Senso-ji"},
+                        {"name": "Meiji Shrine"},
+                    ]},
+                ]
+            },
+        }
+        r = run_rubrics(response, {}, ["R-G-001"])
+        assert r[0].verdict == "PASS"
+
+    def test_fail_when_fabricated_place_emitted(self):
+        response = {
+            "itinerary": {
+                "hotels": [
+                    {"name": "Park Hyatt Tokyo"},
+                    {"name": "Invented Hotel de la Mer"},
+                ],
+                "days": [],
+            },
+            "tool_results": {
+                "search_places": [
+                    {"places": [{"name": "Park Hyatt Tokyo"}]}
+                ]
+            },
+        }
+        r = run_rubrics(response, {}, ["R-G-001"])
+        assert r[0].verdict == "FAIL"
+        assert "Invented Hotel de la Mer" in r[0].reason
+
+    def test_airport_and_hotel_stubs_skipped(self):
+        """Activities with place_id=None (airports, hotels) aren't grounded."""
+        response = {
+            "itinerary": {
+                "days": [
+                    {
+                        "activities": [
+                            {"name": "NRT Airport · Arrival", "place_id": None},
+                            {"name": "Park Hyatt Tokyo · Check-in", "place_id": None},
+                            {"name": "Senso-ji", "place_id": "abc"},
+                        ]
+                    }
+                ],
+            },
+            "tool_results": {
+                "search_places": [{"places": [{"name": "Senso-ji"}]}]
+            },
+        }
+        r = run_rubrics(response, {}, ["R-G-001"])
+        assert r[0].verdict == "PASS"
+
+    def test_skip_when_no_grounded_places_emitted(self):
+        """Plan-only output has no place-backed activities; nothing to verify."""
+        response = {
+            "itinerary": {
+                "flight": {"options": [{"airline": "ANA"}]},
+                "days": [{"activities": []}],
+            },
+            "tool_results": {},
+        }
+        r = run_rubrics(response, {}, ["R-G-001"])
+        assert r[0].verdict == "SKIP"
+
+    def test_no_tool_results_cache_is_skip(self):
+        """If the runner didn't provide tool_results (legacy path), skip."""
+        response = {
+            "itinerary": {
+                "hotels": [{"name": "Park Hyatt Tokyo"}],
+                "days": [],
+            },
+        }
+        r = run_rubrics(response, {}, ["R-G-001"])
+        assert r[0].verdict == "SKIP"
+
+
 # ─── runner contract ────────────────────────────────────────────────────────
 
 

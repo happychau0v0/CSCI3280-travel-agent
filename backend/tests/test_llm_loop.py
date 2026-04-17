@@ -86,6 +86,58 @@ async def test_tools_run_in_parallel_via_gather():
     assert sorted(result["tool_calls_made"]) == ["slow_a", "slow_b", "slow_c"]
 
 
+# ─── tool_results cache exposed through _run_loop ─────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_tool_results_captured_and_returned():
+    """_run_loop should return a tool_results dict mapping name → list of
+    result payloads (so rubrics can verify grounding against actual data)."""
+
+    async def places_tool(**kwargs):
+        return {"places": [{"name": "Senso-ji", "lat": 35.7, "lng": 139.8}]}
+
+    async def directions_tool(**kwargs):
+        return {"duration": "15 mins", "distance": "2 km"}
+
+    round0 = _completion(_msg(
+        content="",
+        tool_calls=[
+            _tc("c1", "search_places", {"query": "temples in Tokyo"}),
+            _tc("c2", "get_directions", {"origin": "A", "destination": "B"}),
+            _tc("c3", "search_places", {"query": "hotels in Tokyo"}),
+        ],
+    ))
+    round1 = _completion(_msg(content="done", tool_calls=None))
+
+    fake_client = SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=SimpleNamespace(
+                create=AsyncMock(side_effect=[round0, round1])
+            )
+        )
+    )
+
+    fake_tools = {
+        "search_places": places_tool,
+        "get_directions": directions_tool,
+    }
+
+    with patch.object(llm, "_get_client", return_value=fake_client), \
+         patch.object(llm, "TOOL_DISPATCH", fake_tools):
+        result = await llm._run_loop([{"role": "user", "content": "hi"}])
+
+    assert "tool_results" in result
+    tr = result["tool_results"]
+    # Two distinct search_places calls should both be kept (list, not overwrite).
+    assert len(tr.get("search_places", [])) == 2
+    assert tr["search_places"][0] == {
+        "places": [{"name": "Senso-ji", "lat": 35.7, "lng": 139.8}]
+    }
+    assert len(tr.get("get_directions", [])) == 1
+    assert tr["get_directions"][0]["duration"] == "15 mins"
+
+
 # ─── MAX_TOOL_ROUNDS guard ────────────────────────────────────────────────
 
 

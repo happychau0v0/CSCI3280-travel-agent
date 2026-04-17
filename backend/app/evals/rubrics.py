@@ -317,6 +317,52 @@ def check_R_DETAIL_006_exactly_one_day(
     return RubricResult.pass_(rid)
 
 
+def check_R_G_001_no_hallucinated_places(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-G-001: every place name in itinerary.hotels and grounded activities
+    (place_id set) MUST appear in the `name` field of at least one
+    search_places result from the same turn.
+
+    v1 uses strict equality. Future: fuzzy match to handle LLM diacritic
+    drift (e.g. 'Senso-ji' vs 'Sensō-ji Temple')."""
+    rid = "R-G-001"
+    tool_results = response.get("tool_results")
+    if tool_results is None:
+        # No cache provided by the runner (legacy path) — can't verify.
+        return RubricResult.skip(rid, "no tool_results cache in response")
+
+    itinerary = response.get("itinerary") or {}
+    sp_results = tool_results.get("search_places") or []
+
+    emitted: list[str] = []
+    for h in itinerary.get("hotels") or []:
+        if h.get("name"):
+            emitted.append(h["name"])
+    for d in itinerary.get("days") or []:
+        for a in d.get("activities") or []:
+            if a.get("place_id") is None:
+                continue  # airport / hotel stubs aren't grounded in search_places
+            if a.get("name"):
+                emitted.append(a["name"])
+
+    if not emitted:
+        return RubricResult.skip(rid, "no place-backed activities to verify")
+
+    tool_names: set[str] = set()
+    for batch in sp_results:
+        for p in (batch.get("places") or []):
+            if p.get("name"):
+                tool_names.add(p["name"])
+
+    hallucinated = [n for n in emitted if n not in tool_names]
+    if hallucinated:
+        return RubricResult.fail(
+            rid, f"place(s) not in any search_places result: {hallucinated}"
+        )
+    return RubricResult.pass_(rid, f"{len(emitted)} places, all grounded")
+
+
 def check_R_HOTELS_003_must_call_search_places(
     response: dict, context: dict
 ) -> RubricResult:
@@ -347,6 +393,7 @@ RUBRICS: dict[str, Callable[[dict, dict], RubricResult]] = {
     "R-REPLACE-006": check_R_REPLACE_006_description_10_to_15_words,
     "R-G-002": check_R_G_002_transport_preceded_by_directions,
     "R-G-003": check_R_G_003_weather_preceded_by_get_weather,
+    "R-G-001": check_R_G_001_no_hallucinated_places,
     "R-PLAN-002": check_R_PLAN_002_country_triggers_request_input,
     "R-PLAN-003": check_R_PLAN_003_no_text_question,
     "R-PLAN-004": check_R_PLAN_004_must_call_search_flights_and_geocode,

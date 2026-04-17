@@ -355,6 +355,11 @@ async def _run_loop(
     else:
         full_messages = [{"role": "system", "content": system_content}] + list(messages)
     tool_calls_made: list[str] = []
+    # Per-tool result cache: name → list of result dicts, in call order.
+    # Exposed through the return value so eval rubrics can verify grounding
+    # (e.g. every place name the LLM emits must appear in a search_places
+    # result from the same turn — see R-G-001 in docs/llm-spec.md).
+    tool_results_by_name: dict[str, list[dict]] = {}
     last_text = ""
 
     for round_idx in range(MAX_TOOL_ROUNDS):
@@ -578,6 +583,9 @@ async def _run_loop(
                     logger.exception("Tool %s failed", fn_name)
                     tool_result = {"error": f"Tool execution failed: {e}"}
 
+            if isinstance(tool_result, dict):
+                tool_results_by_name.setdefault(fn_name, []).append(tool_result)
+
             elapsed_ms = int((asyncio.get_event_loop().time() - t0) * 1000)
             logger.info("Tool done: %s — %dms", fn_name, elapsed_ms)
             # Log the full tool result to llm_events.jsonl — not emitted via
@@ -655,6 +663,7 @@ async def _run_loop(
         "reply": last_text,
         "itinerary": itinerary,
         "tool_calls_made": tool_calls_made,
+        "tool_results": tool_results_by_name,
     }
 
 

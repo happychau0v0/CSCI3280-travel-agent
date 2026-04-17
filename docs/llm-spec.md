@@ -328,7 +328,7 @@ bottom of this section.
 
 | ID | Status | Verified by |
 |---|---|---|
-| R-G-001 No hallucination | GAP | No test asserts the LLM doesn't invent places. Enforceable only via an LLM-judge eval or fact-check against tool results. |
+| R-G-001 No hallucination | RUBRIC READY | `rubrics.py::check_R_G_001_no_hallucinated_places` + `test_eval_rubrics.py::TestR_G_001` (5 unit tests) — cross-checks every emitted hotel name and place_id-grounded activity against names returned from `search_places` tool results (cache exposed via `_run_loop` → `chat()` → `eval_runner`). v1 strict equality; fuzzy match is a follow-up. Awaits live eval run. |
 | R-G-002 `get_directions` before transport | RUBRIC READY | `rubrics.py::check_R_G_002_transport_preceded_by_directions` + `test_eval_rubrics.py::TestR_G_002` (3 unit tests). Awaits live eval run. |
 | R-G-003 `get_weather` before weather claim | RUBRIC READY | `rubrics.py::check_R_G_003_weather_preceded_by_get_weather` + `test_eval_rubrics.py::TestR_G_003` (2 unit tests). Awaits live eval run. |
 | R-G-004 Spoken text outside JSON | RUBRIC READY | `rubrics.py::check_R_G_004_has_prose_outside_json` + `test_eval_rubrics.py::TestR_G_004` (2 unit tests). Awaits live eval run. |
