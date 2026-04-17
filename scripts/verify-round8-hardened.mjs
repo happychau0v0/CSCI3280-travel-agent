@@ -2702,32 +2702,8 @@ const FAKE_MESSAGES = [
   await page.locator('[data-testid="hotel-filter-rating-any"]').click();
   await page.waitForTimeout(150);
 
-  // 22.3 — Plan history export button renders on cards
-  await clearAll(page);
-  await page.evaluate(() => {
-    localStorage.setItem(
-      'travel-plan-history',
-      JSON.stringify([
-        {
-          id: 'testid1',
-          created_at: Date.now(),
-          destination: 'Tokyo',
-          origin: 'Hong Kong',
-          start_date: '2026-05-15',
-          end_date: '2026-05-18',
-          day_count: 3,
-          itinerary: { destination: 'Tokyo' },
-          messages: [],
-        },
-      ]),
-    );
-  });
-  await page.reload({ waitUntil: 'networkidle' });
-  await page.waitForTimeout(500);
-  await page.locator('body').click();
-  await page.waitForTimeout(200);
-  const exportBtn = await page.locator('[data-testid="plan-history-export-testid1"]').count();
-  record('22.3 Plan history card has an EXPORT button', exportBtn === 1);
+  // 22.3 — Removed: plan-history JSON/ICS/share buttons were dropped as
+  // half-baked features; drag-drop import and LOAD/DELETE remain.
 
   // 22.4 — Activity row REPLACE + REMOVE buttons render on non-hotel,
   // non-airport activities.
@@ -3030,31 +3006,8 @@ const FAKE_MESSAGES = [
     record('25.2 (skipped — no note input)', false);
   }
 
-  // 25.3 — Plan history SHARE button renders
-  await page.evaluate(() => {
-    localStorage.setItem(
-      'travel-plan-history',
-      JSON.stringify([
-        {
-          id: 'sh1',
-          created_at: Date.now(),
-          destination: 'Tokyo',
-          origin: 'Hong Kong',
-          start_date: '2026-05-15',
-          end_date: '2026-05-18',
-          day_count: 3,
-          itinerary: { destination: 'Tokyo' },
-          messages: [],
-        },
-      ]),
-    );
-  });
-  await page.reload({ waitUntil: 'networkidle' });
-  await page.waitForTimeout(500);
-  await page.locator('body').click();
-  await page.waitForTimeout(200);
-  const shareBtnCount = await page.locator('[data-testid="plan-history-share-sh1"]').count();
-  record('25.3 Plan history card has a SHARE button', shareBtnCount === 1);
+  // 25.3 — Removed: plan-history SHARE button (permalink feature) was
+  // dropped; drag-drop JSON import covers cross-device transfer.
 
   // 25.4 — Subtitle history toggle appears after a subtitle has
   // been pushed. Seed by installing a stream mock that emits a
@@ -3097,30 +3050,8 @@ const FAKE_MESSAGES = [
   // ─── PHASE 26 — Round 17 print + subtitle size + phrasebook ───────
   console.log('\n=== Phase 26: Round 17 print + subtitle size + phrasebook ===');
 
-  // 26.1 — Press P opens the print view
-  await clearAll(page);
-  await seed(page, { itinerary: R15_ITIN });
-  await page.waitForTimeout(200);
-  await page.locator('.tab-strip').click().catch(() => {});
-  await page.waitForTimeout(150);
-  await page.keyboard.press('p');
-  await page.waitForTimeout(300);
-  const printVisible = await page.locator('[data-testid="print-view"]').count();
-  record('26.1 Press P opens the print view', printVisible === 1);
-
-  // 26.2 — Print view shows destination heading
-  if (printVisible === 1) {
-    const printText = await page.locator('.print-itinerary').innerText();
-    record(
-      '26.2 Print view shows destination heading',
-      printText.toLowerCase().includes('tokyo'),
-      `contains Tokyo: ${printText.toLowerCase().includes('tokyo')}`,
-    );
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(200);
-  } else {
-    record('26.2 (skipped — no print view)', false);
-  }
+  // 26.1 / 26.2 — Removed: the P-key print overlay was replaced by the
+  // EXPORT panel (tab 5) which produces PDF + KML exports.
 
   // 26.3 — SETTINGS has a SUBTITLE SIZE row
   await clearAll(page);
@@ -3277,42 +3208,8 @@ const FAKE_MESSAGES = [
     record('28.2 (skipped — no favorite button)', false);
   }
 
-  // 28.3 — Plan history ICS export button renders
-  await page.evaluate(() => {
-    localStorage.setItem(
-      'travel-plan-history',
-      JSON.stringify([
-        {
-          id: 'ics1',
-          created_at: Date.now(),
-          destination: 'Tokyo',
-          origin: 'Hong Kong',
-          start_date: '2026-05-15',
-          end_date: '2026-05-17',
-          day_count: 3,
-          itinerary: {
-            destination: 'Tokyo',
-            days: [
-              {
-                day: 1,
-                date: '2026-05-15',
-                activities: [
-                  { time: '10:00', name: 'Senso-ji', address: 'Asakusa', duration_min: 60 },
-                ],
-              },
-            ],
-          },
-          messages: [],
-        },
-      ]),
-    );
-  });
-  await page.reload({ waitUntil: 'networkidle' });
-  await page.waitForTimeout(500);
-  await page.locator('body').click();
-  await page.waitForTimeout(200);
-  const icsBtn = await page.locator('[data-testid="plan-history-ics-ics1"]').count();
-  record('28.3 Plan history card has an ICS button', icsBtn === 1);
+  // 28.3 — Removed: plan-history ICS calendar export was dropped as a
+  // half-baked feature (never integrated with a calendar app).
 
   // ─── PHASE 29 — Round 20 favorites overlay + lightbox nav ─────────
   console.log('\n=== Phase 29: Round 20 favorites overlay + lightbox ===');
