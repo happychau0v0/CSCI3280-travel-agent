@@ -1,0 +1,267 @@
+"""Rubric functions — one per R-* requirement the eval harness checks.
+
+Each rubric is a pure function `(response, context) -> RubricResult`.
+
+Rubric categories:
+  - REGEX: deterministic, fast, offline. Regex on the reply text.
+  - TOOL-USE: needs tool_calls_made + tool_result cache from the chat() call.
+  - LLM-JUDGE: calls a second LLM to score the response (see judge.py).
+
+`response` shape:
+    {
+      "reply": str,                  # final LLM text (includes ```json block)
+      "itinerary": dict | None,      # parsed from _extract_itinerary
+      "tool_calls_made": list[str],  # names in call order
+      "tool_results": dict[str, list[dict]],  # name → list of result dicts
+    }
+
+`context` is the eval-suite fixture (call_role, seed user_message, etc.).
+
+Rubric IDs mirror docs/llm-spec.md requirement IDs.
+"""
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from typing import Callable
+
+
+@dataclass
+class RubricResult:
+    rubric_id: str
+    verdict: str  # "PASS" | "FAIL" | "SKIP"
+    reason: str
+
+    @classmethod
+    def pass_(cls, rubric_id: str, reason: str = "") -> "RubricResult":
+        return cls(rubric_id, "PASS", reason or "ok")
+
+    @classmethod
+    def fail(cls, rubric_id: str, reason: str) -> "RubricResult":
+        return cls(rubric_id, "FAIL", reason)
+
+    @classmethod
+    def skip(cls, rubric_id: str, reason: str) -> "RubricResult":
+        return cls(rubric_id, "SKIP", reason)
+
+
+# ─── helpers ────────────────────────────────────────────────────────────────
+
+
+_FENCED_JSON_RE = re.compile(r"```json\s*(.*?)\s*```", re.DOTALL)
+_UNFENCED_JSON_RE = re.compile(r"\{[^{}]*\"itinerary\"", re.DOTALL)
+
+
+def strip_json_block(reply: str) -> str:
+    """Return the reply text with any ```json``` block removed."""
+    # Fenced block
+    prose = _FENCED_JSON_RE.sub("", reply)
+    # Fallback: if there's an unfenced `{"itinerary": ...}` inline, find the
+    # matching closing brace and strip it.
+    if "itinerary" in prose:
+        match = _UNFENCED_JSON_RE.search(prose)
+        if match:
+            start = match.start()
+            depth = 0
+            for i in range(start, len(prose)):
+                if prose[i] == "{":
+                    depth += 1
+                elif prose[i] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        prose = prose[:start] + prose[i + 1 :]
+                        break
+    return prose.strip()
+
+
+def count_words(text: str) -> int:
+    return len([w for w in re.split(r"\s+", text.strip()) if w])
+
+
+# ─── REGEX rubrics ──────────────────────────────────────────────────────────
+
+
+def check_R_G_004_has_prose_outside_json(response: dict, context: dict) -> RubricResult:
+    """R-G-004: every reply MUST include spoken text outside any JSON block."""
+    rid = "R-G-004"
+    prose = strip_json_block(response.get("reply", ""))
+    if not prose:
+        return RubricResult.fail(rid, "Reply contains only a JSON block (no spoken subtitle)")
+    return RubricResult.pass_(rid, f"prose: {prose[:60]!r}")
+
+
+def check_R_G_005_no_markdown(response: dict, context: dict) -> RubricResult:
+    """R-G-005: no **bold**, *italic*, `code` in reply prose."""
+    rid = "R-G-005"
+    prose = strip_json_block(response.get("reply", ""))
+    patterns = {
+        "bold": r"\*\*[^*]+\*\*",
+        "italic": r"(?<!\*)\*[^*\s][^*]*[^*\s]\*(?!\*)",
+        "backtick-code": r"`[^`\n]+`",
+        "underscore-emphasis": r"__[^_]+__",
+    }
+    for kind, pattern in patterns.items():
+        if re.search(pattern, prose):
+            return RubricResult.fail(rid, f"Markdown {kind} detected in reply prose")
+    return RubricResult.pass_(rid)
+
+
+def check_R_G_006_no_bullets(response: dict, context: dict) -> RubricResult:
+    """R-G-006: no bullet lists / paragraphs in reply text."""
+    rid = "R-G-006"
+    prose = strip_json_block(response.get("reply", ""))
+    for line in prose.splitlines():
+        stripped = line.strip()
+        if re.match(r"^([-*•]|\d+[.)])\s+\S", stripped):
+            return RubricResult.fail(rid, f"Bullet/numbered list detected: {stripped[:40]!r}")
+    return RubricResult.pass_(rid)
+
+
+def check_R_G_015_subtitle_length_10_25_words(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-G-015: subtitle is punchy ~10-25 words."""
+    rid = "R-G-015"
+    prose = strip_json_block(response.get("reply", ""))
+    n = count_words(prose)
+    # Allow a small tolerance band; spec says ~10-25 but clarifying questions
+    # are legitimately shorter.
+    if n < 6:
+        return RubricResult.fail(rid, f"Subtitle is {n} words; too short")
+    if n > 35:
+        return RubricResult.fail(rid, f"Subtitle is {n} words; exceeds 25-word target")
+    return RubricResult.pass_(rid, f"{n} words")
+
+
+def check_R_REPLACE_006_description_10_to_15_words(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-REPLACE-006: replacement activity description is 10-15 words."""
+    rid = "R-REPLACE-006"
+    itinerary = response.get("itinerary") or {}
+    replace = itinerary.get("replace")
+    if not replace:
+        return RubricResult.skip(rid, "not a replace response")
+    desc = (replace.get("activity") or {}).get("description", "")
+    n = count_words(desc)
+    if 8 <= n <= 20:
+        return RubricResult.pass_(rid, f"{n} words")
+    return RubricResult.fail(rid, f"Description is {n} words; expected ~10-15")
+
+
+# ─── TOOL-USE rubrics ───────────────────────────────────────────────────────
+
+
+def check_R_G_002_transport_preceded_by_directions(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-G-002: every activity with transport_to_next must be preceded by
+    at least one get_directions call in the same turn."""
+    rid = "R-G-002"
+    itinerary = response.get("itinerary") or {}
+    days = itinerary.get("days") or []
+    has_any_transport = any(
+        (a.get("transport_to_next") is not None)
+        for d in days
+        for a in d.get("activities", [])
+    )
+    if not has_any_transport:
+        return RubricResult.skip(rid, "no transport_to_next in itinerary")
+    tool_calls = response.get("tool_calls_made", [])
+    if "get_directions" not in tool_calls:
+        return RubricResult.fail(
+            rid,
+            "Itinerary contains transport_to_next but no get_directions call was made",
+        )
+    return RubricResult.pass_(rid, f"{tool_calls.count('get_directions')} directions calls")
+
+
+def check_R_G_003_weather_preceded_by_get_weather(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-G-003: every day with weather data must have get_weather fired."""
+    rid = "R-G-003"
+    itinerary = response.get("itinerary") or {}
+    days = itinerary.get("days") or []
+    has_any_weather = any(d.get("weather") for d in days)
+    if not has_any_weather:
+        return RubricResult.skip(rid, "no weather in itinerary")
+    if "get_weather" not in response.get("tool_calls_made", []):
+        return RubricResult.fail(rid, "Itinerary has weather but no get_weather call")
+    return RubricResult.pass_(rid)
+
+
+def check_R_PLAN_002_country_triggers_request_input(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-PLAN-002: country destination should trigger request_input, not search_flights."""
+    rid = "R-PLAN-002"
+    expect_clarification = context.get("expects_clarification") is True
+    if not expect_clarification:
+        return RubricResult.skip(rid, "context does not expect a clarification")
+    calls = response.get("tool_calls_made", [])
+    if "request_input" not in calls:
+        return RubricResult.fail(rid, f"Expected request_input; got {calls}")
+    if "search_flights" in calls:
+        return RubricResult.fail(
+            rid, "search_flights was called despite missing clarification — R-G-016 violation"
+        )
+    return RubricResult.pass_(rid)
+
+
+def check_R_CHAT_001_no_data_fetch_tools(
+    response: dict, context: dict
+) -> RubricResult:
+    """R-CHAT-001: chat role MUST NOT call search_flights/search_places/etc."""
+    rid = "R-CHAT-001"
+    if context.get("call_role") != "chat":
+        return RubricResult.skip(rid, "not a chat role response")
+    banned = {"search_flights", "search_places", "get_directions",
+              "get_weather", "get_place_details"}
+    calls = set(response.get("tool_calls_made", []))
+    offenders = calls & banned
+    if offenders:
+        return RubricResult.fail(rid, f"Chat role called data-fetch tools: {sorted(offenders)}")
+    return RubricResult.pass_(rid)
+
+
+# ─── registry ───────────────────────────────────────────────────────────────
+
+
+# All rubrics, keyed by their canonical ID. eval_runner looks up by ID when
+# the prompt_suite.yaml lists applicable rubrics.
+RUBRICS: dict[str, Callable[[dict, dict], RubricResult]] = {
+    "R-G-004": check_R_G_004_has_prose_outside_json,
+    "R-G-005": check_R_G_005_no_markdown,
+    "R-G-006": check_R_G_006_no_bullets,
+    "R-G-015": check_R_G_015_subtitle_length_10_25_words,
+    "R-REPLACE-006": check_R_REPLACE_006_description_10_to_15_words,
+    "R-G-002": check_R_G_002_transport_preceded_by_directions,
+    "R-G-003": check_R_G_003_weather_preceded_by_get_weather,
+    "R-PLAN-002": check_R_PLAN_002_country_triggers_request_input,
+    "R-CHAT-001": check_R_CHAT_001_no_data_fetch_tools,
+}
+
+
+def run_rubrics(
+    response: dict,
+    context: dict,
+    rubric_ids: list[str] | None = None,
+) -> list[RubricResult]:
+    """Run a set of rubrics against one response.
+
+    If rubric_ids is None, runs every registered rubric (useful for triage).
+    Unknown IDs produce a SKIP result with a warning reason.
+    """
+    ids = rubric_ids if rubric_ids is not None else list(RUBRICS.keys())
+    results: list[RubricResult] = []
+    for rid in ids:
+        fn = RUBRICS.get(rid)
+        if fn is None:
+            results.append(RubricResult.skip(rid, f"no rubric function registered for {rid}"))
+            continue
+        try:
+            results.append(fn(response, context))
+        except Exception as exc:  # noqa: BLE001 — top-level guard so one bad rubric doesn't tank the run
+            results.append(RubricResult.fail(rid, f"rubric raised: {exc}"))
+    return results

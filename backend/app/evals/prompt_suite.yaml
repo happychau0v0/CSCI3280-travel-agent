@@ -1,0 +1,111 @@
+# Eval prompt suite — seed user messages + applicable rubric IDs.
+#
+# Each entry is one scenario the eval_runner will execute via chat(), then
+# score with the listed rubrics. Rubric IDs mirror docs/llm-spec.md.
+#
+# Not committed golden data — safe to add/remove prompts as we discover
+# new failure modes.
+#
+# To run: python -m app.evals.eval_runner --suite=prompt_suite.yaml
+
+# ─── Plan role — happy path ────────────────────────────────────────────────
+
+- id: plan-hkg-nrt-specific-dates
+  call_role: plan
+  user_message: |
+    Plan a 3-day trip from Hong Kong International Airport (HKG) to Tokyo Narita (NRT).
+    START DATE: 2026-05-15. END DATE: 2026-05-17.
+    Transport: plane. Party: 2 people. Interests: food, temples.
+    Flight cabin: economy. Use search_flights with seat_class="economy".
+  context:
+    user_location: Hong Kong
+    today: "2026-04-17"
+  rubrics:
+    - R-G-004   # prose outside json
+    - R-G-005   # no markdown
+    - R-G-006   # no bullets
+    - R-G-015   # subtitle length
+
+# ─── Plan role — country destination should clarify ────────────────────────
+
+- id: plan-country-destination-triggers-clarification
+  call_role: plan
+  user_message: |
+    Plan a trip to Japan.
+    START DATE: 2026-06-01. END DATE: 2026-06-07.
+    Transport: plane. Party: 1.
+  context:
+    user_location: Hong Kong
+    today: "2026-04-17"
+    expects_clarification: true
+  rubrics:
+    - R-PLAN-002  # country → request_input
+    - R-G-005     # no markdown
+
+# ─── Plan role — missing dates should stop ─────────────────────────────────
+
+- id: plan-missing-date-stops
+  call_role: plan
+  user_message: |
+    Plan a trip from Hong Kong International Airport (HKG) to Tokyo Narita (NRT).
+    START DATE: [not set]. END DATE: [not set].
+    Transport: plane. Party: 2.
+  context:
+    user_location: Hong Kong
+    today: "2026-04-17"
+    expects_clarification: true
+  rubrics:
+    - R-PLAN-002  # reuses the request_input detection
+    - R-G-005
+
+# ─── Hotels role — happy path ──────────────────────────────────────────────
+
+- id: hotels-tokyo-after-ana
+  call_role: hotels
+  user_message: |
+    Selected flight: ANA NH821, 08:00 HKG → 13:15 NRT, HK$1,950.
+    Destination: Tokyo (35.6895, 139.6917). Dates: 2026-05-15 to 2026-05-17.
+    Party: 2. Interests: food, temples. Budget: moderate.
+    Find hotels near the city centre.
+  context:
+    user_location: Hong Kong
+    today: "2026-04-17"
+  rubrics:
+    - R-G-002   # transport tool-first
+    - R-G-003   # weather tool-first
+    - R-G-004
+    - R-G-005
+    - R-G-015
+
+# ─── Chat role — must not call data-fetch tools ────────────────────────────
+
+- id: chat-change-destination
+  call_role: chat
+  user_message: "change my destination to Osaka"
+  context:
+    user_location: Hong Kong
+    today: "2026-04-17"
+  rubrics:
+    - R-CHAT-001  # no search_flights/search_places/etc.
+    - R-G-005
+
+- id: chat-multi-airport-tokyo
+  call_role: chat
+  user_message: "plan a 5-day trip to Tokyo starting next weekend"
+  context:
+    user_location: Hong Kong
+    today: "2026-04-17"
+  rubrics:
+    - R-CHAT-001
+    - R-G-005
+
+# ─── Chat role — pick flight suggestion ────────────────────────────────────
+
+- id: chat-pick-cheapest-flight
+  call_role: chat
+  user_message: "pick the cheapest flight"
+  context:
+    user_location: Hong Kong
+    today: "2026-04-17"
+  rubrics:
+    - R-CHAT-001
