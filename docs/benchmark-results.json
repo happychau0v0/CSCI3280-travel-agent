@@ -1,8 +1,1395 @@
-[
-  {
-    "model": "z-ai/glm-5.1",
-    "elapsed_s": 1104.4,
-    "error": null,
-    "score": 0
+{
+  "x-ai/grok-4.20": {
+    "P1": {
+      "runs": [
+        {
+          "model": "x-ai/grok-4.20",
+          "prompt_id": "P1",
+          "run_idx": 0,
+          "elapsed_s": 30.0,
+          "tool_rounds": 3,
+          "tool_calls_made": [
+            "geocode_city",
+            "search_flights",
+            "search_flights",
+            "get_day_windows",
+            "get_phrasebook",
+            "get_weather",
+            "get_weather",
+            "get_weather",
+            "navigate_menu"
+          ],
+          "has_itinerary": true,
+          "itinerary": {
+            "title": "3 Days in Tokyo",
+            "origin": "Hong Kong",
+            "destination": "Tokyo, Japan",
+            "local_transport_mode": "transit",
+            "flight": {
+              "from_city": "Hong Kong",
+              "from_iata": "HKG",
+              "from_lat": 22.308,
+              "from_lng": 113.918,
+              "to_city": "Tokyo",
+              "to_iata": "NRT",
+              "to_lat": 35.764,
+              "to_lng": 140.386,
+              "date": "2026-06-10",
+              "return_date": "2026-06-12",
+              "source": "mock",
+              "google_flights_url": "https://www.google.com/travel/flights?q=mock",
+              "options": [
+                {
+                  "type": "non-stop",
+                  "label": "Cheapest non-stop",
+                  "price_low": 1850,
+                  "price_high": 2100,
+                  "duration_min": 235,
+                  "stops": 0,
+                  "airline": "ANA",
+                  "departure_time": "08:00",
+                  "arrival_time": "13:15",
+                  "recommended": true,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "non-stop",
+                  "label": "Alternative airline",
+                  "price_low": 2200,
+                  "price_high": 2500,
+                  "duration_min": 240,
+                  "stops": 0,
+                  "airline": "Japan Airlines",
+                  "departure_time": "14:00",
+                  "arrival_time": "19:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "non-stop",
+                  "label": "Fastest non-stop",
+                  "price_low": 2400,
+                  "price_high": 2700,
+                  "duration_min": 225,
+                  "stops": 0,
+                  "airline": "Cathay Pacific",
+                  "departure_time": "10:30",
+                  "arrival_time": "15:30",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "1-stop",
+                  "label": "1 stop \u00b7 cheap",
+                  "price_low": 1400,
+                  "price_high": 1750,
+                  "duration_min": 390,
+                  "stops": 1,
+                  "airline": "Vietnam Airlines",
+                  "departure_time": "06:30",
+                  "arrival_time": "16:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "1-stop budget",
+                  "label": "1 stop \u00b7 budget",
+                  "price_low": 1100,
+                  "price_high": 1400,
+                  "duration_min": 510,
+                  "stops": 1,
+                  "airline": "China Southern",
+                  "departure_time": "22:30",
+                  "arrival_time": "14:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                }
+              ],
+              "return_options": [
+                {
+                  "type": "non-stop",
+                  "label": "Cheapest non-stop",
+                  "price_low": 1850,
+                  "price_high": 2100,
+                  "duration_min": 235,
+                  "stops": 0,
+                  "airline": "ANA",
+                  "departure_time": "08:00",
+                  "arrival_time": "13:15",
+                  "recommended": true,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "non-stop",
+                  "label": "Alternative airline",
+                  "price_low": 2200,
+                  "price_high": 2500,
+                  "duration_min": 240,
+                  "stops": 0,
+                  "airline": "Japan Airlines",
+                  "departure_time": "14:00",
+                  "arrival_time": "19:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "non-stop",
+                  "label": "Fastest non-stop",
+                  "price_low": 2400,
+                  "price_high": 2700,
+                  "duration_min": 225,
+                  "stops": 0,
+                  "airline": "Cathay Pacific",
+                  "departure_time": "10:30",
+                  "arrival_time": "15:30",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "1-stop",
+                  "label": "1 stop \u00b7 cheap",
+                  "price_low": 1400,
+                  "price_high": 1750,
+                  "duration_min": 390,
+                  "stops": 1,
+                  "airline": "Vietnam Airlines",
+                  "departure_time": "06:30",
+                  "arrival_time": "16:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "1-stop budget",
+                  "label": "1 stop \u00b7 budget",
+                  "price_low": 1100,
+                  "price_high": 1400,
+                  "duration_min": 510,
+                  "stops": 1,
+                  "airline": "China Southern",
+                  "departure_time": "22:30",
+                  "arrival_time": "14:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                }
+              ]
+            },
+            "phrasebook": {
+              "language": "Japanese",
+              "language_code": "ja",
+              "phrases": [
+                {
+                  "key": "hello",
+                  "english": "Hello",
+                  "romanized": "Konnichiwa",
+                  "native": "\u3053\u3093\u306b\u3061\u306f"
+                },
+                {
+                  "key": "thank_you",
+                  "english": "Thank you",
+                  "romanized": "Arigatou",
+                  "native": "\u3042\u308a\u304c\u3068\u3046"
+                },
+                {
+                  "key": "excuse_me",
+                  "english": "Excuse me",
+                  "romanized": "Sumimasen",
+                  "native": "\u3059\u307f\u307e\u305b\u3093"
+                }
+              ]
+            }
+          },
+          "usage": {
+            "prompt_tokens": 29376,
+            "completion_tokens": 1455
+          },
+          "error": null,
+          "score": 50,
+          "notes": [
+            "Only 0 hotels (expected \u22655)",
+            "Only 0 days (expected 3)",
+            "No transport_to_next directions"
+          ],
+          "day_activities": [],
+          "big_gaps": [],
+          "has_phrasebook": true,
+          "has_directions": false
+        }
+      ],
+      "agg": {
+        "mean": 50.0,
+        "std": 0.0,
+        "min": 50,
+        "max": 50,
+        "runs": [
+          50
+        ]
+      },
+      "avg_cost": 0.07039,
+      "score_per_dollar": 710
+    }
+  },
+  "x-ai/grok-4.20:thinking": {
+    "P1": {
+      "runs": [
+        {
+          "model": "x-ai/grok-4.20:thinking",
+          "prompt_id": "P1",
+          "run_idx": 0,
+          "elapsed_s": 0.4,
+          "tool_rounds": 0,
+          "tool_calls_made": [],
+          "has_itinerary": false,
+          "itinerary": null,
+          "usage": {
+            "prompt_tokens": 0,
+            "completion_tokens": 0
+          },
+          "error": "Error code: 404 - {'error': {'message': 'No endpoints found for x-ai/grok-4.20:thinking.', 'code': 404}, 'user_id': 'user_3Cqzu050zdQ3O7Ii9E2zGbcv08T'}",
+          "score": 0,
+          "notes": [
+            "Error code: 404 - {'error': {'message': 'No endpoints found for x-ai/grok-4.20:thinking.', 'code': 404}, 'user_id': 'user_3Cqzu050zdQ3O7Ii9E2zGbcv08T'}"
+          ],
+          "day_activities": [],
+          "big_gaps": [],
+          "has_phrasebook": false,
+          "has_directions": false
+        }
+      ],
+      "agg": {
+        "mean": 0.0,
+        "std": 0.0,
+        "min": 0,
+        "max": 0,
+        "runs": [
+          0
+        ]
+      },
+      "avg_cost": 0.0,
+      "score_per_dollar": null
+    }
+  },
+  "anthropic/claude-sonnet-4.6": {
+    "P1": {
+      "runs": [
+        {
+          "model": "anthropic/claude-sonnet-4.6",
+          "prompt_id": "P1",
+          "run_idx": 0,
+          "elapsed_s": 27.4,
+          "tool_rounds": 3,
+          "tool_calls_made": [
+            "geocode_city",
+            "search_flights",
+            "search_flights",
+            "get_phrasebook",
+            "get_day_windows",
+            "navigate_menu"
+          ],
+          "has_itinerary": true,
+          "itinerary": {
+            "title": "3 Days in Tokyo",
+            "origin": "Hong Kong",
+            "destination": "Tokyo, Japan",
+            "local_transport_mode": "transit",
+            "flight": {
+              "from_city": "Hong Kong",
+              "from_iata": "HKG",
+              "from_lat": 22.308,
+              "from_lng": 113.918,
+              "to_city": "Tokyo",
+              "to_iata": "NRT",
+              "to_lat": 35.764,
+              "to_lng": 140.386,
+              "date": "2026-06-10",
+              "return_date": "2026-06-12",
+              "source": "mock",
+              "google_flights_url": "https://www.google.com/travel/flights?q=mock",
+              "options": [
+                {
+                  "type": "non-stop",
+                  "label": "Cheapest non-stop",
+                  "price_low": 1850,
+                  "price_high": 2100,
+                  "duration_min": 235,
+                  "stops": 0,
+                  "stop_cities": [],
+                  "airline": "ANA",
+                  "departure_time": "08:00",
+                  "arrival_time": "13:15",
+                  "recommended": true,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "non-stop",
+                  "label": "Alternative airline",
+                  "price_low": 2200,
+                  "price_high": 2500,
+                  "duration_min": 240,
+                  "stops": 0,
+                  "stop_cities": [],
+                  "airline": "Japan Airlines",
+                  "departure_time": "14:00",
+                  "arrival_time": "19:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "non-stop",
+                  "label": "Fastest non-stop",
+                  "price_low": 2400,
+                  "price_high": 2700,
+                  "duration_min": 225,
+                  "stops": 0,
+                  "stop_cities": [],
+                  "airline": "Cathay Pacific",
+                  "departure_time": "10:30",
+                  "arrival_time": "15:30",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "1-stop",
+                  "label": "1 stop \u00b7 cheap",
+                  "price_low": 1400,
+                  "price_high": 1750,
+                  "duration_min": 390,
+                  "stops": 1,
+                  "stop_cities": [
+                    "HAN"
+                  ],
+                  "airline": "Vietnam Airlines",
+                  "departure_time": "06:30",
+                  "arrival_time": "16:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "1-stop budget",
+                  "label": "1 stop \u00b7 budget",
+                  "price_low": 1100,
+                  "price_high": 1400,
+                  "duration_min": 510,
+                  "stops": 1,
+                  "stop_cities": [
+                    "CAN"
+                  ],
+                  "airline": "China Southern",
+                  "departure_time": "22:30",
+                  "arrival_time": "14:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                }
+              ],
+              "return_options": [
+                {
+                  "type": "non-stop",
+                  "label": "Cheapest non-stop",
+                  "price_low": 1850,
+                  "price_high": 2100,
+                  "duration_min": 235,
+                  "stops": 0,
+                  "stop_cities": [],
+                  "airline": "ANA",
+                  "departure_time": "08:00",
+                  "arrival_time": "13:15",
+                  "recommended": true,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "non-stop",
+                  "label": "Alternative airline",
+                  "price_low": 2200,
+                  "price_high": 2500,
+                  "duration_min": 240,
+                  "stops": 0,
+                  "stop_cities": [],
+                  "airline": "Japan Airlines",
+                  "departure_time": "14:00",
+                  "arrival_time": "19:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "non-stop",
+                  "label": "Fastest non-stop",
+                  "price_low": 2400,
+                  "price_high": 2700,
+                  "duration_min": 225,
+                  "stops": 0,
+                  "stop_cities": [],
+                  "airline": "Cathay Pacific",
+                  "departure_time": "10:30",
+                  "arrival_time": "15:30",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "1-stop",
+                  "label": "1 stop \u00b7 cheap",
+                  "price_low": 1400,
+                  "price_high": 1750,
+                  "duration_min": 390,
+                  "stops": 1,
+                  "stop_cities": [
+                    "HAN"
+                  ],
+                  "airline": "Vietnam Airlines",
+                  "departure_time": "06:30",
+                  "arrival_time": "16:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "1-stop budget",
+                  "label": "1 stop \u00b7 budget",
+                  "price_low": 1100,
+                  "price_high": 1400,
+                  "duration_min": 510,
+                  "stops": 1,
+                  "stop_cities": [
+                    "CAN"
+                  ],
+                  "airline": "China Southern",
+                  "departure_time": "22:30",
+                  "arrival_time": "14:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                }
+              ]
+            },
+            "phrasebook": {
+              "language": "Japanese",
+              "language_code": "ja",
+              "phrases": [
+                {
+                  "key": "hello",
+                  "english": "Hello",
+                  "romanized": "Konnichiwa",
+                  "native": "\u3053\u3093\u306b\u3061\u306f"
+                },
+                {
+                  "key": "thank_you",
+                  "english": "Thank you",
+                  "romanized": "Arigatou",
+                  "native": "\u3042\u308a\u304c\u3068\u3046"
+                },
+                {
+                  "key": "excuse_me",
+                  "english": "Excuse me",
+                  "romanized": "Sumimasen",
+                  "native": "\u3059\u307f\u307e\u305b\u3093"
+                }
+              ]
+            }
+          },
+          "usage": {
+            "prompt_tokens": 36171,
+            "completion_tokens": 2299
+          },
+          "error": null,
+          "score": 50,
+          "notes": [
+            "Only 0 hotels (expected \u22655)",
+            "Only 0 days (expected 3)",
+            "No transport_to_next directions"
+          ],
+          "day_activities": [],
+          "big_gaps": [],
+          "has_phrasebook": true,
+          "has_directions": false
+        }
+      ],
+      "agg": {
+        "mean": 50.0,
+        "std": 0.0,
+        "min": 50,
+        "max": 50,
+        "runs": [
+          50
+        ]
+      },
+      "avg_cost": 0.143,
+      "score_per_dollar": 350
+    }
+  },
+  "google/gemini-3.1-pro-preview": {
+    "P1": {
+      "runs": [
+        {
+          "model": "google/gemini-3.1-pro-preview",
+          "prompt_id": "P1",
+          "run_idx": 0,
+          "elapsed_s": 27.6,
+          "tool_rounds": 3,
+          "tool_calls_made": [
+            "geocode_city",
+            "search_flights",
+            "search_flights",
+            "get_day_windows",
+            "get_phrasebook",
+            "navigate_menu"
+          ],
+          "has_itinerary": true,
+          "itinerary": {
+            "title": "3 Days in Tokyo",
+            "origin": "Hong Kong",
+            "destination": "Tokyo, Japan",
+            "local_transport_mode": "transit",
+            "flight": {
+              "from_city": "Hong Kong",
+              "from_iata": "HKG",
+              "from_lat": 22.308,
+              "from_lng": 113.918,
+              "to_city": "Tokyo",
+              "to_iata": "NRT",
+              "to_lat": 35.764,
+              "to_lng": 140.386,
+              "date": "2026-06-10",
+              "return_date": "2026-06-12",
+              "source": "mock",
+              "google_flights_url": "https://www.google.com/travel/flights?q=mock",
+              "options": [
+                {
+                  "airline": "ANA",
+                  "arrival_time": "13:15",
+                  "departure_time": "08:00",
+                  "duration_min": 235,
+                  "label": "Cheapest non-stop",
+                  "price_high": 2100,
+                  "price_low": 1850,
+                  "recommended": true,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy",
+                  "stops": 0,
+                  "type": "non-stop"
+                },
+                {
+                  "airline": "Japan Airlines",
+                  "arrival_time": "19:00",
+                  "departure_time": "14:00",
+                  "duration_min": 240,
+                  "label": "Alternative airline",
+                  "price_high": 2500,
+                  "price_low": 2200,
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy",
+                  "stops": 0,
+                  "type": "non-stop"
+                },
+                {
+                  "airline": "Cathay Pacific",
+                  "arrival_time": "15:30",
+                  "departure_time": "10:30",
+                  "duration_min": 225,
+                  "label": "Fastest non-stop",
+                  "price_high": 2700,
+                  "price_low": 2400,
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy",
+                  "stops": 0,
+                  "type": "non-stop"
+                },
+                {
+                  "airline": "Vietnam Airlines",
+                  "arrival_time": "16:00",
+                  "departure_time": "06:30",
+                  "duration_min": 390,
+                  "label": "1 stop \u00b7 cheap",
+                  "price_high": 1750,
+                  "price_low": 1400,
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy",
+                  "stops": 1,
+                  "type": "1-stop"
+                },
+                {
+                  "airline": "China Southern",
+                  "arrival_time": "14:00",
+                  "departure_time": "22:30",
+                  "duration_min": 510,
+                  "label": "1 stop \u00b7 budget",
+                  "price_high": 1400,
+                  "price_low": 1100,
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy",
+                  "stops": 1,
+                  "type": "1-stop budget"
+                }
+              ],
+              "return_options": [
+                {
+                  "airline": "ANA",
+                  "arrival_time": "13:15",
+                  "departure_time": "08:00",
+                  "duration_min": 235,
+                  "label": "Cheapest non-stop",
+                  "price_high": 2100,
+                  "price_low": 1850,
+                  "recommended": true,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy",
+                  "stops": 0,
+                  "type": "non-stop"
+                },
+                {
+                  "airline": "Japan Airlines",
+                  "arrival_time": "19:00",
+                  "departure_time": "14:00",
+                  "duration_min": 240,
+                  "label": "Alternative airline",
+                  "price_high": 2500,
+                  "price_low": 2200,
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy",
+                  "stops": 0,
+                  "type": "non-stop"
+                },
+                {
+                  "airline": "Cathay Pacific",
+                  "arrival_time": "15:30",
+                  "departure_time": "10:30",
+                  "duration_min": 225,
+                  "label": "Fastest non-stop",
+                  "price_high": 2700,
+                  "price_low": 2400,
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy",
+                  "stops": 0,
+                  "type": "non-stop"
+                },
+                {
+                  "airline": "Vietnam Airlines",
+                  "arrival_time": "16:00",
+                  "departure_time": "06:30",
+                  "duration_min": 390,
+                  "label": "1 stop \u00b7 cheap",
+                  "price_high": 1750,
+                  "price_low": 1400,
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy",
+                  "stops": 1,
+                  "type": "1-stop"
+                },
+                {
+                  "airline": "China Southern",
+                  "arrival_time": "14:00",
+                  "departure_time": "22:30",
+                  "duration_min": 510,
+                  "label": "1 stop \u00b7 budget",
+                  "price_high": 1400,
+                  "price_low": 1100,
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy",
+                  "stops": 1,
+                  "type": "1-stop budget"
+                }
+              ]
+            },
+            "phrasebook": {
+              "language": "Japanese",
+              "language_code": "ja",
+              "phrases": [
+                {
+                  "key": "hello",
+                  "english": "Hello",
+                  "romanized": "Konnichiwa",
+                  "native": "\u3053\u3093\u306b\u3061\u306f"
+                },
+                {
+                  "key": "thank_you",
+                  "english": "Thank you",
+                  "romanized": "Arigatou",
+                  "native": "\u3042\u308a\u304c\u3068\u3046"
+                },
+                {
+                  "key": "excuse_me",
+                  "english": "Excuse me",
+                  "romanized": "Sumimasen",
+                  "native": "\u3059\u307f\u307e\u305b\u3093"
+                }
+              ]
+            }
+          },
+          "usage": {
+            "prompt_tokens": 25815,
+            "completion_tokens": 3156
+          },
+          "error": null,
+          "score": 50,
+          "notes": [
+            "Only 0 hotels (expected \u22655)",
+            "Only 0 days (expected 3)",
+            "No transport_to_next directions"
+          ],
+          "day_activities": [],
+          "big_gaps": [],
+          "has_phrasebook": true,
+          "has_directions": false
+        }
+      ],
+      "agg": {
+        "mean": 50.0,
+        "std": 0.0,
+        "min": 50,
+        "max": 50,
+        "runs": [
+          50
+        ]
+      },
+      "avg_cost": 0.04805,
+      "score_per_dollar": 1041
+    }
+  },
+  "deepseek/deepseek-v3.2": {
+    "P1": {
+      "runs": [
+        {
+          "model": "deepseek/deepseek-v3.2",
+          "prompt_id": "P1",
+          "run_idx": 0,
+          "elapsed_s": 62.6,
+          "tool_rounds": 3,
+          "tool_calls_made": [
+            "geocode_city",
+            "search_flights",
+            "search_flights",
+            "get_day_windows",
+            "get_phrasebook",
+            "navigate_menu"
+          ],
+          "has_itinerary": false,
+          "itinerary": null,
+          "usage": {
+            "prompt_tokens": 32666,
+            "completion_tokens": 1899
+          },
+          "error": null,
+          "score": 0,
+          "notes": [
+            "No itinerary produced"
+          ],
+          "day_activities": [],
+          "big_gaps": [],
+          "has_phrasebook": false,
+          "has_directions": false
+        }
+      ],
+      "agg": {
+        "mean": 0.0,
+        "std": 0.0,
+        "min": 0,
+        "max": 0,
+        "runs": [
+          0
+        ]
+      },
+      "avg_cost": 0.01124,
+      "score_per_dollar": 0
+    }
+  },
+  "deepseek/deepseek-v3.2-speciale": {
+    "P1": {
+      "runs": [
+        {
+          "model": "deepseek/deepseek-v3.2-speciale",
+          "prompt_id": "P1",
+          "run_idx": 0,
+          "elapsed_s": 0.4,
+          "tool_rounds": 0,
+          "tool_calls_made": [],
+          "has_itinerary": false,
+          "itinerary": null,
+          "usage": {
+            "prompt_tokens": 0,
+            "completion_tokens": 0
+          },
+          "error": "Error code: 404 - {'error': {'message': 'No endpoints found that support tool use. Try disabling \"search_places\". To learn more about provider routing, visit: https://openrouter.ai/docs/guides/routing/provider-selection', 'code': 404}}",
+          "score": 0,
+          "notes": [
+            "Error code: 404 - {'error': {'message': 'No endpoints found that support tool use. Try disabling \"search_places\". To learn more about provider routing, visit: https://openrouter.ai/docs/guides/routing/provider-selection', 'code': 404}}"
+          ],
+          "day_activities": [],
+          "big_gaps": [],
+          "has_phrasebook": false,
+          "has_directions": false
+        }
+      ],
+      "agg": {
+        "mean": 0.0,
+        "std": 0.0,
+        "min": 0,
+        "max": 0,
+        "runs": [
+          0
+        ]
+      },
+      "avg_cost": 0.0,
+      "score_per_dollar": null
+    }
+  },
+  "moonshotai/kimi-k2-0905": {
+    "P1": {
+      "runs": [
+        {
+          "model": "moonshotai/kimi-k2-0905",
+          "prompt_id": "P1",
+          "run_idx": 0,
+          "elapsed_s": 64.8,
+          "tool_rounds": 3,
+          "tool_calls_made": [
+            "geocode_city",
+            "search_flights",
+            "search_flights",
+            "get_day_windows",
+            "get_phrasebook",
+            "search_flights",
+            "search_flights"
+          ],
+          "has_itinerary": true,
+          "itinerary": {
+            "title": "3 Days in Tokyo",
+            "origin": "Hong Kong",
+            "destination": "Tokyo, Japan",
+            "local_transport_mode": "transit",
+            "flight": {
+              "from_city": "Hong Kong",
+              "from_iata": "HKG",
+              "from_lat": 22.308,
+              "from_lng": 113.918,
+              "to_city": "Tokyo",
+              "to_iata": "NRT",
+              "to_lat": 35.764,
+              "to_lng": 140.386,
+              "date": "2026-06-10",
+              "return_date": "2026-06-12",
+              "source": "mock",
+              "google_flights_url": "https://www.google.com/travel/flights?q=mock",
+              "options": [
+                {
+                  "type": "non-stop",
+                  "label": "Cheapest non-stop",
+                  "price_low": 1850,
+                  "price_high": 2100,
+                  "duration_min": 235,
+                  "stops": 0,
+                  "airline": "ANA",
+                  "departure_time": "08:00",
+                  "arrival_time": "13:15",
+                  "recommended": true,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "non-stop",
+                  "label": "Alternative airline",
+                  "price_low": 2200,
+                  "price_high": 2500,
+                  "duration_min": 240,
+                  "stops": 0,
+                  "airline": "Japan Airlines",
+                  "departure_time": "14:00",
+                  "arrival_time": "19:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "non-stop",
+                  "label": "Fastest non-stop",
+                  "price_low": 2400,
+                  "price_high": 2700,
+                  "duration_min": 225,
+                  "stops": 0,
+                  "airline": "Cathay Pacific",
+                  "departure_time": "10:30",
+                  "arrival_time": "15:30",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "1-stop",
+                  "label": "1 stop \u00b7 cheap",
+                  "price_low": 1400,
+                  "price_high": 1750,
+                  "duration_min": 390,
+                  "stops": 1,
+                  "airline": "Vietnam Airlines",
+                  "departure_time": "06:30",
+                  "arrival_time": "16:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "1-stop budget",
+                  "label": "1 stop \u00b7 budget",
+                  "price_low": 1100,
+                  "price_high": 1400,
+                  "duration_min": 510,
+                  "stops": 1,
+                  "airline": "China Southern",
+                  "departure_time": "22:30",
+                  "arrival_time": "14:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                }
+              ],
+              "return_options": [
+                {
+                  "type": "non-stop",
+                  "label": "Cheapest non-stop",
+                  "price_low": 1850,
+                  "price_high": 2100,
+                  "duration_min": 235,
+                  "stops": 0,
+                  "airline": "ANA",
+                  "departure_time": "08:00",
+                  "arrival_time": "13:15",
+                  "recommended": true,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "non-stop",
+                  "label": "Alternative airline",
+                  "price_low": 2200,
+                  "price_high": 2500,
+                  "duration_min": 240,
+                  "stops": 0,
+                  "airline": "Japan Airlines",
+                  "departure_time": "14:00",
+                  "arrival_time": "19:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "non-stop",
+                  "label": "Fastest non-stop",
+                  "price_low": 2400,
+                  "price_high": 2700,
+                  "duration_min": 225,
+                  "stops": 0,
+                  "airline": "Cathay Pacific",
+                  "departure_time": "10:30",
+                  "arrival_time": "15:30",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "1-stop",
+                  "label": "1 stop \u00b7 cheap",
+                  "price_low": 1400,
+                  "price_high": 1750,
+                  "duration_min": 390,
+                  "stops": 1,
+                  "airline": "Vietnam Airlines",
+                  "departure_time": "06:30",
+                  "arrival_time": "16:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "type": "1-stop budget",
+                  "label": "1 stop \u00b7 budget",
+                  "price_low": 1100,
+                  "price_high": 1400,
+                  "duration_min": 510,
+                  "stops": 1,
+                  "airline": "China Southern",
+                  "departure_time": "22:30",
+                  "arrival_time": "14:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                }
+              ]
+            },
+            "phrasebook": {
+              "language": "Japanese",
+              "language_code": "ja",
+              "phrases": [
+                {
+                  "key": "hello",
+                  "english": "Hello",
+                  "romanized": "Konnichiwa",
+                  "native": "\u3053\u3093\u306b\u3061\u306f"
+                },
+                {
+                  "key": "thank_you",
+                  "english": "Thank you",
+                  "romanized": "Arigatou",
+                  "native": "\u3042\u308a\u304c\u3068\u3046"
+                },
+                {
+                  "key": "excuse_me",
+                  "english": "Excuse me",
+                  "romanized": "Sumimasen",
+                  "native": "\u3059\u307f\u307e\u305b\u3093"
+                }
+              ]
+            }
+          },
+          "usage": {
+            "prompt_tokens": 26644,
+            "completion_tokens": 1570
+          },
+          "error": null,
+          "score": 50,
+          "notes": [
+            "Only 0 hotels (expected \u22655)",
+            "Only 0 days (expected 3)",
+            "No transport_to_next directions"
+          ],
+          "day_activities": [],
+          "big_gaps": [],
+          "has_phrasebook": true,
+          "has_directions": false
+        }
+      ],
+      "agg": {
+        "mean": 50.0,
+        "std": 0.0,
+        "min": 50,
+        "max": 50,
+        "runs": [
+          50
+        ]
+      },
+      "avg_cost": 0.01991,
+      "score_per_dollar": 2511
+    }
+  },
+  "minimax/minimax-m2": {
+    "P1": {
+      "runs": [
+        {
+          "model": "minimax/minimax-m2",
+          "prompt_id": "P1",
+          "run_idx": 0,
+          "elapsed_s": 117.6,
+          "tool_rounds": 12,
+          "tool_calls_made": [
+            "search_flights",
+            "search_flights",
+            "geocode_city",
+            "get_day_windows",
+            "get_phrasebook",
+            "search_flights",
+            "search_flights",
+            "search_flights",
+            "navigate_menu",
+            "search_places",
+            "get_weather",
+            "navigate_menu",
+            "get_weather",
+            "get_weather",
+            "get_weather",
+            "search_places",
+            "search_places",
+            "search_places",
+            "search_places",
+            "search_places",
+            "search_places",
+            "get_place_details",
+            "get_place_details",
+            "get_place_details",
+            "get_directions",
+            "get_directions",
+            "get_directions",
+            "get_directions",
+            "get_directions",
+            "navigate_menu"
+          ],
+          "has_itinerary": false,
+          "itinerary": null,
+          "usage": {
+            "prompt_tokens": 175623,
+            "completion_tokens": 7405
+          },
+          "error": null,
+          "score": 0,
+          "notes": [
+            "No itinerary produced"
+          ],
+          "day_activities": [],
+          "big_gaps": [],
+          "has_phrasebook": false,
+          "has_directions": false
+        }
+      ],
+      "agg": {
+        "mean": 0.0,
+        "std": 0.0,
+        "min": 0,
+        "max": 0,
+        "runs": [
+          0
+        ]
+      },
+      "avg_cost": 0.0821,
+      "score_per_dollar": 0
+    }
+  },
+  "minimax/minimax-m2.7": {
+    "P1": {
+      "runs": [
+        {
+          "model": "minimax/minimax-m2.7",
+          "prompt_id": "P1",
+          "run_idx": 0,
+          "elapsed_s": 60.6,
+          "tool_rounds": 4,
+          "tool_calls_made": [
+            "search_airports",
+            "geocode_city",
+            "search_flights",
+            "get_day_windows",
+            "get_phrasebook",
+            "search_flights",
+            "search_flights",
+            "search_places",
+            "navigate_menu"
+          ],
+          "has_itinerary": true,
+          "itinerary": {
+            "title": "3 Days in Tokyo",
+            "origin": "Hong Kong",
+            "destination": "Tokyo, Japan",
+            "local_transport_mode": "transit",
+            "flight": {
+              "from_city": "Hong Kong",
+              "from_iata": "HKG",
+              "from_lat": 22.308,
+              "from_lng": 113.918,
+              "to_city": "Tokyo",
+              "to_iata": "NRT",
+              "to_lat": 35.764,
+              "to_lng": 140.386,
+              "date": "2026-06-10",
+              "return_date": "2026-06-12",
+              "source": "mock",
+              "google_flights_url": "https://www.google.com/travel/flights?q=HKG+to+NRT+June+10+2026",
+              "options": [
+                {
+                  "label": "Cheapest non-stop",
+                  "stops": 0,
+                  "airline": "ANA",
+                  "price_low": 1850,
+                  "price_high": 2100,
+                  "duration_min": 235,
+                  "departure_time": "08:00",
+                  "arrival_time": "13:15",
+                  "recommended": true,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "label": "Alternative airline",
+                  "stops": 0,
+                  "airline": "Japan Airlines",
+                  "price_low": 2200,
+                  "price_high": 2500,
+                  "duration_min": 240,
+                  "departure_time": "14:00",
+                  "arrival_time": "19:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "label": "Fastest non-stop",
+                  "stops": 0,
+                  "airline": "Cathay Pacific",
+                  "price_low": 2400,
+                  "price_high": 2700,
+                  "duration_min": 225,
+                  "departure_time": "10:30",
+                  "arrival_time": "15:30",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "label": "1 stop \u00b7 cheap",
+                  "stops": 1,
+                  "airline": "Vietnam Airlines",
+                  "price_low": 1400,
+                  "price_high": 1750,
+                  "duration_min": 390,
+                  "departure_time": "06:30",
+                  "arrival_time": "16:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "label": "1 stop \u00b7 budget",
+                  "stops": 1,
+                  "airline": "China Southern",
+                  "price_low": 1100,
+                  "price_high": 1400,
+                  "duration_min": 510,
+                  "departure_time": "22:30",
+                  "arrival_time": "14:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                }
+              ],
+              "return_options": [
+                {
+                  "label": "Cheapest non-stop",
+                  "stops": 0,
+                  "airline": "ANA",
+                  "price_low": 1850,
+                  "price_high": 2100,
+                  "duration_min": 235,
+                  "departure_time": "08:00",
+                  "arrival_time": "13:15",
+                  "recommended": true,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "label": "Alternative airline",
+                  "stops": 0,
+                  "airline": "Japan Airlines",
+                  "price_low": 2200,
+                  "price_high": 2500,
+                  "duration_min": 240,
+                  "departure_time": "14:00",
+                  "arrival_time": "19:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "label": "Fastest non-stop",
+                  "stops": 0,
+                  "airline": "Cathay Pacific",
+                  "price_low": 2400,
+                  "price_high": 2700,
+                  "duration_min": 225,
+                  "departure_time": "10:30",
+                  "arrival_time": "15:30",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "label": "1 stop \u00b7 cheap",
+                  "stops": 1,
+                  "airline": "Vietnam Airlines",
+                  "price_low": 1400,
+                  "price_high": 1750,
+                  "duration_min": 390,
+                  "departure_time": "06:30",
+                  "arrival_time": "16:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                },
+                {
+                  "label": "1 stop \u00b7 budget",
+                  "stops": 1,
+                  "airline": "China Southern",
+                  "price_low": 1100,
+                  "price_high": 1400,
+                  "duration_min": 510,
+                  "departure_time": "22:30",
+                  "arrival_time": "14:00",
+                  "recommended": false,
+                  "seat_class": "economy",
+                  "seat_class_label": "Economy"
+                }
+              ]
+            },
+            "phrasebook": {
+              "language": "Japanese",
+              "language_code": "ja",
+              "phrases": [
+                {
+                  "key": "hello",
+                  "english": "Hello",
+                  "romanized": "Konnichiwa",
+                  "native": "\u3053\u3093\u306b\u3061\u306f"
+                },
+                {
+                  "key": "thank_you",
+                  "english": "Thank you",
+                  "romanized": "Arigatou",
+                  "native": "\u3042\u308a\u304c\u3068\u3046"
+                },
+                {
+                  "key": "excuse_me",
+                  "english": "Excuse me",
+                  "romanized": "Sumimasen",
+                  "native": "\u3059\u307f\u307e\u305b\u3093"
+                }
+              ]
+            }
+          },
+          "usage": {
+            "prompt_tokens": 40033,
+            "completion_tokens": 2841
+          },
+          "error": null,
+          "score": 50,
+          "notes": [
+            "Only 0 hotels (expected \u22655)",
+            "Only 0 days (expected 3)",
+            "No transport_to_next directions"
+          ],
+          "day_activities": [],
+          "big_gaps": [],
+          "has_phrasebook": true,
+          "has_directions": false
+        }
+      ],
+      "agg": {
+        "mean": 50.0,
+        "std": 0.0,
+        "min": 50,
+        "max": 50,
+        "runs": [
+          50
+        ]
+      },
+      "avg_cost": 0.02056,
+      "score_per_dollar": 2432
+    }
   }
-]
+}

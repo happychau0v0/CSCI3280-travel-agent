@@ -44,7 +44,7 @@ from openai import AsyncOpenAI  # noqa: E402
 
 from app.config import OPENROUTER_API_KEY, check_key  # noqa: E402
 from app.llm import _extract_itinerary  # noqa: E402
-from app.prompts import SYSTEM_PROMPT, Itinerary  # noqa: E402
+from app.prompts import BENCH_EVAL_ADDENDUM, SYSTEM_PROMPT, Itinerary  # noqa: E402
 from app.tools import TOOL_DEFINITIONS, TOOL_DISPATCH  # noqa: E402
 
 # ─── Models ─────────────────────────────────────────────────────────────────
@@ -175,7 +175,7 @@ async def run_one(model_id: str, prompt: dict, run_idx: int) -> dict:
     """Run one model on one prompt and return raw result with usage data."""
     client = _get_client()
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": SYSTEM_PROMPT + BENCH_EVAL_ADDENDUM},
         {"role": "user", "content": prompt["text"]},
     ]
     tool_calls_made: list[str] = []
