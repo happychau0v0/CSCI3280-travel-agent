@@ -53,20 +53,15 @@ from app.tools import TOOL_DEFINITIONS, TOOL_DISPATCH  # noqa: E402
 # Exact slugs follow openrouter.ai/models naming. Verify against the site
 # if any return 404/auth errors during the dry run.
 MODELS = [
-    # xAI Grok — both variants (bake-off resolution: was inconclusive before)
-    "x-ai/grok-4.20-0309-non-reasoning",   # production default — scored 100% previously
-    "x-ai/grok-4.20-0309-reasoning",        # reasoning variant — context pruning issue unresolved
-    # OpenRouter top-10 by token volume (April 2026)
-    "anthropic/claude-sonnet-4-5",          # #1 — Claude Sonnet 4.6 (was 0% via old proxy)
-    "deepseek/deepseek-v3-2",               # #2 — DeepSeek V3.2
-    "moonshotai/kimi-k2-6",                 # #3 — Kimi K2.6
-    "google/gemini-3-flash",                # #4 — Gemini 3 Flash Preview
-    "anthropic/claude-opus-4-7",            # #5 — Claude Opus 4.7
-    "minimax/minimax-m2-7",                 # #6 — MiniMax M2.7
-    "minimax/minimax-m2-5",                 # #7 — MiniMax M2.5
-    "xiaomi/mimo-v2-pro",                   # #8 — MiMo-V2-Pro
-    "x-ai/grok-4-1-fast",                  # #9 — Grok 4.1 Fast
-    "anthropic/claude-opus-4-6",            # #10 — Claude Opus 4.6
+    "x-ai/grok-4.20",
+    "x-ai/grok-4.20:thinking",
+    "anthropic/claude-sonnet-4.6",
+    "google/gemini-3.1-pro-preview",
+    "deepseek/deepseek-v3.2",
+    "deepseek/deepseek-v3.2-speciale",
+    "moonshotai/kimi-k2-0905",
+    "minimax/minimax-m2",
+    "minimax/minimax-m2.7",
 ]
 
 N_RUNS = 3
@@ -142,18 +137,15 @@ PROMPTS = [
 
 # Approximate April 2026 OpenRouter pricing ($/1M tokens)
 COST_PER_1M: dict[str, dict[str, float]] = {
-    "x-ai/grok-4.20-0309-non-reasoning": {"input": 2.00,  "output": 8.00},
-    "x-ai/grok-4.20-0309-reasoning":     {"input": 3.00,  "output": 15.00},
-    "anthropic/claude-sonnet-4-5":       {"input": 3.00,  "output": 15.00},
-    "anthropic/claude-opus-4-7":         {"input": 15.00, "output": 75.00},
-    "anthropic/claude-opus-4-6":         {"input": 15.00, "output": 75.00},
-    "deepseek/deepseek-v3-2":            {"input": 0.28,  "output": 1.10},
-    "moonshotai/kimi-k2-6":              {"input": 0.60,  "output": 2.50},
-    "google/gemini-3-flash":             {"input": 0.15,  "output": 0.60},
-    "minimax/minimax-m2-7":              {"input": 0.40,  "output": 1.60},
-    "minimax/minimax-m2-5":              {"input": 0.30,  "output": 1.20},
-    "xiaomi/mimo-v2-pro":                {"input": 0.50,  "output": 2.00},
-    "x-ai/grok-4-1-fast":               {"input": 1.00,  "output": 4.00},
+    "x-ai/grok-4.20":                    {"input": 2.00,  "output": 8.00},
+    "x-ai/grok-4.20:thinking":           {"input": 3.00,  "output": 15.00},
+    "anthropic/claude-sonnet-4.6":       {"input": 3.00,  "output": 15.00},
+    "google/gemini-3.1-pro-preview":     {"input": 1.25,  "output": 5.00},
+    "deepseek/deepseek-v3.2":            {"input": 0.28,  "output": 1.10},
+    "deepseek/deepseek-v3.2-speciale":   {"input": 0.28,  "output": 1.10},
+    "moonshotai/kimi-k2-0905":           {"input": 0.60,  "output": 2.50},
+    "minimax/minimax-m2":                {"input": 0.40,  "output": 1.60},
+    "minimax/minimax-m2.7":              {"input": 0.40,  "output": 1.60},
 }
 
 MAX_TOOL_ROUNDS = 20
@@ -166,6 +158,9 @@ _client: AsyncOpenAI | None = None
 def _get_client() -> AsyncOpenAI:
     global _client
     if _client is None:
+        # IMPORTANT: Do NOT pass trust_env=False or a custom httpx client here.
+        # OpenRouter calls MUST go through the system proxy (HTTP_PROXY / HTTPS_PROXY)
+        # set at http://127.0.0.1:7897 — running without proxy risks account bans.
         _client = AsyncOpenAI(
             api_key=OPENROUTER_API_KEY,
             base_url="https://openrouter.ai/api/v1",
