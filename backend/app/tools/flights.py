@@ -53,6 +53,85 @@ logger = logging.getLogger(__name__)
 # airline name AND a trackable flight number separately.
 _FLIGHT_CODE_RE = re.compile(r"\b([A-Z0-9]{2,3}\s*\d{1,4})\s*$")
 
+# ─── Stop-city extraction from Google Flights embedded JavaScript ─────────
+#
+# Google Flights embeds structured flight data directly in JavaScript inside
+# the HTML response.  Each flight option that has one or more stops includes
+# a layover block of the form:
+#
+#   [[LAYOVER_DURATION_MIN, "IATA", "IATA", [flags], "Airport Full Name",
+#     "City Name", "Airport Full Name", "City Name"], ...]
+#
+# We locate every such block, then look backward in the same HTML chunk to
+# find the preceding 2-letter airline code and HH:MM departure time.  The
+# resulting (airline_code, dep_hhmm) → [city_names] map lets us annotate
+# the Flight objects returned by fast-flights' CSS-based parser.
+#
+# Thread-local storage lets the monkey-patched fetch() pass the raw HTML to
+# _try_fast_flights() without changing the fast-flights function signature.
+_response_local = threading.local()
+
+# Matches a single layover entry inside the JS data.
+_LAYOVER_RE = re.compile(
+    r"\[(\d{2,3}),"           # group 1: layover duration in minutes
+    r"\"([A-Z]{3})\","        # group 2: stop airport IATA code
+    r"\"[A-Z]{3}\","          # duplicate IATA (ignored)
+    r"\[[^\]]*\],"            # flags array (ignored)
+    r"\"[^\"]*\","            # full airport name (ignored – use IATA lookup)
+    r"\"([^\"]+)\""           # group 3: city name from dataset
+)
+
+# Finds the departure time [H, MM] immediately before a destination IATA in JS.
+_DEP_TIME_RE = re.compile(r"\[(\d{1,2}),(\d{2})\],\"[A-Z]{3}\"")
+
+# Finds an airline entry header: ["XX", ["Airline Name"], [[
+_AIRLINE_ENTRY_RE = re.compile(r"\[\"([A-Z]{2,3})\",\[\"[^\"]+\"\],\[\[")
+
+
+def _extract_layover_stop_cities(html: str) -> dict[tuple[str, str], list[str]]:
+    """Parse stop-city names from Google Flights embedded JavaScript.
+
+    Returns {(airline_code, dep_hhmm): [city_name, ...]} for every
+    multi-stop flight option found in the page.  Uses the airports table
+    to get canonical city names; falls back to the JS-embedded city string.
+    """
+    from app.tools.airports import _BY_IATA  # local import avoids circular deps
+
+    # Build the result incrementally.  For each layover entry we look
+    # backward up to 3 000 chars for (a) the nearest airline code and
+    # (b) the nearest departure-time pattern.  We then key on
+    # (airline_2letter, dep_hhmm) so that two airlines departing at the
+    # same time don't collide.
+    result: dict[tuple[str, str], list[str]] = {}
+
+    for m in _LAYOVER_RE.finditer(html):
+        pos = m.start()
+        window = html[max(0, pos - 3000): pos]
+
+        # Nearest airline code
+        airline_hits = list(_AIRLINE_ENTRY_RE.finditer(window))
+        airline_code = airline_hits[-1].group(1) if airline_hits else ""
+
+        # Nearest departure time
+        dep_hits = list(_DEP_TIME_RE.finditer(window))
+        if not dep_hits:
+            continue
+        dep_h, dep_m = int(dep_hits[-1].group(1)), int(dep_hits[-1].group(2))
+        dep_key = f"{dep_h:02d}:{dep_m:02d}"
+
+        key = (airline_code, dep_key)
+
+        # Use airport table for canonical city name; fall back to JS string.
+        iata = m.group(2)
+        airport_entry = _BY_IATA.get(iata)
+        city = airport_entry["city"] if airport_entry else m.group(3)
+
+        cities = result.setdefault(key, [])
+        if city not in cities:
+            cities.append(city)
+
+    return result
+
 
 def _split_airline_and_code(name: str) -> tuple[str, str | None]:
     """Split 'Cathay Pacific CX 100' → ('Cathay Pacific', 'CX100').
@@ -84,6 +163,9 @@ try:
         client = _PrimpClient(impersonate="chrome_126", verify=False, timeout=8.0)
         res = client.get("https://www.google.com/travel/flights", params=params)
         assert res.status_code == 200, f"{res.status_code} Result: {res.text_markdown}"
+        # Save raw HTML so _extract_layover_stop_cities can mine stop city names
+        # from the JS embedded in the page without modifying fast-flights internals.
+        _response_local.html = res.text
         return res
 
     _ff_core.fetch = _fetch_with_timeout  # type: ignore[attr-defined]
@@ -415,6 +497,25 @@ def _try_fast_flights(from_iata: str, to_iata: str, date: str, seat_class: str =
                 "is_best": getattr(f, "is_best", False),
             }
         )
+
+    # Annotate each multi-stop flight with the actual layover cities extracted
+    # from the JS embedded in the Google Flights page HTML.  Non-stop flights
+    # and flights where we couldn't find matching JS data get an empty list.
+    raw_html = getattr(_response_local, "html", "")
+    if raw_html and any(f["stops"] > 0 for f in flights):
+        stop_map = _extract_layover_stop_cities(raw_html)
+        for flight in flights:
+            if flight["stops"] == 0:
+                flight["stop_cities"] = []
+                continue
+            # Key: (2-letter airline prefix, departure HH:MM)
+            airline_prefix = (flight["flight_number"] or "")[:2] or (flight["airline"] or "")[:2]
+            dep_key = _normalize_time(flight["departure"]) or ""
+            flight["stop_cities"] = stop_map.get((airline_prefix, dep_key), [])
+    else:
+        for flight in flights:
+            flight["stop_cities"] = []
+
     return flights
 
 
@@ -454,6 +555,7 @@ def _options_from_live(live: list[dict]) -> list[dict]:
             "price_high": flight["price_num"],
             "duration_min": flight["duration_min"],
             "stops": flight["stops"],
+            "stop_cities": flight.get("stop_cities", []),        # ["Dubai", "Doha"] or []
             "airline": flight["airline"],
             "flight_number": flight.get("flight_number"),        # "CX100" or None
             "next_day_arrival": flight.get("next_day_arrival", False),
