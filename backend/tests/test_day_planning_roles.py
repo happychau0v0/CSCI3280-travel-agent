@@ -8,14 +8,12 @@ Verifies:
 """
 from __future__ import annotations
 
-import json
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from app import llm
-from app.prompts import SYSTEM_PROMPT_DAY_THEMES, SYSTEM_PROMPT_DAY_DETAIL
 
 
 # ─── shared helpers (mirror test_llm_loop.py) ────────────────────────────────

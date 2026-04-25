@@ -1,5 +1,4 @@
 """Tests for bench_eval mode and bench scorer."""
-import json
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -111,7 +110,7 @@ async def test_bench_eval_produces_complete_itinerary():
             "itinerary": MOCK_FULL_ITIN["itinerary"],
             "tool_calls_made": [],
         }
-        result = await chat(
+        await chat(
             [{"role": "user", "content": "Plan 3 days in Tokyo"}],
             bench_eval=True,
         )

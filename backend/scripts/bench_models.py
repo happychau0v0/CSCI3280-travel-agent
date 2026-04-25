@@ -225,7 +225,7 @@ def restart_backend_with_model(model: str) -> bool:
                 return True
         except Exception:
             pass
-    print(f"  ❌ backend failed to start within 15s")
+    print("  ❌ backend failed to start within 15s")
     return False
 
 

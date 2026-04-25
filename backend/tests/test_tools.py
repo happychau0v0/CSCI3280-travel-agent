@@ -1120,7 +1120,6 @@ def test_tools_list_only_contains_function_types():
 ])
 def test_prune_keep_rounds_is_model_aware(model, expected_rounds, monkeypatch):
     """PRUNE_KEEP_ROUNDS must be 3 for reasoning models, 2 for non-reasoning."""
-    import importlib
     import app.config as cfg
     monkeypatch.setattr(cfg, "LLM_MODEL", model)
     # Re-derive the value the same way config.py does

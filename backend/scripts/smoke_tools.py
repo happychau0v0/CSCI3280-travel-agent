@@ -152,7 +152,7 @@ def build_cases(place_id_holder):
 async def run_one(name, args, check):
     fn = TOOL_DISPATCH.get(name)
     if fn is None:
-        return (name, "❌", 0, f"not in TOOL_DISPATCH")
+        return (name, "❌", 0, "not in TOOL_DISPATCH")
     t0 = time.perf_counter()
     try:
         result = await fn(**args)
