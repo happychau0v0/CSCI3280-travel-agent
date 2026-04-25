@@ -28,12 +28,12 @@ from __future__ import annotations
 
 import httpx
 
-from app.config import GOOGLE_MAPS_API_KEY, check_key
+from app.config import GOOGLE_MAPS_API_KEY, check_key, make_http_client
 from app.tools.errors import ToolUnavailableError
 
 # Module-level shared client: reuses TCP connections across calls, eliminating
 # per-call TCP+TLS handshake overhead (~100-300ms saved per Google API call).
-_http = httpx.AsyncClient(timeout=15.0, trust_env=False)
+_http = make_http_client(15.0)
 
 PLACES_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
 PLACES_DETAILS_URL = "https://places.googleapis.com/v1/places/{place_id}"

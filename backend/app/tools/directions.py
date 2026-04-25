@@ -7,11 +7,11 @@ from typing import Any
 
 import httpx
 
-from app.config import GOOGLE_MAPS_API_KEY, check_key
+from app.config import GOOGLE_MAPS_API_KEY, check_key, make_http_client
 from app.tools.errors import ToolUnavailableError
 
 # Module-level shared client: reuses TCP connections across calls.
-_http = httpx.AsyncClient(timeout=15.0, trust_env=False)
+_http = make_http_client(15.0)
 
 ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
 

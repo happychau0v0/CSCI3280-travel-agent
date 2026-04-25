@@ -53,6 +53,7 @@ from app.config import (
     XAI_API_KEY,
     XAI_BASE_URL,
     check_key,
+    make_http_client,
 )
 from app.prompts import BENCH_EVAL_ADDENDUM, ROLE_ALLOWED_TOOLS, ROLE_PROMPTS, SYSTEM_PROMPT
 from app.tools import TOOL_DEFINITIONS, TOOL_DISPATCH, ToolUnavailableError
@@ -108,12 +109,11 @@ def _get_client() -> AsyncOpenAI:
         # even for slow reasoning, while cutting hangs from stalled API
         # connections (was 120 s, which felt like "hung forever" to users).
         timeout = httpx.Timeout(connect=10.0, read=45.0, write=30.0, pool=5.0)
-        http_client = httpx.AsyncClient(timeout=timeout, trust_env=False)
         _client = AsyncOpenAI(
             api_key=XAI_API_KEY,
             base_url=XAI_BASE_URL,
             timeout=timeout,
-            http_client=http_client,
+            http_client=make_http_client(timeout),
         )
     return _client
 
@@ -135,6 +135,7 @@ def _get_fallback_client() -> AsyncOpenAI:
             api_key=GEMINI_API_KEY,
             base_url=GEMINI_BASE_URL,
             timeout=timeout,
+            http_client=make_http_client(timeout),
         )
     return _fallback_client
 

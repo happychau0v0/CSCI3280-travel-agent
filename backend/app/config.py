@@ -1,5 +1,7 @@
 import os
+from typing import Union
 
+import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -33,6 +35,21 @@ OPENROUTER_PROXY = os.getenv("OPENROUTER_PROXY", "")
 
 # Google Maps Platform — single key for Places, Routes, Weather, Geocoding, Time Zone
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
+
+# Local VPN/proxy for routing external API calls (e.g. Clash on port 7897).
+# Leave empty to connect directly.
+HTTPS_PROXY: str = os.getenv("HTTPS_PROXY", "")
+
+
+def make_http_client(timeout: Union[float, httpx.Timeout] = 15.0) -> httpx.AsyncClient:
+    """Return an AsyncClient with the configured proxy (if any).
+
+    All callers set trust_env=False, so the proxy must be passed explicitly.
+    """
+    kwargs: dict = {"timeout": timeout, "trust_env": False}
+    if HTTPS_PROXY:
+        kwargs["proxy"] = HTTPS_PROXY
+    return httpx.AsyncClient(**kwargs)
 
 
 def check_key(value: str) -> bool:
