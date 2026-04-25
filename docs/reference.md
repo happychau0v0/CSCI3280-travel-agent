@@ -1130,6 +1130,123 @@ Checklist for adding a new hotkey:
 
 ---
 
+## 7b. Frontend-Only Features
+
+### Favorites
+
+**Component:** `frontend/src/components/FavoritesOverlay.jsx`  
+**Hotkey:** `F`  
+**localStorage key:** `travel-favorites`
+
+Any activity card in the DAYS panel has a ★ button. Clicking it calls
+`onToggleFavorite(activity)` in App.jsx, which adds or removes the activity
+from the `favorites` array and persists it.
+
+**Data shape:**
+
+```js
+[
+  {
+    key: "unique-id",          // activity.place_id or generated UUID
+    name: "Senso-ji Temple",
+    destination: "Tokyo",
+    address: "2-3-1 Asakusa, Tokyo",
+    photo_url: "https://…",
+    saved_at: 1713200000000,   // Date.now() at save time
+  },
+  …
+]
+```
+
+The overlay groups entries by `destination`, shows relative time ("3d ago"),
+and provides a Remove (×) button per entry. Removing updates localStorage
+immediately. The overlay is read-only — activities cannot be navigated to from
+here (no deep-link to the day).
+
+---
+
+### Trip Checklist
+
+**Component:** `frontend/src/components/TripChecklist.jsx`  
+**Hotkey:** `L`  
+**localStorage key:** `travel-checklist`
+
+A 12-item pre-trip checklist keyed by destination string (lowercased). Each
+item is either checked or unchecked and persists independently per destination.
+
+**Items:**
+
+| Key | Label | Category |
+|-----|-------|----------|
+| `passport` | Passport valid 6+ months | critical |
+| `visa` | Visa / ETA obtained | critical |
+| `flights_confirm` | Flights confirmed | critical |
+| `hotel_confirm` | Hotel confirmed | critical |
+| `emergency` | Emergency contacts noted | critical |
+| `insurance` | Travel insurance | nice-to-have |
+| `adapter` | Power adapter packed | nice-to-have |
+| `sim` | SIM / eSIM arranged | nice-to-have |
+| `cash` | Local cash / card | nice-to-have |
+| `meds` | Medications packed | nice-to-have |
+| `calendar` | Calendar blocked | nice-to-have |
+| `home` | Home secured | nice-to-have |
+
+**Data shape:**
+
+```js
+{
+  "tokyo": { "passport": true, "visa": false, "insurance": true, … },
+  "paris": { "passport": true, … },
+}
+```
+
+The header shows `X/12 items · Y/5 critical` progress counts. Critical items
+are highlighted in amber until checked.
+
+---
+
+### Currency Conversion
+
+**Component:** `frontend/src/components/SettingsOverlay.jsx`  
+**Exported helper:** `formatDisplayPrice(hkdAmount, currency)`
+
+All prices from the backend are denominated in **HKD**. Conversion to the
+user's selected currency happens client-side at display time using hardcoded
+rates — the backend is never called for FX.
+
+**Supported currencies and rates (as of project submission):**
+
+| Code | Symbol | Rate (1 unit = X HKD) |
+|------|--------|----------------------|
+| `HKD` | `HK$` | 1.0 (passthrough) |
+| `USD` | `$` | 7.8 |
+| `EUR` | `€` | 8.4 |
+| `JPY` | `¥` | 0.052 |
+| `GBP` | `£` | 9.9 |
+| `CNY` | `¥` | 1.1 |
+
+**Implementation:**
+
+```js
+// SettingsOverlay.jsx (exported)
+export function formatDisplayPrice(hkd, currency = "HKD") {
+  if (!hkd && hkd !== 0) return "—";
+  const rate = CURRENCY_TO_HKD[currency] ?? 1;
+  const converted = hkd / rate;
+  return `${CURRENCY_LABELS[currency]}${Math.round(converted).toLocaleString()}`;
+}
+```
+
+The rates are intentionally static. The flight estimator already carries a
+±30 % confidence band that swallows typical FX drift (< 2 % week-over-week).
+
+**Persistence:** Selected currency is written to `travel-currency` in
+localStorage and read on load. The `currency` prop is threaded from App.jsx
+down to every panel that displays a price (`PanelFlights`, `PanelHotels`,
+`PanelDays`, `PanelHome`).
+
+---
+
 ## 8. Service Status Overlay
 
 **Triggered by:** `C` hotkey  
