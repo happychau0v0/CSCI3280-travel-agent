@@ -1,0 +1,40 @@
+# Version-control and local tooling state
+.git
+.claude
+.worktrees
+.playwright-mcp
+test-results
+playwright-report
+
+# Credentials and machine-specific TLS material
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+
+# Dependencies, build output, and language caches
+**/node_modules
+frontend/dist
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+backend/.venv
+*.py[cod]
+*.log
+
+# Local reference material and ad-hoc walkthrough captures
+docs/references/flight.png
+docs/references/maplibre-globe
+docs/screenshots/walkthrough
+
+# Generated LaTeX build files
+docs/final-report/**/*.aux
+docs/final-report/**/*.fdb_latexmk
+docs/final-report/**/*.fls
+docs/final-report/**/*.log
+docs/final-report/**/*.out
+docs/final-report/**/*.synctex.gz

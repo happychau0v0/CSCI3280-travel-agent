@@ -18,8 +18,15 @@ yarn-error.log*
 
 # Environment
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+
+# Private keys and local TLS material
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
 
 # IDE
 .vscode/
@@ -36,14 +43,27 @@ Thumbs.db
 *.log
 .ralph/
 
+# Test, coverage, and tool caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage/
+htmlcov/
+*.tsbuildinfo
+
 # Playwright MCP test artifacts
 .playwright-mcp/
-*.png
+test-results/
+playwright-report/
+
+# Local reference material and ad-hoc walkthrough captures
+docs/references/flight.png
+docs/references/maplibre-globe/
+docs/screenshots/walkthrough/
 
 # Runtime artifacts
 backend/logs/
 backend/tests/fixtures/llm_outputs/dump_*.txt
-.playwright-mcp/
 .worktrees/
 
 # Claude Code working directory (per-user AI assistant state)
