@@ -453,8 +453,10 @@ export default function PanelDays({
     }
 
     setLiveRouteLoading(true);
+    let cancelled = false;
     liveRouteTimer.current = setTimeout(async () => {
       const result = await getDirections(originStr, destStr, mode);
+      if (cancelled) return;
       setLiveRouteLoading(false);
       if (result?.polyline) {
         const route = { ...result, mode };
@@ -463,7 +465,10 @@ export default function PanelDays({
       }
     }, 400);
 
-    return () => clearTimeout(liveRouteTimer.current);
+    return () => {
+      cancelled = true;
+      clearTimeout(liveRouteTimer.current);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeActivityIdx, selectedIdx, itinerary?.selected_hotel?.lat]);
 

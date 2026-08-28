@@ -174,14 +174,15 @@ export default function DayMiniMap({
     const pts = [];
     const lines = [];
     let counter = 1;
-    for (const a of activities || []) {
+    for (let i = 0; i < (activities || []).length; i++) {
+      const a = activities[i];
       if (a.lat != null && a.lng != null) {
-        pts.push({ idx: counter++, name: a.name, lat: a.lat, lng: a.lng });
+        pts.push({ idx: counter++, activityIdx: i, name: a.name, lat: a.lat, lng: a.lng });
       }
       if (a.transport_to_next?.polyline) {
         const decoded = decodePolyline(a.transport_to_next.polyline);
         if (decoded.length > 1) {
-          lines.push({ coords: decoded, mode: a.transport_to_next.mode || "TRANSIT" });
+          lines.push({ activityIdx: i, coords: decoded, mode: a.transport_to_next.mode || "TRANSIT" });
         }
       }
     }
@@ -201,10 +202,9 @@ export default function DayMiniMap({
         return [decoded[0], decoded[decoded.length - 1]];
       }
     }
-    // Origin = previous activity (idx is 1-based, activeActivityIdx is 0-based)
-    const a = points.find((p) => p.idx === activeActivityIdx);
-    // Destination = clicked activity
-    const b = points.find((p) => p.idx === activeActivityIdx + 1);
+    // Origin = previous activity; destination = clicked activity (both by raw 0-based activityIdx)
+    const a = points.find((p) => p.activityIdx === activeActivityIdx - 1);
+    const b = points.find((p) => p.activityIdx === activeActivityIdx);
     const pair = [a, b].filter(Boolean).map((p) => [p.lat, p.lng]);
     return pair.length >= 2 ? pair : actPts;
   }, [activeActivityIdx, points, liveRoute]);
@@ -291,9 +291,8 @@ export default function DayMiniMap({
           />
         )}
         {points.map((p) => {
-          // p.idx is 1-based; activeActivityIdx is 0-based index into activities[]
-          const isActive = activeActivityIdx >= 0 && p.idx === activeActivityIdx + 1;
-          const isNext = activeActivityIdx > 0 && p.idx === activeActivityIdx;
+          const isActive = activeActivityIdx >= 0 && p.activityIdx === activeActivityIdx;
+          const isNext = activeActivityIdx > 0 && p.activityIdx === activeActivityIdx - 1;
           return (
             <Marker
               key={`${p.idx}-${p.lat}-${p.lng}`}
@@ -303,7 +302,7 @@ export default function DayMiniMap({
           );
         })}
         {polylines.map((line, i) => {
-          const isActiveLine = activeActivityIdx > 0 && i === activeActivityIdx - 1;
+          const isActiveLine = activeActivityIdx > 0 && line.activityIdx === activeActivityIdx - 1;
           const color = MODE_COLOR[line.mode] || MODE_DEFAULT_COLOR;
           if (activeActivityIdx >= 0 && !isActiveLine) {
             return (
