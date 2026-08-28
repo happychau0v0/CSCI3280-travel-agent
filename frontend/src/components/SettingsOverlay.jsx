@@ -132,11 +132,15 @@ const SUBTITLE_SIZES = ["small", "medium", "large"];
 // LLM model selector — stored in localStorage, sent to backend on each request.
 const LLM_MODEL_STORAGE_KEY = "travel-llm-model";
 
+// Hints reference the v3 benchmark mean score (docs/bench-2026-04-26.md)
+// so users can see why each fallback is ordered the way it is.
 export const LLM_MODELS = [
-  { id: "grok-4.20-0309-non-reasoning", label: "grok-4.20 Non-Reasoning", hint: "xAI · fast (~3-5 s/round) — default" },
+  { id: "grok-4.20-0309-non-reasoning", label: "grok-4.20 Non-Reasoning", hint: "xAI · fast (~3-5 s/round) — default · score 82.1" },
   { id: "grok-4.20-0309-reasoning",     label: "grok-4.20 Thinking",      hint: "xAI · extended reasoning (~30-60 s/round)" },
   { id: "grok-4.20-multi-agent-0309",   label: "grok-4.20 Multi-Agent",   hint: "xAI · agentic tasks" },
-  { id: "gemini-3.1-pro-preview",       label: "Gemini 3.1 Pro Preview",  hint: "Google · fallback provider" },
+  { id: "moonshotai/kimi-k2-0905",      label: "Kimi K2-0905",            hint: "OpenRouter · score 70 · score-tier fallback" },
+  { id: "minimax/minimax-m2.7",         label: "MiniMax M2.7",            hint: "OpenRouter · score 63 · fast cost-tier fallback" },
+  { id: "gemini-3.1-pro-preview",       label: "Gemini 3.1 Pro Preview",  hint: "Google · score 33 · last-resort fallback" },
 ];
 
 export function loadLlmModel() {

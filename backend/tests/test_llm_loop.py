@@ -261,10 +261,18 @@ async def test_region_error_swaps_to_fallback_model_on_round_zero():
     async def on_event(t, p):
         events.append((t, p))
 
+    # Single-entry chain so we test the legacy "swap to Gemini" semantics
+    # under the new chain-walking logic. _is_provider_available is patched
+    # to True so the chain does not skip past the patched fake client.
+    single_chain = [
+        {"model": "fallback-model", "provider": "google", "score": 50.0},
+    ]
     with patch.object(llm, "_get_client", return_value=fake_client), \
          patch.object(llm, "_get_fallback_client", return_value=fake_client), \
-         patch.object(llm, "LLM_MODEL", "primary-model"), \
-         patch.object(llm, "FALLBACK_LLM_MODEL", "fallback-model"):
+         patch.object(llm, "_client_for_provider", return_value=fake_client), \
+         patch.object(llm, "_is_provider_available", return_value=True), \
+         patch.object(llm, "FALLBACK_CHAIN", single_chain), \
+         patch.object(llm, "LLM_MODEL", "primary-model"):
         result = await llm._run_loop(
             [{"role": "user", "content": "hi"}],
             on_event=on_event,
@@ -480,3 +488,146 @@ async def test_role_default_overrides_global_llm_model():
     assert model_calls, "client was never called"
     assert model_calls[0] == llm.ROLE_DEFAULT_MODELS["hotels"]
     assert "non-reasoning" in model_calls[0]
+
+
+# ─── FALLBACK_CHAIN walking ──────────────────────────────────────────────
+
+
+def _outage_exc():
+    """Build a region-error that triggers fallback (matches _is_region_error)."""
+    return openai.APIConnectionError(
+        message="403 region not available",
+        request=SimpleNamespace(method="POST", url="https://primary/v1/chat"),
+    )
+
+
+async def _stream_done(content):
+    """Async generator yielding one chunk that closes the streaming loop."""
+    yield SimpleNamespace(
+        choices=[SimpleNamespace(
+            delta=SimpleNamespace(content=content, tool_calls=None)
+        )]
+    )
+
+
+@pytest.mark.asyncio
+async def test_fallback_chain_advances_on_repeated_outage():
+    """Primary fails → chain[0] fails → chain[1] succeeds. Two model_fallback events."""
+    chain = [
+        {"model": "kimi", "provider": "openrouter", "score": 70.2},
+        {"model": "minimax", "provider": "openrouter", "score": 63.4},
+        {"model": "gemini-3.1-pro-preview", "provider": "google", "score": 32.6},
+    ]
+    calls: list[str] = []
+
+    async def fake_create(**kwargs):
+        model = kwargs.get("model")
+        calls.append(model)
+        # Primary and chain[0] raise outage; chain[1] (minimax) succeeds.
+        if model in ("primary-model", "kimi"):
+            raise _outage_exc()
+        return _stream_done("from minimax")
+
+    fake_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create))
+    )
+    events: list[tuple[str, dict]] = []
+
+    async def on_event(t, p):
+        events.append((t, p))
+
+    with patch.object(llm, "_get_client", return_value=fake_client), \
+         patch.object(llm, "_client_for_provider", return_value=fake_client), \
+         patch.object(llm, "_is_provider_available", return_value=True), \
+         patch.object(llm, "FALLBACK_CHAIN", chain), \
+         patch.object(llm, "LLM_MODEL", "primary-model"):
+        result = await llm._run_loop(
+            [{"role": "user", "content": "hi"}],
+            on_event=on_event,
+        )
+
+    assert result["reply"] == "from minimax"
+    assert calls == ["primary-model", "kimi", "minimax"]
+    fb_events = [(t, p) for t, p in events if t == "model_fallback"]
+    assert len(fb_events) == 2
+    assert fb_events[0][1]["from"] == "primary-model"
+    assert fb_events[0][1]["to"] == "kimi"
+    assert fb_events[0][1]["fallback_index"] == 0
+    assert fb_events[1][1]["from"] == "kimi"
+    assert fb_events[1][1]["to"] == "minimax"
+    assert fb_events[1][1]["fallback_index"] == 1
+
+
+@pytest.mark.asyncio
+async def test_fallback_chain_skips_unconfigured_provider():
+    """When OpenRouter is not configured, chain skips kimi/minimax to Gemini."""
+    chain = [
+        {"model": "kimi", "provider": "openrouter", "score": 70.2},
+        {"model": "minimax", "provider": "openrouter", "score": 63.4},
+        {"model": "gemini-3.1-pro-preview", "provider": "google", "score": 32.6},
+    ]
+    calls: list[str] = []
+
+    async def fake_create(**kwargs):
+        model = kwargs.get("model")
+        calls.append(model)
+        if model == "primary-model":
+            raise _outage_exc()
+        return _stream_done("from gemini")
+
+    fake_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create))
+    )
+
+    def fake_is_available(provider: str) -> bool:
+        return provider == "google"  # OpenRouter unconfigured
+
+    events: list[tuple[str, dict]] = []
+
+    async def on_event(t, p):
+        events.append((t, p))
+
+    with patch.object(llm, "_get_client", return_value=fake_client), \
+         patch.object(llm, "_client_for_provider", return_value=fake_client), \
+         patch.object(llm, "_is_provider_available", side_effect=fake_is_available), \
+         patch.object(llm, "FALLBACK_CHAIN", chain), \
+         patch.object(llm, "LLM_MODEL", "primary-model"):
+        result = await llm._run_loop(
+            [{"role": "user", "content": "hi"}],
+            on_event=on_event,
+        )
+
+    assert result["reply"] == "from gemini"
+    # Skipped kimi and minimax; landed straight on Gemini.
+    assert calls == ["primary-model", "gemini-3.1-pro-preview"]
+    fb_events = [(t, p) for t, p in events if t == "model_fallback"]
+    assert len(fb_events) == 1
+    assert fb_events[0][1]["to"] == "gemini-3.1-pro-preview"
+    assert fb_events[0][1]["fallback_index"] == 2  # idx 0/1 skipped
+
+
+@pytest.mark.asyncio
+async def test_fallback_chain_reraises_when_exhausted():
+    """All chain entries raise outage → original exception bubbles up."""
+    chain = [
+        {"model": "kimi", "provider": "openrouter", "score": 70.2},
+        {"model": "gemini-3.1-pro-preview", "provider": "google", "score": 32.6},
+    ]
+
+    async def fake_create(**kwargs):
+        raise _outage_exc()
+
+    fake_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create))
+    )
+
+    with patch.object(llm, "_get_client", return_value=fake_client), \
+         patch.object(llm, "_client_for_provider", return_value=fake_client), \
+         patch.object(llm, "_is_provider_available", return_value=True), \
+         patch.object(llm, "FALLBACK_CHAIN", chain), \
+         patch.object(llm, "LLM_MODEL", "primary-model"):
+        with pytest.raises(openai.APIConnectionError):
+            await llm._run_loop(
+                [{"role": "user", "content": "hi"}],
+                on_event=None,  # non-streaming path; raise propagates cleanly
+            )

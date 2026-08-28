@@ -5,8 +5,6 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-import httpx
-
 from app.config import GOOGLE_MAPS_API_KEY, check_key, make_http_client
 from app.tools.errors import ToolUnavailableError
 

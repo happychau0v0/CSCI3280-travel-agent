@@ -27,6 +27,11 @@ ALLOWED_MODELS = {
     # "grok-4.20-multi-agent-0309" removed — xAI rejects this variant on
     # the chat completions endpoint with "Multi Agent requests are not allowed".
     "gemini-3.1-pro-preview",
+    # FALLBACK_CHAIN entries — exposed so users can manually pick them
+    # via Settings overlay even outside an outage. They route through
+    # OpenRouter (requires OPENROUTER_PROXY).
+    "moonshotai/kimi-k2-0905",
+    "minimax/minimax-m2.7",
 }
 
 ALLOWED_ROLES = {None, "plan", "hotels", "days", "chat", "replace", "day_themes", "day_detail"}

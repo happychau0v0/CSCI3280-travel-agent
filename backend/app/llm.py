@@ -46,10 +46,13 @@ import openai
 from openai import AsyncOpenAI
 
 from app.config import (
-    FALLBACK_LLM_MODEL,
+    FALLBACK_CHAIN,
     GEMINI_API_KEY,
     GEMINI_BASE_URL,
     LLM_MODEL,
+    OPENROUTER_API_KEY,
+    OPENROUTER_BASE_URL,
+    OPENROUTER_PROXY,
     XAI_API_KEY,
     XAI_BASE_URL,
     check_key,
@@ -94,6 +97,11 @@ ROLE_MAX_ROUNDS: dict[str, int] = {
 
 _client: AsyncOpenAI | None = None
 _fallback_client: AsyncOpenAI | None = None
+# Per-provider client cache for the FALLBACK_CHAIN. Built lazily as each
+# provider is touched; the entry for "google" aliases _fallback_client so
+# legacy single-fallback tests that patch _get_fallback_client still see
+# the right object.
+_provider_clients: dict[str, AsyncOpenAI] = {}
 
 
 def _get_client() -> AsyncOpenAI:
@@ -119,10 +127,10 @@ def _get_client() -> AsyncOpenAI:
 
 
 def _get_fallback_client() -> AsyncOpenAI:
-    """Lazily build the fallback client pointed at Google Gemini's OpenAI-compatible API.
+    """Lazily build the Gemini fallback client.
 
-    Used when xAI is down (outage) or geo-restricted. Gemini uses the same
-    OpenAI SDK wire format so no changes to tool calling or response parsing needed.
+    Preserved as a stable name for legacy single-fallback callers and tests
+    that patch this directly. New code should prefer ``_client_for_provider``.
     """
     global _fallback_client
     if _fallback_client is None:
@@ -138,6 +146,73 @@ def _get_fallback_client() -> AsyncOpenAI:
             http_client=make_http_client(timeout),
         )
     return _fallback_client
+
+
+def _is_provider_available(provider: str) -> bool:
+    """Return True if a provider's credentials (and proxy, for OpenRouter) are set."""
+    if provider == "openrouter":
+        # Proxy is mandatory — direct calls have historically resulted in bans
+        return bool(check_key(OPENROUTER_API_KEY) and OPENROUTER_PROXY)
+    if provider == "google":
+        return bool(check_key(GEMINI_API_KEY))
+    if provider == "xai":
+        return bool(check_key(XAI_API_KEY))
+    return False
+
+
+def _client_for_provider(provider: str) -> AsyncOpenAI:
+    """Return a configured AsyncOpenAI client for the given fallback provider.
+
+    Caches per provider. ``google`` aliases the legacy ``_fallback_client``
+    so test mocks of ``_get_fallback_client`` continue to work.
+    """
+    if provider == "google":
+        # Reuse the existing Gemini client — keeps the legacy alias coherent
+        return _get_fallback_client()
+    if provider in _provider_clients:
+        return _provider_clients[provider]
+    timeout = httpx.Timeout(connect=10.0, read=45.0, write=30.0, pool=5.0)
+    if provider == "openrouter":
+        if not check_key(OPENROUTER_API_KEY):
+            raise RuntimeError("OPENROUTER_API_KEY not configured.")
+        if not OPENROUTER_PROXY:
+            raise RuntimeError(
+                "OPENROUTER_PROXY not set — refusing to call OpenRouter "
+                "directly to avoid account bans."
+            )
+        # Build an httpx client that forces the OpenRouter proxy regardless
+        # of HTTPS_PROXY (which may be unset for direct xAI/Google traffic)
+        http_client = httpx.AsyncClient(
+            timeout=timeout, trust_env=False, proxy=OPENROUTER_PROXY,
+        )
+        client = AsyncOpenAI(
+            api_key=OPENROUTER_API_KEY,
+            base_url=OPENROUTER_BASE_URL,
+            timeout=timeout,
+            http_client=http_client,
+        )
+    elif provider == "xai":
+        client = _get_client()
+    else:
+        raise RuntimeError(f"Unknown fallback provider: {provider!r}")
+    _provider_clients[provider] = client
+    return client
+
+
+def _next_available_fallback(start_idx: int) -> int:
+    """Return the index of the next configured fallback at or after ``start_idx``,
+    or ``len(FALLBACK_CHAIN)`` if no further entries are available."""
+    idx = start_idx
+    while idx < len(FALLBACK_CHAIN):
+        entry = FALLBACK_CHAIN[idx]
+        if _is_provider_available(entry["provider"]):
+            return idx
+        logger.info(
+            "Skipping fallback chain[%d] (%s via %s) — provider not configured",
+            idx, entry["model"], entry["provider"],
+        )
+        idx += 1
+    return idx
 
 
 def _format_preferences(preferences: dict | None) -> str:
@@ -324,8 +399,10 @@ async def _run_loop(
     (``"tool_start"``) and after it finishes (``"tool_end"``). Pass None to
     disable streaming.
     """
-    # Pick the right client for whichever model is active — Gemini models use
-    # the Gemini client; everything else uses the xAI client.
+    # Pick the right client for whichever model is active. Most models route
+    # to xAI (the primary provider); explicit user picks of a fallback model
+    # route to that fallback's provider. The chain-walk on outage further
+    # below may swap this mid-request.
     # Resolution: explicit user choice > role default > global env default
     _user_chose_explicitly = preferred_model and preferred_model != LLM_MODEL
     if _user_chose_explicitly:
@@ -334,7 +411,23 @@ async def _run_loop(
         active_model = ROLE_DEFAULT_MODELS[call_role]
     else:
         active_model = preferred_model or LLM_MODEL
-    client = _get_fallback_client() if active_model.startswith("gemini") else _get_client()
+    # Match a user-picked model to a chain entry (so explicit Gemini /
+    # Kimi / MiniMax picks route through the right provider client).
+    _matching_chain_entry = next(
+        (e for e in FALLBACK_CHAIN if e["model"] == active_model), None,
+    )
+    if _matching_chain_entry is not None:
+        client = _client_for_provider(_matching_chain_entry["provider"])
+    elif active_model.startswith("gemini"):
+        client = _get_fallback_client()
+    else:
+        client = _get_client()
+    # Track which fallback chain entry we're on; -1 = primary provider.
+    fallback_idx = (
+        FALLBACK_CHAIN.index(_matching_chain_entry)
+        if _matching_chain_entry is not None
+        else -1
+    )
 
     # Pick system prompt and tool allow-list based on call_role.
     # Scoped calls (plan/hotels/days/chat) get a focused prompt and a strict
@@ -495,31 +588,50 @@ async def _run_loop(
                 )
                 msg = response.choices[0].message
         except (openai.APIStatusError, openai.APIConnectionError) as exc:
-            # On round 0 only: if the primary provider is down (outage) or
-            # geo-restricted, transparently retry with the Gemini fallback.
-            # Any error on later rounds re-raises — we don't mid-stream switch
-            # providers since tool results are already in the message history.
-            is_first_round = round_idx == 0
-            already_on_fallback = active_model.startswith("gemini")
-            should_fallback = is_first_round and not already_on_fallback and (
+            # Provider outage / region restriction / timeout on ANY round:
+            # walk the FALLBACK_CHAIN forward to the next configured entry
+            # and retry. Each chain step burns one round_idx (the current
+            # round failed); chain depth is small (≤3) so this stays
+            # within the per-role budget.
+            is_outage = (
                 _is_provider_outage(exc) or _is_region_error(exc)
                 or isinstance(exc, openai.APITimeoutError)
             )
-            if should_fallback:
-                reason = "outage" if _is_provider_outage(exc) else "region_restricted"
-                logger.warning(
-                    "Primary model %s unavailable (%s), falling back to %s: %s",
-                    active_model, reason, FALLBACK_LLM_MODEL, exc,
+            if not is_outage:
+                raise
+            next_idx = _next_available_fallback(fallback_idx + 1)
+            if next_idx >= len(FALLBACK_CHAIN):
+                # Exhausted — all configured fallbacks have failed
+                logger.error(
+                    "Fallback chain exhausted at active_model=%s (round %d): %s",
+                    active_model, round_idx, exc,
                 )
-                client = _get_fallback_client()
-                active_model = FALLBACK_LLM_MODEL
-                if on_event is not None:
-                    await on_event("model_fallback", {
-                        "from": LLM_MODEL, "to": FALLBACK_LLM_MODEL,
-                        "reason": reason,
-                    })
-                continue
-            raise
+                raise
+            reason = (
+                "outage" if _is_provider_outage(exc)
+                else "timeout" if isinstance(exc, openai.APITimeoutError)
+                else "region_restricted"
+            )
+            prev_model = active_model
+            fallback_idx = next_idx
+            entry = FALLBACK_CHAIN[fallback_idx]
+            active_model = entry["model"]
+            client = _client_for_provider(entry["provider"])
+            logger.warning(
+                "Provider unavailable for %s (%s) at round %d — "
+                "advancing to fallback chain[%d]: %s via %s (score %.1f)",
+                prev_model, reason, round_idx, fallback_idx,
+                active_model, entry["provider"], entry["score"],
+            )
+            if on_event is not None:
+                await on_event("model_fallback", {
+                    "from": prev_model,
+                    "to": active_model,
+                    "reason": reason,
+                    "fallback_index": fallback_idx,
+                    "score": entry["score"],
+                })
+            continue
         last_text = msg.content or last_text
 
         if not msg.tool_calls:

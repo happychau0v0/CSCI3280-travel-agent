@@ -10,7 +10,7 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
-from app.config import GOOGLE_MAPS_API_KEY, check_key
+from app.config import GOOGLE_MAPS_API_KEY, check_key, make_http_client
 
 router = APIRouter(prefix="/photo", tags=["photo"])
 
@@ -30,7 +30,7 @@ async def get_photo(photo_name: str, max_width: int = 800):
     upstream_url = f"{PHOTO_BASE}/{photo_name}/media"
     params = {"key": GOOGLE_MAPS_API_KEY, "maxWidthPx": max_width}
 
-    client = httpx.AsyncClient(timeout=30.0, follow_redirects=True, trust_env=False)
+    client = make_http_client(30.0, follow_redirects=True)
     try:
         upstream = await client.get(upstream_url, params=params)
     except httpx.HTTPError as e:

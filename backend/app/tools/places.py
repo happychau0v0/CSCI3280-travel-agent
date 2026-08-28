@@ -26,8 +26,6 @@ API key.
 """
 from __future__ import annotations
 
-import httpx
-
 from app.config import GOOGLE_MAPS_API_KEY, check_key, make_http_client
 from app.tools.errors import ToolUnavailableError
 
