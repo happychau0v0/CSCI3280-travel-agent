@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components -- shared text sanitizer is intentionally exported with its component. */
+
 import { useMemo } from "react";
 
 /**

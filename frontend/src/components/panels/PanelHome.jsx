@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components -- form helpers are intentionally shared with the app shell. */
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import AirportCombobox from "../AirportCombobox";
 import PlanHistoryPanel from "../PlanHistoryPanel";

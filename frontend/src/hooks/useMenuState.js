@@ -59,7 +59,7 @@ export function useMenuState() {
 
   /** Programmatic navigation triggered by the LLM via navigate_menu. */
   const navigate = useCallback(
-    ({ panel, item, filter } = {}) => {
+    ({ panel, filter } = {}) => {
       setState((s) => ({
         ...s,
         panel: PANELS.includes(panel) ? panel : s.panel,
@@ -67,8 +67,7 @@ export function useMenuState() {
         side: "left",
         filter: filter || null,
       }));
-      // Item resolution by name (e.g. "non-stop", "Park Hyatt") is handled
-      // inside each panel via a useEffect that watches `filter` and `item`.
+      // Filter resolution (e.g. "non-stop") is handled inside each panel.
     },
     [],
   );

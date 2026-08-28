@@ -79,6 +79,7 @@ export default function PanelFlights({
   // Auto-advance to RETURN tab when outbound is picked and return options exist
   useEffect(() => {
     if (itinerary?.selected_flight && hasReturn && activeTab === "outbound") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- selected outbound flight advances this panel to the return tab.
       setActiveTab("return");
       onSelect?.(0); // reset list index so return tab starts at row 0
     }

@@ -1123,7 +1123,7 @@ function App() {
       try {
         const raw = localStorage.getItem("travel-trip-form");
         if (raw) localForm = JSON.parse(raw);
-      } catch (e) {
+      } catch {
         // ignore parse error
       }
       // --- END BUG FIX ---
