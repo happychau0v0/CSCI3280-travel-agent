@@ -1,0 +1,135 @@
+\documentclass[border=4pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{helvet}
+\renewcommand\familydefault{\sfdefault}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{xcolor}
+
+\definecolor{accent}{rgb}{0.122,0.306,0.475}
+
+% Per-model data (extracted from docs/benchmark-results.json, sweep
+% 2026-04-26):
+%   model            mean   $/run    median elapsed_s
+%   grok-4.20        82.1   0.129    70
+%   kimi-k2-0905     70.2   0.034    263
+%   minimax-m2.7     63.4   0.040    100
+%   sonnet-4.6       48.3   0.451    144
+%   deepseek-v3.2    37.9   0.023    187
+%   gemini-3.1-pro   32.6   0.151    215
+
+\begin{document}
+\begin{tikzpicture}[font=\small]
+
+% ─── LEFT panel: Score vs Cost ────────────────────────────────────────
+\begin{axis}[
+  name=cost,
+  width=7.4cm, height=6.2cm,
+  xmode=log,
+  xmin=0.018, xmax=0.7,
+  ymin=20, ymax=95,
+  xlabel={Cost (USD / run, log)},
+  ylabel={Mean score (\%)},
+  xlabel style={font=\small},
+  ylabel style={font=\small},
+  xticklabel style={font=\scriptsize},
+  yticklabel style={font=\scriptsize},
+  grid=both,
+  grid style={line width=0.3pt, draw=gray!30},
+  minor grid style={line width=0.2pt, draw=gray!15},
+  log ticks with fixed point,
+  clip=false,
+]
+
+% Shaded preferred region: upper-left (high score, low cost)
+\addplot[fill=accent!12, draw=none]
+  coordinates {(0.018,68) (0.06,68) (0.06,95) (0.018,95)} \closedcycle;
+\node[font=\scriptsize\itshape, text=accent, anchor=north west,
+      text width=2.0cm, align=left] at (axis cs:0.019,93)
+  {preferred:\\high score,\\low cost};
+
+% Non-highlighted models (filled gray circles)
+\addplot[
+  only marks,
+  mark=*,
+  mark size=2.8pt,
+  mark options={fill=gray!55, draw=black!50},
+] coordinates {
+  (0.034, 70.2)   % kimi
+  (0.040, 63.4)   % minimax
+  (0.451, 48.3)   % sonnet
+  (0.023, 37.9)   % deepseek
+  (0.151, 32.6)   % gemini-pro
+};
+
+% Highlighted: grok-4.20 (filled star, accent) — deployed
+\addplot[
+  only marks,
+  mark=star,
+  mark size=5.5pt,
+  mark options={fill=accent, draw=accent},
+] coordinates {(0.129, 82.1)};
+
+% Labels (positioned to avoid overlap; \scriptsize for compactness)
+\node[font=\scriptsize, anchor=south, yshift=4pt] at (axis cs:0.129, 82.1) {\textbf{grok-4.20}};
+\node[font=\scriptsize, anchor=south west, xshift=2pt, yshift=1pt] at (axis cs:0.034, 70.2) {kimi-k2};
+\node[font=\scriptsize, anchor=south west, xshift=2pt, yshift=1pt] at (axis cs:0.040, 63.4) {minimax-m2.7};
+\node[font=\scriptsize, anchor=south, yshift=3pt] at (axis cs:0.451, 48.3) {sonnet-4.6};
+\node[font=\scriptsize, anchor=north, yshift=-3pt] at (axis cs:0.023, 37.9) {deepseek};
+\node[font=\scriptsize, anchor=north, yshift=-3pt] at (axis cs:0.151, 32.6) {gemini-3.1-pro};
+
+\end{axis}
+
+% ─── RIGHT panel: Score vs 3-turn Elapsed Time ─────────────────────────
+\begin{axis}[
+  at={(cost.east)}, anchor=west, xshift=12mm,
+  width=7.4cm, height=6.2cm,
+  xmode=log,
+  xmin=55, xmax=400,
+  ymin=20, ymax=95,
+  xlabel={Median 3-turn elapsed (s, log)},
+  ylabel={},
+  xlabel style={font=\small},
+  yticklabel=\empty,
+  xticklabel style={font=\scriptsize},
+  grid=both,
+  grid style={line width=0.3pt, draw=gray!30},
+  minor grid style={line width=0.2pt, draw=gray!15},
+  log ticks with fixed point,
+  clip=false,
+]
+
+% Non-highlighted models
+\addplot[
+  only marks,
+  mark=*,
+  mark size=2.8pt,
+  mark options={fill=gray!55, draw=black!50},
+] coordinates {
+  (263, 70.2)   % kimi
+  (100, 63.4)   % minimax
+  (144, 48.3)   % sonnet
+  (187, 37.9)   % deepseek
+  (215, 32.6)   % gemini-pro
+};
+
+% Highlighted: grok-4.20
+\addplot[
+  only marks,
+  mark=star,
+  mark size=5.5pt,
+  mark options={fill=accent, draw=accent},
+] coordinates {(70, 82.1)};
+
+\node[font=\scriptsize, anchor=south west, xshift=3pt, yshift=1pt] at (axis cs:70, 82.1) {\textbf{grok-4.20}};
+\node[font=\scriptsize, anchor=south, yshift=3pt] at (axis cs:263, 70.2) {kimi-k2};
+\node[font=\scriptsize, anchor=south, yshift=3pt] at (axis cs:100, 63.4) {minimax-m2.7};
+\node[font=\scriptsize, anchor=south, yshift=3pt] at (axis cs:144, 48.3) {sonnet-4.6};
+\node[font=\scriptsize, anchor=west, xshift=4pt] at (axis cs:187, 37.9) {deepseek};
+\node[font=\scriptsize, anchor=north east, xshift=-3pt, yshift=-3pt] at (axis cs:215, 32.6) {gemini-3.1-pro};
+
+\end{axis}
+
+\end{tikzpicture}
+\end{document}

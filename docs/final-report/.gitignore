@@ -1,0 +1,11 @@
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+# The rendered copies under figures/ are the report assets; PDFs created
+# beside their TikZ sources are build by-products.
+figures/sources/*.pdf
+# Allow screenshots needed for Overleaf upload
+!screenshots/**/*.png
