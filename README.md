@@ -4,6 +4,28 @@ This is a multimodal travel-planning agent that accepts voice or text, fetches l
 
 ![Final walkthrough: TravelMind PLAN panel](docs/final-report/screenshots/walkthrough/walkthrough-01-home-1440.png)
 
+## At a glance
+
+TravelMind keeps the model in charge of orchestration, not facts: live data comes from specialised flight and maps tools, while Server-Sent Events progressively render each planning stage. The pipeline is deliberately scoped so each stage has a defined input, tool allow-list, and structured output.
+
+<p align="center">
+  <img src="docs/final-report/figures/f1-architecture.png" alt="Architecture diagram: React frontend and FastAPI backend use a streaming LLM orchestration layer with flight and Google Maps tools." width="48%" />
+  <img src="docs/final-report/figures/f2-pipeline.png" alt="Three-stage planning pipeline for flights, hotels, and daily activities, each producing part of one itinerary." width="48%" />
+</p>
+
+<p align="center"><em>Architecture and three-stage planning pipeline from the <a href="docs/final-report/main.pdf">final report</a>.</em></p>
+
+## Product walkthrough
+
+The keyboard-first shell progresses from live flight options to a map-backed day-by-day itinerary. The agent can also revise a single activity while preserving the rest of the plan.
+
+<p align="center">
+  <img src="docs/final-report/screenshots/walkthrough/walkthrough-02-tab-flights.png" alt="FLIGHTS panel showing live flight options beside a globe." width="48%" />
+  <img src="docs/final-report/screenshots/walkthrough/walkthrough-15-after-replace-activity.png" alt="DAYS panel showing a mapped itinerary after the agent replaced one activity." width="48%" />
+</p>
+
+<p align="center"><em>Flight selection and an agent-assisted itinerary revision.</em></p>
+
 ## Features
 
 ### Multimodal interface
