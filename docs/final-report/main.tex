@@ -58,7 +58,7 @@ cost-efficient runner-up at 86\% of Grok's quality and $3\times$ its
 score-per-dollar. Server-Sent Events stream a partial itinerary
 7.4\,s before the final response, converting a 12\,s blocking wait
 into a 4.4\,s active wait. The implementation is React~19 / FastAPI,
-validated by 384~pytest, 57~Vitest, and 5~Playwright tests, plus an
+validated by 387~pytest, 57~Vitest, and 54~Playwright browser checks, plus an
 LLM-judge harness with 31 rubric functions tied to 82 numbered
 requirements.
 \end{abstract}
@@ -379,11 +379,11 @@ leniently, so a cross-vendor judge was substituted.
 \textbf{Feature} & \textbf{Evaluation surface}\\
 \midrule
 199-passport visa-alert banner (\S\ref{sec:visa}) &
-  384 pytest cases over 18 modules \\
+  387 pytest cases over 17 modules \\
 3-D globe arcing origin$\to$destination~\cite{rgg} &
   57 Vitest unit tests \\
 Per-hotel and per-day Leaflet maps~\cite{leaflet} &
-  5 Playwright E2E specs \\
+  5 Playwright E2E specs (54 browser checks) \\
 Favourites ($\bigstar$, F~key); 12-item checklist (L~key) &
   \quad{\scriptsize plan, keyboard nav, overlays, persistence, 1024$\times$600 viewport} \\
 HKD currency switching (USD/EUR/JPY/GBP/CNY, S~key) &

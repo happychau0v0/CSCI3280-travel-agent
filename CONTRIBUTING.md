@@ -34,7 +34,7 @@ npm run lint
 npm run build
 ```
 
-Run the five Playwright spec files against a running development server with `cd frontend && npm run test:e2e`.
+Run the five Playwright spec files with `cd frontend && npm run test:e2e`; the command starts Vite automatically and reuses an already-running development server.
 
 ## Project conventions
 

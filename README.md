@@ -132,15 +132,15 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for local development and verification 
 ## Testing
 
 ```bash
-cd backend && pytest         # 384 collected: 383 pass, 1 skip; no API keys required
+cd backend && pytest         # 387 collected: 386 pass, 1 skip; no API keys required
 cd backend && ruff check .
 cd frontend && npm test      # 57 vitest component + hook tests
 cd frontend && npm run lint
 cd frontend && npm run build # verifies the bundle compiles
 
-# E2E tests — requires the dev server running on http://localhost:5173
+# E2E tests — starts the Vite dev server automatically
 # First time: npm install && npx playwright install chromium
-cd frontend && npm run test:e2e # 5 Playwright spec files (22 checks)
+cd frontend && npm run test:e2e # 5 Playwright spec files (54 browser checks)
 ```
 
 `MOCK_TOOLS=1` replaces every tool in `TOOL_DISPATCH` with a fixture-returning stub (see `backend/app/tools/mock_dispatch.py`) so the end-to-end LLM / SSE / tool-call loop is exercised without real API keys.
