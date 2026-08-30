@@ -1,5 +1,6 @@
 // @ts-check
 import { test, expect } from "@playwright/test";
+import { enableGlobalHotkeys, visitApp } from "./helpers";
 
 /**
  * Settings persistence tests — verify that currency, theme, and other
@@ -9,32 +10,28 @@ import { test, expect } from "@playwright/test";
 test.describe("Settings persistence", () => {
   test.beforeEach(async ({ page }) => {
     // Start with a clean localStorage state
-    await page.goto("/");
+    await visitApp(page);
     await page.evaluate(() => {
       localStorage.removeItem("travel-currency");
       localStorage.removeItem("travel-theme");
+      localStorage.removeItem("travel-plan-history");
     });
     await page.reload();
   });
 
   test("currency selection persists across reload", async ({ page }) => {
     // Open settings
-    await page.keyboard.press("Escape"); // blur inputs
+    await enableGlobalHotkeys(page);
     await page.keyboard.press("s");
-    await expect(page.locator(".settings-overlay")).toBeVisible();
+    const dialog = page.getByRole("dialog", { name: "Settings" });
+    await expect(dialog).toBeVisible();
 
-    // Change currency — find the select or radio for currency
-    const currencySelect = page.locator("select[data-testid='currency-select']");
-    if (await currencySelect.isVisible()) {
-      await currencySelect.selectOption("USD");
-    } else {
-      // Fallback: click the USD option button
-      const usdBtn = page.getByRole("button", { name: /USD/ });
-      await usdBtn.click();
-    }
+    // Currency is a cycle action; HKD's next value is USD.
+    await dialog.locator('[data-row-key="currency"]').click();
 
     // Close settings
     await page.keyboard.press("Escape");
+    await expect(dialog).not.toBeVisible();
 
     // Reload page
     await page.reload();
@@ -62,20 +59,22 @@ test.describe("Settings persistence", () => {
     // Inject a fake plan history entry into localStorage
     const fakeHistory = [
       {
-        title: "3 Days in Tokyo",
+        id: "test-tokyo",
         destination: "Tokyo",
+        origin: "Hong Kong",
         start_date: "2026-06-01",
         end_date: "2026-06-03",
-        saved_at: Date.now(),
+        created_at: Date.now(),
+        day_count: 3,
       },
     ];
     await page.evaluate((h) => {
-      localStorage.setItem("travel-history", JSON.stringify(h));
+      localStorage.setItem("travel-plan-history", JSON.stringify(h));
     }, fakeHistory);
 
     await page.reload();
 
     // The plan history panel should show the injected entry
-    await expect(page.getByText("3 Days in Tokyo")).toBeVisible();
+    await expect(page.getByTestId("plan-history-card-test-tokyo")).toContainText("Tokyo");
   });
 });

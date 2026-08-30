@@ -112,7 +112,7 @@ export default function PanelExport({ itinerary, visaAlert }) {
   }
 
   return (
-    <div className="export-panel">
+    <section className="export-panel panel-export" aria-label="Export trip">
       <div className="export-panel-header">
         <span className="export-panel-bracket">◢</span>
         <span className="export-panel-title">EXPORT TRIP</span>
@@ -213,6 +213,6 @@ export default function PanelExport({ itinerary, visaAlert }) {
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

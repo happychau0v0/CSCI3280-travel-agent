@@ -122,7 +122,13 @@ export default function ChatPopover({
   return (
     <>
       <div className="chat-popover-backdrop" onClick={onClose} />
-      <form className="chat-popover" onSubmit={handleSubmit}>
+      <form
+        className="chat-popover"
+        onSubmit={handleSubmit}
+        role="dialog"
+        aria-label="Chat with travel agent"
+        aria-modal="true"
+      >
         <div className="chat-popover-bracket chat-popover-bracket-tl" />
         <div className="chat-popover-bracket chat-popover-bracket-tr" />
         <div className="chat-popover-bracket chat-popover-bracket-bl" />

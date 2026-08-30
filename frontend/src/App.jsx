@@ -595,6 +595,7 @@ function App() {
     onOpenChecklist: () => setChecklistOpen(true),
     onOpenFavorites: () => setFavoritesOpen(true),
     onOpenStatus: () => { cues.select(); setStatusOpen(true); },
+    exportEnabled: !!(currentItinerary?.days?.length > 0),
     enabled: !historyOpen && !settingsOpen && !helpOpen && !checklistOpen && !favoritesOpen && !statusOpen,
   });
 

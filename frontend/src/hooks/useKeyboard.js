@@ -39,6 +39,7 @@ export function useKeyboard({
   onNewTrip,
   onOpenChecklist,
   onOpenFavorites,
+  exportEnabled = false,
   enabled = true,
 }) {
   // Long-press Q timer ref — lives outside the effect so keydown/keyup
@@ -63,6 +64,9 @@ export function useKeyboard({
       // Number keys → jump to panel N
       const num = parseInt(e.key, 10);
       if (!Number.isNaN(num) && num >= 1 && num <= PANELS.length) {
+        // Export remains unavailable until a complete itinerary exists,
+        // matching the disabled EXPORT tab in the visible navigation.
+        if (num === 5 && !exportEnabled) return;
         e.preventDefault();
         setPanel(PANELS[num - 1]);
         return;
@@ -273,5 +277,6 @@ export function useKeyboard({
     onNewTrip,
     onOpenChecklist,
     onOpenFavorites,
+    exportEnabled,
   ]);
 }

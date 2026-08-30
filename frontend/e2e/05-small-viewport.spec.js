@@ -1,5 +1,6 @@
 // @ts-check
 import { test, expect } from "@playwright/test";
+import { enableGlobalHotkeys, visitApp } from "./helpers";
 
 /**
  * Small-viewport tests — run against the "small-viewport" Playwright
@@ -12,7 +13,7 @@ test.use({ viewport: { width: 1024, height: 600 } });
 
 test.describe("Small viewport (1024×600)", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
+    await visitApp(page);
   });
 
   test("START PLANNING button is not clipped below fold", async ({ page }) => {
@@ -35,35 +36,37 @@ test.describe("Small viewport (1024×600)", () => {
   });
 
   test("FLIGHTS panel renders without overflow on small viewport", async ({ page }) => {
+    await enableGlobalHotkeys(page);
     await page.keyboard.press("2");
-    const panel = page.locator(".panel-flights");
+    const panel = page.getByRole("region", { name: "Flights" });
     await expect(panel).toBeVisible();
 
     // No horizontal scrollbar should appear — scrollWidth === clientWidth
     const noOverflow = await page.evaluate(() => {
-      const el = document.querySelector(".panel-flights");
+      const el = document.querySelector('[aria-label="Flights"]');
       return !el || el.scrollWidth <= el.clientWidth + 1; // 1px tolerance
     });
     expect(noOverflow).toBe(true);
   });
 
   test("HOTELS panel renders without overflow on small viewport", async ({ page }) => {
+    await enableGlobalHotkeys(page);
     await page.keyboard.press("3");
-    const panel = page.locator(".panel-hotels");
+    const panel = page.getByRole("region", { name: "Hotels" });
     await expect(panel).toBeVisible();
 
     const noOverflow = await page.evaluate(() => {
-      const el = document.querySelector(".panel-hotels");
+      const el = document.querySelector('[aria-label="Hotels"]');
       return !el || el.scrollWidth <= el.clientWidth + 1;
     });
     expect(noOverflow).toBe(true);
   });
 
   test("overlays open and are scrollable on small viewport", async ({ page }) => {
-    await page.keyboard.press("Escape");
+    await enableGlobalHotkeys(page);
     await page.keyboard.press("?");
 
-    const overlay = page.locator(".help-overlay");
+    const overlay = page.getByRole("dialog", { name: "Keyboard shortcuts" });
     await expect(overlay).toBeVisible();
 
     // Overlay should not overflow the viewport horizontally

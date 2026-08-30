@@ -1,5 +1,6 @@
 // @ts-check
 import { test, expect } from "@playwright/test";
+import { enableGlobalHotkeys, visitApp } from "./helpers";
 
 /**
  * Keyboard navigation tests — verify that number keys switch panels,
@@ -12,35 +13,35 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Keyboard navigation", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
-    // Blur any auto-focused inputs so hotkeys register on the body
-    await page.keyboard.press("Escape");
+    await visitApp(page);
+    await enableGlobalHotkeys(page);
   });
 
   test("pressing 2 navigates to FLIGHTS panel", async ({ page }) => {
     await page.keyboard.press("2");
-    await expect(page.locator(".panel-flights")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Flights" })).toBeVisible();
   });
 
   test("pressing 3 navigates to HOTELS panel", async ({ page }) => {
     await page.keyboard.press("3");
-    await expect(page.locator(".panel-hotels")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Hotels" })).toBeVisible();
   });
 
   test("pressing 4 navigates to DAYS panel", async ({ page }) => {
     await page.keyboard.press("4");
-    await expect(page.locator(".panel-days")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Days" })).toBeVisible();
   });
 
-  test("pressing 5 navigates to EXPORT panel", async ({ page }) => {
+  test("pressing 5 does not bypass the disabled EXPORT tab", async ({ page }) => {
     await page.keyboard.press("5");
-    await expect(page.locator(".panel-export")).toBeVisible();
+    await expect(page.getByRole("tab", { name: /export/i })).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByRole("region", { name: "Home dashboard" })).toBeVisible();
   });
 
   test("pressing 1 returns to PLAN panel", async ({ page }) => {
     await page.keyboard.press("2");
     await page.keyboard.press("1");
-    await expect(page.locator(".panel-home")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Home dashboard" })).toBeVisible();
   });
 
   test("footer hints update when switching panels", async ({ page }) => {

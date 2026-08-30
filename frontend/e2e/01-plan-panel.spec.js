@@ -8,13 +8,13 @@ test.describe("PLAN panel — initial render", () => {
 
   test("shows the PLAN form with all required fields", async ({ page }) => {
     // Header
-    await expect(page.getByText("START PLANNING")).toBeVisible();
+    await expect(page.getByTestId("trip-plan-btn")).toBeVisible();
 
     // Origin field
-    await expect(page.getByPlaceholder(/origin/i)).toBeVisible();
+    await expect(page.locator('[data-field="origin"] .airport-combo-input')).toBeVisible();
 
     // Destination field — any combobox labelled "destination"
-    const destination = page.getByPlaceholder(/destination/i);
+    const destination = page.locator('[data-field="destination"] .airport-combo-input');
     await expect(destination).toBeVisible();
 
     // Date inputs

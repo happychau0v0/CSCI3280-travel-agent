@@ -111,7 +111,7 @@ export default function TabStrip({
   exportEnabled = false,
 }) {
   return (
-    <nav className="tab-strip" aria-label="Menu sections">
+    <nav className="tab-strip" aria-label="Menu sections" role="tablist">
       {PANELS.map((panel, i) => {
         const isActive = panel === activePanel;
         const inFocus = isActive && scope === "tabs";
@@ -122,7 +122,8 @@ export default function TabStrip({
             type="button"
             className={`tab${isActive ? " active" : ""}${inFocus ? " focused" : ""}${isDisabled ? " disabled" : ""}`}
             onClick={() => !isDisabled && onTabClick?.(panel)}
-            aria-current={isActive ? "page" : undefined}
+            role="tab"
+            aria-selected={isActive}
             aria-disabled={isDisabled || undefined}
             title={isDisabled ? "Complete your itinerary first (PLAN → FLIGHTS → HOTELS → DAYS)" : undefined}
           >

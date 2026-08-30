@@ -1,5 +1,6 @@
 // @ts-check
 import { test, expect } from "@playwright/test";
+import { enableGlobalHotkeys, visitApp } from "./helpers";
 
 /**
  * Overlay tests — verify that every overlay opens via its hotkey and
@@ -8,52 +9,53 @@ import { test, expect } from "@playwright/test";
  */
 
 const OVERLAYS = [
-  { key: "h",  selector: ".history-overlay",      name: "History" },
-  { key: "s",  selector: ".settings-overlay",     name: "Settings" },
-  { key: "?",  selector: ".help-overlay",         name: "Help" },
-  { key: "l",  selector: ".checklist-overlay",    name: "Checklist" },
-  { key: "f",  selector: ".favorites-overlay",    name: "Favorites" },
-  { key: "c",  selector: ".service-status-overlay", name: "Service Status" },
+  { key: "h", dialogName: "Conversation history", name: "History" },
+  { key: "s", dialogName: "Settings", name: "Settings" },
+  { key: "?", dialogName: "Keyboard shortcuts", name: "Help" },
+  { key: "l", dialogName: "Trip checklist", name: "Checklist" },
+  { key: "f", dialogName: "Favorite activities", name: "Favorites" },
+  { key: "c", dialogName: "Service Status", name: "Service Status" },
 ];
 
-for (const { key, selector, name } of OVERLAYS) {
+for (const { key, dialogName, name } of OVERLAYS) {
   test(`${name} overlay opens with '${key}' and closes with Esc`, async ({ page }) => {
-    await page.goto("/");
-    // Blur inputs so hotkeys fire on body
-    await page.keyboard.press("Escape");
+    await visitApp(page);
+    await enableGlobalHotkeys(page);
 
     await page.keyboard.press(key);
-    await expect(page.locator(selector)).toBeVisible();
+    const dialog = page.getByRole("dialog", { name: dialogName });
+    await expect(dialog).toBeVisible();
 
     await page.keyboard.press("Escape");
-    await expect(page.locator(selector)).not.toBeVisible();
+    await expect(dialog).not.toBeVisible();
   });
 }
 
 test("only one overlay is open at a time — opening a second closes the first", async ({ page }) => {
-  await page.goto("/");
-  await page.keyboard.press("Escape");
+  await visitApp(page);
+  await enableGlobalHotkeys(page);
 
   // Open Help
   await page.keyboard.press("?");
-  await expect(page.locator(".help-overlay")).toBeVisible();
+  const help = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+  await expect(help).toBeVisible();
 
   // Close Help with Esc before opening History (hotkeys suppressed while overlay open)
   await page.keyboard.press("Escape");
-  await expect(page.locator(".help-overlay")).not.toBeVisible();
+  await expect(help).not.toBeVisible();
 
   // Now open History
   await page.keyboard.press("h");
-  await expect(page.locator(".history-overlay")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Conversation history" })).toBeVisible();
 });
 
 test("chat popover opens with T and closes with Esc", async ({ page }) => {
-  await page.goto("/");
-  await page.keyboard.press("Escape");
+  await visitApp(page);
+  await enableGlobalHotkeys(page);
 
   await page.keyboard.press("t");
-  await expect(page.locator(".chat-popover")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: /chat/i })).toBeVisible();
 
   await page.keyboard.press("Escape");
-  await expect(page.locator(".chat-popover")).not.toBeVisible();
+  await expect(page.getByRole("dialog", { name: /chat/i })).not.toBeVisible();
 });
