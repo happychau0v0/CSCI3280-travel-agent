@@ -5,7 +5,7 @@ Hits /chat/stream and produces:
   1. A human-readable waterfall table printed to stdout showing every SSE
      phase (thinking, LLM TTFT, tool_start/end, partial, done) with ms offsets
      from request receipt, bottleneck annotations, and a summary.
-  2. A machine-readable JSON saved to scripts/reports/perf_<timestamp>.json
+  2. A machine-readable JSON saved to artifacts/performance/perf_<timestamp>.json
      for diff-over-time analysis.
 
 Requires a running backend (uvicorn on :8000) and real API keys.
@@ -403,7 +403,7 @@ def render_waterfall(prompt: str, analysis: dict) -> str:
 # ── JSON report ───────────────────────────────────────────────────────────────
 
 def save_report(prompt: str, analysis: dict) -> Path:
-    reports_dir = Path(__file__).parent / "reports"
+    reports_dir = Path(__file__).resolve().parents[2] / "artifacts" / "performance"
     reports_dir.mkdir(exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     path = reports_dir / f"perf_{ts}.json"
