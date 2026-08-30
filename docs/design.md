@@ -519,7 +519,7 @@ A dedicated 5th panel for exporting the trip as a PDF document or Google Maps KM
 
 ### Panel
 
-`5 EXPORT` appears in the TabStrip after `4 DAYS`. It is disabled (greyed out, `cursor: not-allowed`) until `currentItinerary.days.length > 0`. Pressing `5` on the keyboard navigates to it (same number-key convention as other panels). The earlier P-key PrintView overlay was dropped — the EXPORT panel is now the single printable / exportable view.
+`5 EXPORT` appears in the TabStrip after `4 DAYS`. It is disabled (greyed out, `cursor: not-allowed`) until `currentItinerary.days.length > 0`; while disabled, keyboard shortcut `5` is ignored as well. The earlier P-key PrintView overlay was dropped — the EXPORT panel is now the single printable / exportable view.
 
 ### PDF Export
 

@@ -36,7 +36,7 @@ The keyboard-first shell progresses from live flight options to a map-backed day
 
 ### Keyboard driven menu shell
 
-- Five numbered tabs (1 PLAN · 2 FLIGHTS · 3 HOTELS · 4 DAYS · 5 EXPORT) with keyboard navigation (number keys, Tab, ↑/↓, Space, Esc)
+- Five numbered tabs (1 PLAN · 2 FLIGHTS · 3 HOTELS · 4 DAYS · 5 EXPORT) with keyboard navigation (number keys, Tab, ↑/↓, Space, Esc); Export unlocks when an itinerary is complete
 - Overlays: `?` help · `S` settings · `H` history · `L` checklist · `F` favorites · `C` service status
 - Long-press `Q` (2 s) to start a new trip; `⌘Z` / `⌘⇧Z` for undo / redo of picks; `M` to mute TTS
 
