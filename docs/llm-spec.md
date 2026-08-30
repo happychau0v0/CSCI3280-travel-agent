@@ -1,7 +1,7 @@
 # LLM Role & Behavior Spec
 
 > Source of truth for **what the LLM is expected to do** in the AI Travel
-> Agent, extracted from `CLAUDE.md`, `backend/app/prompts.py`, and
+> Agent, extracted from `backend/app/prompts.py` and
 > `docs/design.md`. Every requirement has a stable ID and a verification
 > pointer (or is flagged GAP) so we can audit coverage at a glance.
 >
@@ -42,7 +42,7 @@ Shorthand: `R-G-NNN` = global requirement.
 
 | ID | Requirement | Source |
 |---|---|---|
-| R-G-001 | **No hallucination.** Never invent place names, addresses, ratings, opening hours, or prices. Always call a tool first. | `prompts.py:51`; `CLAUDE.md` "Key Conventions" |
+| R-G-001 | **No hallucination.** Never invent place names, addresses, ratings, opening hours, or prices. Always call a tool first. | `prompts.py:51` |
 | R-G-002 | **Tool-first for transport.** Never suggest transport between places without calling `get_directions` first. | `prompts.py:52` |
 | R-G-003 | **Tool-first for weather.** Never state weather conditions without calling `get_weather` first. | `prompts.py:53` |
 | R-G-004 | **Every reply has spoken text outside JSON.** Never reply with only a JSON block; the subtitle is what the user hears. | `prompts.py:42`, `:247`, `:312`, `:347`, `:493`, `:502`, `:536` |
@@ -335,7 +335,7 @@ bottom of this section.
 | R-G-005 No markdown in reply | RUBRIC READY | `rubrics.py::check_R_G_005_no_markdown` + `test_eval_rubrics.py::TestR_G_005` (5 unit tests). Awaits live eval run. |
 | R-G-006 No bullets/paragraphs in reply | RUBRIC READY | `rubrics.py::check_R_G_006_no_bullets` + `test_eval_rubrics.py::TestR_G_006` (3 unit tests). Awaits live eval run. |
 | R-G-007 Don't narrate tool calls | RUBRIC READY | `rubrics.py::check_R_G_007_no_tool_narration` (async LLM-judge via `judge.py`) + `test_eval_rubrics.py::TestR_G_007` (4 unit tests using mocked judge). Runs through `arun_rubrics` — eval_runner switched to the async path so judge calls actually fire during live runs. Awaits live eval run. |
-| R-G-008 `navigate_menu` once, at end | PARTIAL · WONTFIX-STRICT | Runtime: `llm.py:556-557` emits `navigate` event; Playwright walkthrough step 3 (`CLAUDE.md:114-115`) observes the panel actually advances to FLIGHTS after START PLANNING. **Wontfix (strict "once, at end" position check):** observable only by parsing tool_call order mid-stream; allow-list + Playwright + `request_input` stopping rule already cover the user-visible end state. |
+| R-G-008 `navigate_menu` once, at end | PARTIAL · WONTFIX-STRICT | Runtime: `llm.py:556-557` emits `navigate` event; the browser smoke check in `CONTRIBUTING.md` observes the panel actually advances to FLIGHTS after START PLANNING. **Wontfix (strict "once, at end" position check):** observable only by parsing tool_call order mid-stream; allow-list + Playwright + `request_input` stopping rule already cover the user-visible end state. |
 | R-G-009 Batch tool calls | COVERED | `test_llm_loop.py::test_tools_run_in_parallel_via_gather` (`:44`). |
 | R-G-010 Honor USER LOCATION | COVERED (by construction) | `llm.py` injects the block; `test_chat.py::test_format_preferences_renders_user_profile_block` checks injection. No test asserts the LLM doesn't re-ask. |
 | R-G-011 Honor TRIP DATES | GAP | — |
@@ -358,14 +358,14 @@ bottom of this section.
 | R-PLAN-008 Copy options verbatim | PARTIAL | `TestGoldenTokyoFull` + `TestRoundTripFlight` cover fidelity indirectly (≥3 options with prices/times). Strict verbatim-equality check (LLM didn't edit prices) needs a live-eval rubric. |
 | R-PLAN-009 `days` count = trip_days | COVERED | `TestGoldenTaipeiSparse::test_days_match_trip_length` (2-day) + `TestRoundTripFlight::test_day_count_matches_trip_length` (6-day). |
 | R-PLAN-010 Output shape | COVERED | `TestGoldenTokyoFull::test_pydantic_validates` + `_has_title_and_destination` + `_has_multiple_days` + `_phrasebook_present`. |
-| R-PLAN-011 `navigate_menu("FLIGHTS")` at end | PARTIAL | Playwright walkthrough step 3 (`CLAUDE.md:115`) — real browser observes panel change. No unit test. |
+| R-PLAN-011 `navigate_menu("FLIGHTS")` at end | PARTIAL | The `CONTRIBUTING.md` browser smoke check observes the panel change. No unit test. |
 | R-HOTELS-001 2-round cap | COVERED (runtime) | `llm.py::ROLE_MAX_ROUNDS["hotels"]=3` enforces a 3-loop-iteration cap (2 tool-call rounds + 1 wrap-up round for the spoken subtitle); `test_role_round_caps.py::test_scoped_planner_halts_at_three_rounds[hotels]` + `::test_role_cap_stops_before_fourth_llm_call` assert the loop halts before a 4th LLM call. The spec's "2 rounds only" wording refers to tool-call rounds; R-G-004 requires a wrap-up round for the prose subtitle, verified against the 2026-04-17 live eval. |
 | R-HOTELS-002 Destination = actual flight city | RUBRIC READY | `rubrics.py::check_R_HOTELS_002_hotels_near_destination` + `test_eval_rubrics.py::TestR_HOTELS_002` (4 unit tests) — haversine-checks every hotel lat/lng is within 80 km of `context.flight_to_lat`/`flight_to_lng`. Awaits live eval run. |
 | R-HOTELS-003 MUST call `search_places` | RUBRIC READY | `rubrics.py::check_R_HOTELS_003_must_call_search_places` + `test_eval_rubrics.py::TestR_HOTELS_003` (4 unit tests). Awaits live eval run. |
 | R-HOTELS-004 Allow-list (post-D2: `search_places`, `get_weather`, `navigate_menu`) | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[hotels]` + `test_hotels_allow_list_excludes_get_place_details`. |
 | R-HOTELS-005 5-8 hotels (post-D3) | PARTIAL · WONTFIX-UPPER-BOUND | `TestGoldenTokyoFull::test_has_enough_hotels` (≥3) covers the lower bound. **Wontfix (strict 8-upper bound + neighborhood-diversity check):** the lower bound is load-bearing for the UI (≥3 avoids a sparse panel); an extra hotel or two above 8 is a harmless quality issue, not a regression. Neighborhood diversity is subjective and already nudged in the prompt. |
 | R-HOTELS-006 Output shape | COVERED | `TestGoldenTokyoFull::test_hotels_have_required_fields`. |
-| R-HOTELS-007 `navigate_menu("HOTELS")` | PARTIAL | Playwright step 5 (`CLAUDE.md:121`). |
+| R-HOTELS-007 `navigate_menu("HOTELS")` | PARTIAL | The `CONTRIBUTING.md` browser smoke check covers the transition. |
 | R-DAYS-001 2-round cap | COVERED (runtime) | `llm.py::ROLE_MAX_ROUNDS["days"]=3` — see R-HOTELS-001 for the 3-iteration rationale; `test_role_round_caps.py::test_scoped_planner_halts_at_three_rounds[days]` asserts the loop halts after round 3. |
 | R-DAYS-002 `search_places` + `get_directions` each pair | PARTIAL | `TestGoldenTokyoFull::test_middle_days_have_enough_activities` (≥4 mid-day) and indirectly `_activity_times_monotonic`. `get_directions` call count not asserted. |
 | R-DAYS-003 Allow-list (post-D2: `search_places`, `get_directions`, `get_weather`, `navigate_menu`) | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[days]` + `test_days_allow_list_excludes_get_place_details`. |
@@ -379,7 +379,7 @@ bottom of this section.
 | R-DAYS-011 Self-written description | RUBRIC READY | `rubrics.py::check_R_DAYS_011_activity_description_word_count` + `test_eval_rubrics.py::TestR_DAYS_011` (4 unit tests) — verifies every `place_id`-grounded activity's description falls within 8-20 words (target 10-15). Awaits live eval run. |
 | R-DAYS-012 Output shape (no re-emit flight/hotels) | RUBRIC READY | `rubrics.py::check_R_DAYS_012_no_flight_or_hotels_re_emit` + `test_eval_rubrics.py::TestR_DAYS_012` (4 unit tests). Awaits live eval run. |
 | R-DAYS-013 Complete `days[]` on single replace | GAP · WONTFIX-FRONTEND-OWNED | Replacement merge is frontend-owned (`App.jsx:285` + `:1273-1288`); backend's `SYSTEM_PROMPT_REPLACE` emits the single-day `replace` block per R-REPLACE-005 instead of a full days array. **Wontfix:** the "complete days[]" invariant is enforced by the React merge logic, not the LLM output shape; adding a backend rubric would test the wrong layer. |
-| R-DAYS-014 `navigate_menu("DAYS")` | PARTIAL | Playwright step 6 (`CLAUDE.md:128`). |
+| R-DAYS-014 `navigate_menu("DAYS")` | PARTIAL | The `CONTRIBUTING.md` browser smoke check covers the transition. |
 | R-CHAT-001 No planning tools | COVERED | `test_role_allow_lists.py::test_role_uses_correct_tool_allow_list[chat]` (static allow-list) + `rubrics.py::check_R_CHAT_001_no_data_fetch_tools` + `test_eval_rubrics.py::TestR_CHAT_001` (3 unit tests; catches runtime behavior). |
 | R-CHAT-002 Airport disambiguation | RUBRIC READY | `rubrics.py::check_R_CHAT_002_airport_disambiguation` + `test_eval_rubrics.py::TestR_CHAT_002` (4 unit tests) — fires only when `expects_airport_disambiguation=true` in fixture context; asserts both `search_airports` and `request_input` fired and the latter's options contain ≥2 `Name (IATA)` labels. Awaits live eval run. |
 | R-CHAT-003 Single-airport shortcut | RUBRIC READY | `rubrics.py::check_R_CHAT_003_single_airport_shortcut` + `test_eval_rubrics.py::TestR_CHAT_003` (3 unit tests) — fails if `search_airports` is called or `submit_trip_form` is skipped when `expects_single_airport=true`. Awaits live eval run. |
@@ -428,7 +428,7 @@ bottom of this section.
 | Role default model override precedence | `llm.py` | `test_llm_loop.py::test_role_default_model_applies_when_no_preferred_model`, `::test_explicit_preferred_model_overrides_role_default`, `::test_role_default_overrides_global_llm_model`. |
 | Bench-eval addendum injection | `llm.py:343-344` | `test_bench_eval.py` (per exploration). |
 
-**Playwright real-browser walkthrough** (`CLAUDE.md:103-160`) covers the
+**Playwright real-browser walkthrough** (`CONTRIBUTING.md`) covers the
 observable end-to-end: PLAN form → FLIGHTS panel → HOTELS panel → DAYS
 panel, plus overlay hotkeys and viewport overflow. It validates navigation
 + data rendering but does not assert prompt-level rules.

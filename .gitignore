@@ -65,6 +65,7 @@ docs/screenshots/walkthrough/
 backend/logs/
 backend/tests/fixtures/llm_outputs/dump_*.txt
 .worktrees/
+artifacts/
 
 # Claude Code working directory (per-user AI assistant state)
 .claude/

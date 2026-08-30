@@ -21,7 +21,7 @@ Playwright browser walkthrough immediately found 8+ real bugs:
 **Rule:** After every round, before the final commit, use Playwright
 MCP to walk through PLAN → FLIGHTS → HOTELS → DAYS at 1440×900 AND
 1024×600 viewports. Check every overlay (? P L S H F). This is
-documented in CLAUDE.md as a mandatory 9-step checklist.
+documented in CONTRIBUTING.md as a required browser smoke check.
 
 ## 2. The LLM Copies the Prompt Example Literally
 

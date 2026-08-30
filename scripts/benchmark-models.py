@@ -1091,10 +1091,11 @@ def _save_report(all_results: dict, prompts: list, models: list) -> None:
         f.write("\n".join(lines) + "\n")
     print(f"\nReport saved to docs/bench-{today}.md")
 
-    json_path = os.path.join(out_dir, "benchmark-results.json")
+    json_path = os.path.join("artifacts", "benchmark-results.json")
+    os.makedirs(os.path.dirname(json_path), exist_ok=True)
     with open(json_path, "w") as f:
         json.dump(all_results, f, indent=2, default=str)
-    print(f"Raw data saved to docs/benchmark-results.json")
+    print("Raw data saved to artifacts/benchmark-results.json")
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────

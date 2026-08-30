@@ -1,6 +1,6 @@
 # AI Travel Agent ✈
 
-This is a multimodal travel-planning agent that accepts voice or text, fetches live flight, hotel, and place data through tool calls, and renders a day-by-day itinerary in an in-game-style menu shell. Submitted for CUHK CSCI3280.
+This is a multimodal travel-planning agent that accepts voice or text, fetches flight options plus live hotel and place data through tool calls, and renders a day-by-day itinerary in an in-game-style menu shell. Submitted for CUHK CSCI3280.
 
 ![Final walkthrough: TravelMind PLAN panel](docs/final-report/screenshots/walkthrough/walkthrough-01-home-1440.png)
 
@@ -54,6 +54,10 @@ The `/chat/stream` endpoint emits SSE events (`tool_start`, `tool_end`, `partial
 
 - `EXPORT` produces a printable PDF (WeasyPrint) and a KML file that opens in Google Maps / Earth
 - Plan history persists to `localStorage`; drag a `.json` plan onto the history panel to import it on another device
+
+## Prototype scope
+
+TravelMind is a local-first portfolio prototype. Google Maps data is retrieved live; flight options come from `fast-flights` when its upstream source is reachable and otherwise use a deterministic estimate, so they are not booking-ready fares. The model benchmark uses mocked tools to evaluate orchestration consistently, not to make an end-user quality claim. A shared public deployment should add authentication, rate limits, and a restricted CORS policy before handling paid API keys.
 
 ## Quick start
 
@@ -113,12 +117,12 @@ Visit <http://localhost:5173>. Fill the PLAN form (origin, destination, dates, t
 | Backend | Python 3.12 · FastAPI + `uvicorn` · `httpx` · `weasyprint` |
 | Frontend | React 19 · Vite 8 · Leaflet · three.js (globe view) |
 
-See [`CLAUDE.md`](CLAUDE.md) for project conventions and the `docs/` references below for design and behaviour specs.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for local development and verification conventions, and the `docs/` references below for design and behaviour specs.
 
 ## Testing
 
 ```bash
-cd backend && pytest         # 384 tests, mocked (no API keys required)
+cd backend && pytest         # 384 collected: 383 pass, 1 skip; no API keys required
 cd backend && ruff check .
 cd frontend && npm test      # 57 vitest component + hook tests
 cd frontend && npm run lint
@@ -126,14 +130,14 @@ cd frontend && npm run build # verifies the bundle compiles
 
 # E2E tests — requires the dev server running on http://localhost:5173
 # First time: npm install && npx playwright install chromium
-cd frontend && npm run test:e2e
+cd frontend && npm run test:e2e # 5 Playwright spec files (22 checks)
 ```
 
 `MOCK_TOOLS=1` replaces every tool in `TOOL_DISPATCH` with a fixture-returning stub (see `backend/app/tools/mock_dispatch.py`) so the end-to-end LLM / SSE / tool-call loop is exercised without real API keys.
 
 ## Documentation
 
-- [`CLAUDE.md`](CLAUDE.md) — conventions, dev commands, required Playwright walkthrough checklist
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — local setup, verification, and contribution conventions
 - [`CHANGELOG.md`](CHANGELOG.md) — per-round feature history
 - [`docs/design.md`](docs/design.md) — interaction model, panel contract, LLM role scoping
 - [`docs/llm-spec.md`](docs/llm-spec.md) — 82 numbered LLM behaviour requirements (R-G-*, R-PLAN-*, R-HOTELS-*, R-DAYS-*, R-CHAT-*, R-REPLACE-*, R-THEMES-*, R-DETAIL-*) with test coverage

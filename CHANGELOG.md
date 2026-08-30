@@ -215,5 +215,5 @@ Playwright walkthrough → commit.
 
 - FastAPI backend skeleton with `/chat`, `/health` endpoints
 - Python venv + `requirements.txt`, `uvicorn` dev server
-- `CLAUDE.md` conventions, `scripts/dev.sh` + `scripts/smoke-test.sh`
+- Contributor conventions, `scripts/dev.sh` + `scripts/smoke-test.sh`
 - `.env.example` with all required API key slots

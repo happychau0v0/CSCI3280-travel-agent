@@ -13,6 +13,6 @@ Regex-based rubrics are deterministic; LLM-judge rubrics call a small
 model (Haiku / Gemini Flash) to score responses against a rubric.
 
 Not run in CI — cost and flakiness make this a manual/scheduled job.
-Results land in docs/bench-YYYY-MM-DD.md (see docs/bench-models-2026-04-14.md
-for the reference format).
+Results land in dated `docs/bench-YYYY-MM-DD.md` reports; the canonical final
+result is `docs/bench-2026-04-26.md`.
 """

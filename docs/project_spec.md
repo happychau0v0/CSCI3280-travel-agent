@@ -1,5 +1,7 @@
 # CSCI3280 Final Project — AI Travel Agent
 
+> Historical course specification. The shipped project scope and current behaviour are documented in the root README and [`final-report/main.pdf`](final-report/main.pdf).
+
 ---
 
 ## 1. Project Vision
@@ -162,7 +164,7 @@ User ──► The Interface ──► The Brain ──► The Interface ──�
 
 ```
 travel-agent/
-├── CLAUDE.md
+├── CONTRIBUTING.md
 ├── TASKS.md
 ├── PROGRESS.md
 ├── README.md

@@ -1338,11 +1338,10 @@ Visa requirement lookup table for **HKSAR passport** holders (used by `GET /visa
 
 | # | Area | Description |
 |---|------|-------------|
-| 1 | Chat mode — pick/replace tools not yet implemented | `pick_flight`, `pick_hotel`, and `replace_activity` tools are designed (§1.3) but not yet built. Until they exist, chat cannot pick flights/hotels or replace activities — user must use the UI buttons. Backend tools needed: `pick_flight(label_or_index)`, `pick_hotel(name_or_index)`, `replace_activity(day, activity_name, query)`. Each emits an SSE event; frontend handles it identically to the corresponding button click. |
-| 2 | fast-flights reliability | Google Flights blocks datacenter IPs. In production/cloud deployments, `search_flights` will almost always fall back to the estimator. Prices are reasonable estimates but not live fares. |
-| 3 | Reasoning model latency | `grok-4.20-0309-reasoning` TTFT is 26–33s (vs 7–16s non-reasoning). Use non-reasoning for all 3 planning turns unless the trip is unusually complex. |
-| 4 | Output token volume | Hotels and days prompts generate large JSON. This — not inference speed — is the primary latency bottleneck. `SYSTEM_PROMPT_HOTELS` was trimmed 73% and `SYSTEM_PROMPT_DAYS` 76% in round 21 to address this. |
-| 5 | No real session persistence | All state is localStorage. Multi-device sync and sharing require the `/itinerary` save/retrieve endpoints, but there's no UI to generate/share a link. |
-| 6 | Single-city itineraries only | Multi-city trips (HKG → TYO → OSA → HKG) are not supported. The `days` structure assumes one destination. |
-| 7 | get_place_details underused | The tool exists but is forbidden in hotels/days prompts for latency reasons. Place detail quality (descriptions, hours) relies on `search_places` editorialSummary which is often short. |
-| 8 | Weather API geo-coverage | Google Weather API returns 404 for ocean tiles and some disputed territories. The graceful fallback returns `"condition": "Weather unavailable"` but the frontend weather strip goes blank. |
+| 1 | fast-flights reliability | Google Flights blocks datacenter IPs. In production/cloud deployments, `search_flights` will often fall back to the estimator. Prices are useful planning estimates, not booking-ready fares. |
+| 2 | Reasoning model latency | `grok-4.20-0309-reasoning` TTFT is 26–33s (vs 7–16s non-reasoning). Use non-reasoning for all 3 planning turns unless the trip is unusually complex. |
+| 3 | Output token volume | Hotels and days prompts generate large JSON. This — not inference speed — is the primary latency bottleneck. `SYSTEM_PROMPT_HOTELS` was trimmed 73% and `SYSTEM_PROMPT_DAYS` 76% in round 21 to address this. |
+| 4 | No real session persistence | All state is localStorage. Multi-device sync and sharing require the `/itinerary` save/retrieve endpoints, but there's no UI to generate/share a link. |
+| 5 | Single-city itineraries only | Multi-city trips (HKG → TYO → OSA → HKG) are not supported. The `days` structure assumes one destination. |
+| 6 | get_place_details underused | The tool exists but is forbidden in hotels/days prompts for latency reasons. Place detail quality (descriptions, hours) relies on `search_places` editorialSummary which is often short. |
+| 7 | Weather API geo-coverage | Google Weather API returns 404 for ocean tiles and some disputed territories. The graceful fallback returns `"condition": "Weather unavailable"` but the frontend weather strip goes blank. |
