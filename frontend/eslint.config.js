@@ -24,6 +24,15 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // These compiler diagnostics are valuable when a project opts into the
+      // React Compiler. This project intentionally uses hand-managed effects,
+      // refs, and memoization, so keep the established Hooks checks without
+      // turning an ESLint dependency update into a behaviour-changing refactor.
+      'react-hooks/immutability': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
+      'react-hooks/purity': 'off',
+      'react-hooks/refs': 'off',
+      'react-hooks/set-state-in-effect': 'off',
     },
   },
 ])

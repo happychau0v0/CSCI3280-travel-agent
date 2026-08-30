@@ -80,7 +80,7 @@ Copy `.env.example` to `.env` and fill them in. The repo ships with `LLM_MODEL=g
 cd backend
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt -c requirements.lock
 uvicorn app.main:app --reload --port 8000
 ```
 

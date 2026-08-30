@@ -4,7 +4,9 @@ services:
       context: .
       dockerfile: Dockerfile
       target: backend
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false
     expose:
       - "8000"
     restart: unless-stopped

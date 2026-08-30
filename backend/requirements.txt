@@ -1,3 +1,5 @@
+# Direct dependencies. Install with `-c requirements.lock` to reproduce the
+# validated environment used by CI and Docker.
 fastapi
 uvicorn[standard]
 openai

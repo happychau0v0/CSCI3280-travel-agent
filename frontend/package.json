@@ -1,7 +1,8 @@
 {
-  "name": "frontend",
+  "name": "travelmind",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Multimodal AI travel-planning agent frontend",
   "type": "module",
   "scripts": {
     "dev": "vite",
