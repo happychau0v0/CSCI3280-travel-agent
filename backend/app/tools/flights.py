@@ -160,7 +160,7 @@ try:
     def _fetch_with_timeout(params: dict):  # type: ignore[no-untyped-def]
         # 8 s is enough for a normal Google Flights response (3-7 s typical)
         # while still bounding hangs from stalled connections or body transfers.
-        client = _PrimpClient(impersonate="chrome_126", verify=False, timeout=8.0)
+        client = _PrimpClient(impersonate="chrome_126", timeout=8.0)
         res = client.get("https://www.google.com/travel/flights", params=params)
         assert res.status_code == 200, f"{res.status_code} Result: {res.text_markdown}"
         # Save raw HTML so _extract_layover_stop_cities can mine stop city names

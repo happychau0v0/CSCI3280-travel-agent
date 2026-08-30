@@ -18,6 +18,8 @@ npm ci
 
 Start both applications with `./scripts/dev.sh`, then open <http://localhost:5173>.
 
+For a local container deployment, configure `.env` and run `docker compose up --build`; open <http://localhost>.
+
 ## Verification
 
 ```bash

@@ -23,6 +23,11 @@ FROM node:20-slim AS frontend-build
 
 WORKDIR /app
 
+# Docker serves frontend and API through one Nginx origin. A slash becomes an
+# empty base in api/client.js, so browser requests stay same-origin.
+ARG VITE_API_BASE=/
+ENV VITE_API_BASE=${VITE_API_BASE}
+
 COPY frontend/package*.json ./
 RUN npm ci
 

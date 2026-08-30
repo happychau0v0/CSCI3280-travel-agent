@@ -6,6 +6,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def parse_cors_origins(value: str | None) -> list[str]:
+    """Parse a comma-separated CORS allow-list with safe local defaults."""
+    if value is None:
+        return ["http://localhost:5173", "http://127.0.0.1:5173"]
+    return [origin.strip() for origin in value.split(",") if origin.strip()]
+
+
+# Local Vite development needs cross-origin requests. Docker uses the Nginx
+# same-origin proxy, while shared deployments must set their explicit origin.
+CORS_ORIGINS = parse_cors_origins(os.getenv("CORS_ORIGINS"))
+
 # xAI direct API — OpenAI SDK compatible, no proxy/VPN needed (accessible from HK)
 XAI_API_KEY = os.getenv("XAI_API_KEY", "")
 XAI_BASE_URL = "https://api.x.ai/v1"

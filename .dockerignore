@@ -30,6 +30,7 @@ backend/.venv
 docs/references/flight.png
 docs/references/maplibre-globe
 docs/screenshots/walkthrough
+artifacts/
 
 # Generated LaTeX build files
 docs/final-report/**/*.aux

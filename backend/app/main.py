@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import CORS_ORIGINS
 from app.routers import airports as airports_router
 from app.routers import chat, export, geo, itinerary, photo, speech, status, visa
 from app.routers.directions import router as directions_router
@@ -30,8 +31,8 @@ app = FastAPI(title="AI Travel Agent")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
     max_age=3600,  # cache preflight for 1 hour — eliminates per-request OPTIONS round-trips

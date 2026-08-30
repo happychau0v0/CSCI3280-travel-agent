@@ -104,6 +104,16 @@ Visit <http://localhost:5173>. Fill the PLAN form (origin, destination, dates, t
 ./scripts/restart.sh      # kills stale ports and restarts both
 ```
 
+### Docker
+
+For a same-origin local container deployment, copy `.env.example` to `.env`, add the API keys you need, then run:
+
+```bash
+docker compose up --build
+```
+
+Open <http://localhost>. The backend is private to the Compose network; Nginx forwards the application routes and SSE stream from the frontend container.
+
 ## Tech stack
 
 | Layer | Choice |
