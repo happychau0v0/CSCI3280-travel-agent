@@ -55,7 +55,7 @@ export default function PanelHotels({
   theme = "dark",
   suggestedIdx = null,
 }) {
-  const hotelsRaw = itinerary?.hotels || [];
+  const hotelsRaw = useMemo(() => itinerary?.hotels || [], [itinerary]);
   const [priceFilter, setPriceFilter] = useState("any");
   const [ratingFilter, setRatingFilter] = useState("any");
 

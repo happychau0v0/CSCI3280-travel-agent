@@ -1489,7 +1489,6 @@ function App() {
       llmModel,
       saveCurrentPlanToHistory,
       setPendingInputRequest,
-      pushPickSnapshot,
     ],
   );
 

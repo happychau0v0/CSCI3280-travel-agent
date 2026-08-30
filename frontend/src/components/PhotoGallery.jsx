@@ -26,15 +26,15 @@ export default function PhotoGallery({
   altPrefix = "",
 }) {
   const validPhotos = (photos || []).filter(Boolean).slice(0, maxCount);
+  const firstPhoto = validPhotos[0];
   const [activeIdx, setActiveIdx] = useState(0);
 
   // Reset to first photo when the photo set changes (e.g. user clicks
   // a different hotel). Without this, activeIdx stays stale and the
   // hero shows the wrong image or a broken URL.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset local selection when the prop-driven gallery changes.
     setActiveIdx(0);
-  }, [validPhotos.length, validPhotos[0]]);
+  }, [validPhotos.length, firstPhoto]);
 
   if (validPhotos.length === 0) {
     return (

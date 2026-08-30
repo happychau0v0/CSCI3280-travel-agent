@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- settings constants/helpers are intentionally shared with other panels. */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { COUNTRIES } from "../data/countries";
 
@@ -255,7 +255,6 @@ export default function SettingsOverlay({
 
   useEffect(() => {
     if (open) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- opening the modal must reset its local focus and confirmation state.
       setActiveIdx(0);
       setConfirmClear(false);
       previousFocusRef.current = document.activeElement;
@@ -278,7 +277,7 @@ export default function SettingsOverlay({
     setTimeout(() => setSavedFlash(false), 600);
   };
 
-  const rows = [
+  const rows = useMemo(() => [
     // Most-used: model and appearance
     { kind: "llm", key: "llm_model", label: "LLM MODEL", value: llmModel },
     {
@@ -360,7 +359,18 @@ export default function SettingsOverlay({
         }
       },
     },
-  ];
+  ], [
+    confirmClear,
+    currency,
+    llmModel,
+    muted,
+    onClearAll,
+    onClose,
+    onThemeChange,
+    onToggleMute,
+    subtitleSize,
+    theme,
+  ]);
 
   const selectedIdx = Math.min(activeIdx, rows.length - 1);
   const selected = rows[selectedIdx];
