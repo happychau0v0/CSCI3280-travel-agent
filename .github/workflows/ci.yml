@@ -61,7 +61,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build and start the Compose stack
-        run: docker compose up --build --detach --wait
+        run: docker compose up --build --detach --wait --pull=never
       - name: Verify the same-origin proxy
         run: |
           curl --fail --silent --show-error http://localhost/
